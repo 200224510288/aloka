@@ -13,7 +13,8 @@ import {
   Sparkles, 
   Clock,
   ShieldCheck,
-  Zap
+  Zap,
+  AlertCircle
 } from 'lucide-react';
 import { DailySheet, PreviewStyleOptions, PrintSettings } from '@/types/lottery';
 
@@ -119,11 +120,12 @@ export default function PrintModal({
         printFrame = document.createElement('iframe');
         printFrame.id = 'lottery-direct-print-frame';
         printFrame.style.position = 'fixed';
-        printFrame.style.right = '0';
-        printFrame.style.bottom = '0';
-        printFrame.style.width = '0';
-        printFrame.style.height = '0';
+        printFrame.style.left = '-9999px';
+        printFrame.style.top = '-9999px';
+        printFrame.style.width = '297mm';
+        printFrame.style.height = '210mm';
         printFrame.style.border = '0';
+        printFrame.style.visibility = 'hidden';
         printFrame.style.zIndex = '-9999';
         document.body.appendChild(printFrame);
       }
@@ -149,7 +151,7 @@ export default function PrintModal({
           console.error('Print trigger error:', e);
           showToast?.('Print dialog could not open automatically. You can download PDF instead.', 'error');
         }
-      }, 350);
+      }, 450);
 
     } catch (err: any) {
       console.error('Print error:', err);
@@ -382,6 +384,31 @@ export default function PrintModal({
               />
               <div className="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
             </label>
+          </div>
+
+          {/* 5. Essential Printer Settings Guidance */}
+          <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl space-y-1.5 text-xs text-amber-950">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Printer Settings (කොළය කැපීම වැළැක්වීමට මුද්‍රණ සැකසුම්):</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-tight">
+              In your system/browser print window (Print dialog), please ensure:
+            </p>
+            <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+              <div className="bg-white/80 p-2 rounded-lg border border-amber-200/60">
+                <span className="font-bold text-slate-900 block">1. Paper Size:</span>
+                <span className="text-emerald-700 font-extrabold font-mono">A4</span> (not Letter)
+              </div>
+              <div className="bg-white/80 p-2 rounded-lg border border-amber-200/60">
+                <span className="font-bold text-slate-900 block">2. Margins:</span>
+                <span className="text-emerald-700 font-extrabold">None / 0</span>
+              </div>
+              <div className="bg-white/80 p-2 rounded-lg border border-amber-200/60">
+                <span className="font-bold text-slate-900 block">3. Scale:</span>
+                <span className="text-emerald-700 font-extrabold">100%</span> (Actual size)
+              </div>
+            </div>
           </div>
 
         </div>
