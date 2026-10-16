@@ -63,8 +63,28 @@ export function generatePrintHtml(
     ${fontsCss}
 
     @page {
-      size: 297mm 210mm landscape;
+      size: A4 landscape;
       margin: 0;
+    }
+
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+      html, body {
+        width: 297mm !important;
+        height: 210mm !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .print-page {
+        width: 297mm !important;
+        height: 210mm !important;
+        margin: 0 auto !important;
+      }
     }
 
     * {
@@ -318,6 +338,8 @@ export function generatePrintHtml(
     /* Footer Announcement & Date */
     .sheet-footer {
       padding-top: 1.5mm;
+      padding-left: 3.5mm;
+      padding-right: 3.5mm;
       display: flex;
       flex-direction: column;
       gap: 1.2mm;
