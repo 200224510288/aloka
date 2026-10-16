@@ -122,6 +122,13 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('PDF export error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const isServerless = error.message?.includes('SERVERLESS_BROWSER_UNAVAILABLE') || error.message?.includes('Executable doesn');
+    return NextResponse.json({
+      success: false,
+      isServerless,
+      error: isServerless
+        ? "Direct PDF download requires a local browser engine. Please click 'Print Sheet' (මුද්‍රණය) -> 'Save as PDF' for instant 1-click A4 export."
+        : error.message
+    }, { status: isServerless ? 503 : 500 });
   }
 }

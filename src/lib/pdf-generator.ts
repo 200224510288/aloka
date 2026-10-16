@@ -5,17 +5,30 @@ import { DailySheet, PreviewStyleOptions } from '@/types/lottery';
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS, DEFAULT_STYLE_OPTIONS } from './constants';
 import { ZODIAC_IMAGE_MAP } from './zodiac-icons';
 
-function getBrowserExecutablePath(): string {
-  const possiblePaths = [
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-  ];
+function getBrowserExecutablePath(): string | undefined {
+  if (process.platform === 'win32') {
+    const possiblePaths = [
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    ];
 
-  for (const p of possiblePaths) {
-    if (fs.existsSync(/*turbopackIgnore: true*/ p)) return p;
+    for (const p of possiblePaths) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ p)) return p;
+    }
+    return 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
   }
-  return 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+  // Linux / Serverless environments (Vercel, AWS Lambda)
+  const linuxPaths = [
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ];
+  for (const p of linuxPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return undefined;
 }
 
 export function generatePrintHtml(
@@ -44,6 +57,29 @@ export function generatePrintHtml(
   const cellPaddingLeftMm = merged.cellPaddingLeftMm ?? DEFAULT_STYLE_OPTIONS.cellPaddingLeftMm;
   const announcementOffsetYMm = merged.announcementOffsetYMm ?? DEFAULT_STYLE_OPTIONS.announcementOffsetYMm;
   const topMarginMm = merged.topMarginMm ?? DEFAULT_STYLE_OPTIONS.topMarginMm;
+
+  // Font Types and Bold Weights
+  const lotteryNameFontFamily = merged.lotteryNameFontFamily ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontFamily;
+  const lotteryNameFontWeight = merged.lotteryNameFontWeight ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontWeight;
+
+  const drawNoFontFamily = merged.drawNoFontFamily ?? DEFAULT_STYLE_OPTIONS.drawNoFontFamily;
+  const drawNoFontWeight = merged.drawNoFontWeight ?? DEFAULT_STYLE_OPTIONS.drawNoFontWeight;
+
+  const resultFontFamily = merged.resultFontFamily ?? DEFAULT_STYLE_OPTIONS.resultFontFamily;
+  const resultFontWeight = merged.resultFontWeight ?? (isHighDensity ? 800 : DEFAULT_STYLE_OPTIONS.resultFontWeight);
+
+  const letterFontFamily = merged.letterFontFamily ?? DEFAULT_STYLE_OPTIONS.letterFontFamily;
+  const letterFontWeight = merged.letterFontWeight ?? (isHighDensity ? 900 : DEFAULT_STYLE_OPTIONS.letterFontWeight);
+
+  const footerFontFamily = merged.footerFontFamily ?? DEFAULT_STYLE_OPTIONS.footerFontFamily;
+  const footerFontWeight = merged.footerFontWeight ?? DEFAULT_STYLE_OPTIONS.footerFontWeight;
+
+  const dateFontFamily = merged.dateFontFamily ?? DEFAULT_STYLE_OPTIONS.dateFontFamily;
+  const dateFontWeight = merged.dateFontWeight ?? DEFAULT_STYLE_OPTIONS.dateFontWeight;
+
+  const dealerFontFamily = merged.dealerFontFamily ?? DEFAULT_STYLE_OPTIONS.dealerFontFamily;
+  const dealerFontWeight = merged.dealerFontWeight ?? DEFAULT_STYLE_OPTIONS.dealerFontWeight;
+
   // Read local font CSS or base64 embed
   const fontsCssPath = path.join(process.cwd(), 'public', 'fonts', 'fonts.css');
   let fontsCss = '';
@@ -221,7 +257,8 @@ export function generatePrintHtml(
     .col-name {
       width: 35.5mm;
       font-size: ${lotteryNameFontSizePt}pt;
-      font-weight: 800;
+      font-family: ${lotteryNameFontFamily};
+      font-weight: ${lotteryNameFontWeight};
       color: #000000;
       padding-left: 1.5mm !important;
       white-space: nowrap;
@@ -232,8 +269,8 @@ export function generatePrintHtml(
     .col-draw {
       width: 13mm;
       font-size: ${drawNoFontSizePt}pt;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-weight: 700;
+      font-family: ${drawNoFontFamily};
+      font-weight: ${drawNoFontWeight};
       text-align: center;
       color: #000000;
     }
@@ -241,7 +278,8 @@ export function generatePrintHtml(
     .col-result {
       width: 89mm;
       font-size: ${resultFontSizePt}pt;
-      font-weight: ${isHighDensity ? '800' : '600'};
+      font-family: ${resultFontFamily};
+      font-weight: ${resultFontWeight};
       color: #000000;
       padding-left: ${cellPaddingLeftMm}mm !important;
       padding-right: 1.5mm !important;
@@ -265,8 +303,8 @@ export function generatePrintHtml(
 
     .result-letter {
       font-size: ${resultFontSizePt}pt;
-      font-weight: ${isHighDensity ? '900' : '700'};
-      font-family: Arial, sans-serif;
+      font-weight: ${letterFontWeight};
+      font-family: ${letterFontFamily};
       min-width: 5.5mm;
       text-align: center;
       line-height: 1;
@@ -278,7 +316,8 @@ export function generatePrintHtml(
       align-items: center;
       gap: 1.8mm;
       font-size: ${Math.max(10, resultFontSizePt - 5)}pt;
-      font-weight: 800;
+      font-family: ${lotteryNameFontFamily};
+      font-weight: ${lotteryNameFontWeight};
       line-height: 1;
       color: #000000;
     }
@@ -294,8 +333,8 @@ export function generatePrintHtml(
 
     .number-item {
       font-size: ${resultFontSizePt}pt;
-      font-family: Arial, 'Noto Sans Sinhala', sans-serif;
-      font-weight: ${isHighDensity ? '800' : '600'};
+      font-family: ${resultFontFamily};
+      font-weight: ${resultFontWeight};
       color: #000000;
       line-height: 1;
       display: inline-block;
@@ -306,7 +345,8 @@ export function generatePrintHtml(
       border: ${isHighDensity ? '2px' : '1.5px'} solid #000000;
       padding: 0.3mm 1.5mm;
       border-radius: 1px;
-      font-weight: ${isHighDensity ? '900' : '700'};
+      font-family: ${resultFontFamily};
+      font-weight: ${Math.min(900, Number(resultFontWeight) + 100)};
       line-height: 1;
     }
 
@@ -320,8 +360,8 @@ export function generatePrintHtml(
 
     .bonus-number {
       font-size: 12.5pt;
-      font-weight: ${isHighDensity ? '800' : '700'};
-      font-family: Arial, sans-serif;
+      font-weight: ${resultFontWeight};
+      font-family: ${resultFontFamily};
       color: #000000;
       margin-left: 1mm;
       line-height: 1;
@@ -347,7 +387,8 @@ export function generatePrintHtml(
 
     .footer-announcement {
       font-size: ${footerFontSizePt}pt;
-      font-weight: 700;
+      font-family: ${footerFontFamily};
+      font-weight: ${footerFontWeight};
       line-height: 1.2;
       color: #000000;
       min-height: 4.5mm;
@@ -371,7 +412,7 @@ export function generatePrintHtml(
       align-items: center;
       gap: 3mm;
       font-size: ${dateFontSizePt}pt;
-      font-weight: 800;
+      font-weight: ${dateFontWeight};
       color: #000000;
       position: relative;
       top: ${dateOffsetYMm}mm;
@@ -382,7 +423,8 @@ export function generatePrintHtml(
       display: inline-flex;
       align-items: center;
       font-size: ${dealerFontSizePt}pt;
-      font-weight: 800;
+      font-family: ${dealerFontFamily};
+      font-weight: ${dealerFontWeight};
       color: #000000;
       letter-spacing: -0.2px;
       text-align: right;
@@ -392,12 +434,14 @@ export function generatePrintHtml(
     }
 
     .date-text {
-      font-family: 'Arial', sans-serif;
+      font-family: ${dateFontFamily};
+      font-weight: ${dateFontWeight};
       letter-spacing: 0.5px;
     }
 
     .day-text {
-      font-weight: 800;
+      font-family: ${dealerFontFamily};
+      font-weight: ${dateFontWeight};
     }
   </style>
 </head>
@@ -539,6 +583,9 @@ export async function generatePdfBuffer(
   copies: number = 1
 ): Promise<Buffer> {
   const browserPath = getBrowserExecutablePath();
+  if (!browserPath) {
+    throw new Error('SERVERLESS_BROWSER_UNAVAILABLE: Headless browser is not installed in this serverless environment.');
+  }
   const html = generatePrintHtml(sheet, options, copies);
 
   const browser = await chromium.launch({

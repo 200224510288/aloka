@@ -17,7 +17,60 @@ export const DEFAULT_STYLE_OPTIONS: Required<Omit<PreviewStyleOptions, 'printDen
   cellPaddingLeftMm: 2.0,
   announcementOffsetYMm: 0.0,
   topMarginMm: 6.0,
+
+  // Default Font Families
+  lotteryNameFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+  drawNoFontFamily: "'Consolas', 'Courier New', monospace",
+  resultFontFamily: "Arial, sans-serif",
+  letterFontFamily: "Arial, sans-serif",
+  footerFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+  dateFontFamily: "Arial, sans-serif",
+  dealerFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+
+  // Default Font Weights (Bold Weight)
+  lotteryNameFontWeight: 800,
+  drawNoFontWeight: 700,
+  resultFontWeight: 700,
+  letterFontWeight: 800,
+  footerFontWeight: 700,
+  dateFontWeight: 800,
+  dealerFontWeight: 800,
 };
+
+export interface FontOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export const SINHALA_FONT_OPTIONS: FontOption[] = [
+  { id: 'noto_sans', label: 'Noto Sans Sinhala (පෙරනිමි)', value: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif" },
+  { id: 'iskoola_pota', label: 'Iskoola Pota (ඉස්කෝල පොත)', value: "'Iskoola Pota', 'Noto Sans Sinhala', 'Nirmala UI', sans-serif" },
+  { id: 'nirmala_ui', label: 'Nirmala UI (නිර්මලා UI)', value: "'Nirmala UI', 'Noto Sans Sinhala', 'Iskoola Pota', sans-serif" },
+  { id: 'inter_sinhala', label: 'Inter + Sinhala (නවීන)', value: "'Inter', 'Noto Sans Sinhala', sans-serif" },
+  { id: 'arial_sinhala', label: 'Arial + Sinhala (ඒරියල්)', value: "Arial, 'Noto Sans Sinhala', sans-serif" },
+  { id: 'system_sinhala', label: 'System UI (පද්ධති)', value: "system-ui, 'Noto Sans Sinhala', sans-serif" },
+];
+
+export const NUMBER_FONT_OPTIONS: FontOption[] = [
+  { id: 'arial', label: 'Arial (Standard Clean)', value: "Arial, sans-serif" },
+  { id: 'inter', label: 'Inter (Modern Sans)', value: "'Inter', sans-serif" },
+  { id: 'consolas', label: 'Consolas (Monospace)', value: "'Consolas', 'Courier New', monospace" },
+  { id: 'courier', label: 'Courier New (Typewriter)', value: "'Courier New', monospace" },
+  { id: 'segoe_ui', label: 'Segoe UI (Windows Clean)', value: "'Segoe UI', sans-serif" },
+  { id: 'trebuchet', label: 'Trebuchet MS (Humanist)', value: "'Trebuchet MS', sans-serif" },
+  { id: 'impact', label: 'Impact (Heavy Poster)', value: "Impact, sans-serif" },
+  { id: 'times', label: 'Times New Roman (Serif)', value: "'Times New Roman', serif" },
+];
+
+export const FONT_WEIGHT_OPTIONS = [
+  { weight: 400, label: '400', name: 'Regular', sinhalaName: 'සාමාන්‍ය' },
+  { weight: 500, label: '500', name: 'Medium', sinhalaName: 'මධ්‍යම' },
+  { weight: 600, label: '600', name: 'Semi-Bold', sinhalaName: 'අර්ධ තද' },
+  { weight: 700, label: '700', name: 'Bold', sinhalaName: 'තද' },
+  { weight: 800, label: '800', name: 'Extra-Bold', sinhalaName: 'ඉතා තද' },
+  { weight: 900, label: '900', name: 'Black', sinhalaName: 'අතිශය තද' },
+];
 
 export const STYLE_PRESETS: Record<string, { label: string; description: string; options: Partial<PreviewStyleOptions> }> = {
   standard: {
@@ -39,6 +92,20 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 2.0,
       announcementOffsetYMm: 0.0,
       topMarginMm: 6.0,
+      lotteryNameFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+      drawNoFontFamily: "'Consolas', 'Courier New', monospace",
+      resultFontFamily: "Arial, sans-serif",
+      letterFontFamily: "Arial, sans-serif",
+      footerFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+      dateFontFamily: "Arial, sans-serif",
+      dealerFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
+      lotteryNameFontWeight: 800,
+      drawNoFontWeight: 700,
+      resultFontWeight: 700,
+      letterFontWeight: 800,
+      footerFontWeight: 700,
+      dateFontWeight: 800,
+      dealerFontWeight: 800,
     }
   },
   compact: {
@@ -60,6 +127,13 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 1.5,
       announcementOffsetYMm: 0.0,
       topMarginMm: 5.0,
+      lotteryNameFontWeight: 700,
+      drawNoFontWeight: 600,
+      resultFontWeight: 600,
+      letterFontWeight: 700,
+      footerFontWeight: 600,
+      dateFontWeight: 700,
+      dealerFontWeight: 700,
     }
   },
   large: {
@@ -81,6 +155,13 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 2.2,
       announcementOffsetYMm: 0.0,
       topMarginMm: 5.0,
+      lotteryNameFontWeight: 900,
+      drawNoFontWeight: 800,
+      resultFontWeight: 800,
+      letterFontWeight: 900,
+      footerFontWeight: 800,
+      dateFontWeight: 900,
+      dealerFontWeight: 900,
     }
   }
 };

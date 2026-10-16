@@ -9,7 +9,7 @@ import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 interface HeaderProps {
   sheet: DailySheet;
   currentStep: WorkflowStep;
-  cloudStatus?: 'synced' | 'syncing' | 'offline';
+  cloudStatus?: 'synced' | 'syncing' | 'offline' | 'permission_denied';
   onStepChange: (step: WorkflowStep) => void;
   onDateChange: (newDate: string) => void;
   onUpdateSheet: (updater: (prev: DailySheet) => DailySheet) => void;
@@ -169,21 +169,39 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Cloud Auto-Sync Status */}
             <div
-              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
                 cloudStatus === 'syncing'
                   ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
                   : cloudStatus === 'synced'
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : cloudStatus === 'permission_denied'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
                   : 'bg-slate-100 text-slate-600 border-slate-200'
               }`}
-              title="Auto-synced to cloud (branch: result_generator_daily_sheets)"
+              title={
+                cloudStatus === 'permission_denied'
+                  ? 'Firebase Firestore permission denied: Set allow read, write in Firebase Console -> Firestore -> Rules'
+                  : cloudStatus === 'synced'
+                  ? 'Auto-synced to cloud (branch: result_generator_daily_sheets)'
+                  : 'Offline / local cache'
+              }
             >
               {cloudStatus === 'syncing' ? (
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              ) : cloudStatus === 'permission_denied' ? (
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <Cloud className={`w-3.5 h-3.5 ${cloudStatus === 'synced' ? 'text-emerald-600' : 'text-slate-400'}`} />
               )}
-              <span>{cloudStatus === 'syncing' ? 'Syncing...' : 'Cloud Synced'}</span>
+              <span>
+                {cloudStatus === 'syncing'
+                  ? 'Syncing...'
+                  : cloudStatus === 'synced'
+                  ? 'Cloud Synced'
+                  : cloudStatus === 'permission_denied'
+                  ? 'Cloud: Rule Blocked'
+                  : 'Local Cache'}
+              </span>
             </div>
 
             {/* Revision History */}

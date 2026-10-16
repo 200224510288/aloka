@@ -117,6 +117,24 @@ export interface PreviewStyleOptions {
   cellPaddingLeftMm?: number; // default: 2.0mm
   announcementOffsetYMm?: number; // default: 0.0mm (move announcement up/down)
   topMarginMm?: number; // default: 6.0mm (top free space above table)
+
+  // Font Types (Family)
+  lotteryNameFontFamily?: string;
+  drawNoFontFamily?: string;
+  resultFontFamily?: string;
+  letterFontFamily?: string;
+  footerFontFamily?: string;
+  dateFontFamily?: string;
+  dealerFontFamily?: string;
+
+  // Bold Weights (400, 500, 600, 700, 800, 900)
+  lotteryNameFontWeight?: number | string;
+  drawNoFontWeight?: number | string;
+  resultFontWeight?: number | string;
+  letterFontWeight?: number | string;
+  footerFontWeight?: number | string;
+  dateFontWeight?: number | string;
+  dealerFontWeight?: number | string;
 }
 
 export interface SavedCustomDesign {

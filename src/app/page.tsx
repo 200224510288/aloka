@@ -62,7 +62,7 @@ export default function Home() {
   const [isSplitView, setIsSplitView] = useState<boolean>(true);
   const [printDensity, setPrintDensity] = useState<'eco' | 'high'>('eco');
   const [previewStyles, setPreviewStyles] = useState<PreviewStyleOptions | undefined>(undefined);
-  const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
+  const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -88,7 +88,7 @@ export default function Home() {
     return true;
   }, []);
 
-  // Fetch sheet by date
+  // Fetch sheet by date with triple redundancy (Cloud -> Local Server -> Browser LocalStorage)
   const loadSheet = useCallback(async (date: string) => {
     try {
       const res = await fetch(`/api/sheet?date=${date}`);
@@ -96,11 +96,33 @@ export default function Home() {
       if (data.success && data.sheet) {
         setSheet(data.sheet);
         setRevisions(data.revisions || []);
+        if (data.fromCloud) {
+          setCloudStatus('synced');
+        }
+        // Cache to browser localStorage
+        try {
+          localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(data.sheet));
+        } catch {}
       } else {
+        // Fallback to localStorage before empty sheet
+        try {
+          const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
+          if (cached) {
+            setSheet(JSON.parse(cached));
+            return;
+          }
+        } catch {}
         setSheet(createEmptySheet(date));
       }
     } catch (e) {
       console.error('Error loading sheet:', e);
+      try {
+        const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
+        if (cached) {
+          setSheet(JSON.parse(cached));
+          return;
+        }
+      } catch {}
       setSheet(createEmptySheet(date));
     }
   }, []);
@@ -145,6 +167,12 @@ export default function Home() {
     const targetSheet = sheetToSave || sheet;
     setIsSaving(true);
     setCloudStatus('syncing');
+
+    // Instantly persist to browser localStorage so client data is never lost
+    try {
+      localStorage.setItem(`sinhala_lottery_sheet_${targetSheet.date}`, JSON.stringify(targetSheet));
+    } catch {}
+
     try {
       const res = await fetch('/api/sheet', {
         method: 'POST',
@@ -158,6 +186,9 @@ export default function Home() {
         if (data.cloudSynced) {
           setCloudStatus('synced');
           showToast('Saved locally & auto-synced to cloud!', 'success');
+        } else if (data.isPermissionDenied) {
+          setCloudStatus('permission_denied');
+          showToast('Saved locally. Cloud sync blocked: Update Firebase Firestore rules.', 'info');
         } else {
           // Attempt client-side direct cloud save (shares active browser session if authenticated)
           try {
@@ -166,6 +197,9 @@ export default function Home() {
             if (clientCloud.success) {
               setCloudStatus('synced');
               showToast('Saved locally & auto-synced to cloud!', 'success');
+            } else if (clientCloud.isPermissionDenied) {
+              setCloudStatus('permission_denied');
+              showToast('Saved locally. Cloud sync blocked: Update Firebase Firestore rules.', 'info');
             } else {
               setCloudStatus('offline');
               showToast('Saved locally (cloud sync pending)', 'info');
@@ -366,7 +400,12 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
+        if (errorData.isServerless) {
+          showToast(errorData.error, 'info');
+          setIsPrintModalOpen(true);
+          return;
+        }
         setExportBlockedErrors(errorData.errors || [errorData.error]);
         showToast(errorData.error || 'Export blocked by validation rules', 'error');
         return;

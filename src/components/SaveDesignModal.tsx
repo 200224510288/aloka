@@ -118,10 +118,10 @@ export default function SaveDesignModal({
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600">
               <div>Top Free Space: <strong className="text-slate-900 font-mono">{currentStyles.topMarginMm ?? 6.0}mm</strong></div>
               <div>Row Height: <strong className="text-slate-900 font-mono">{currentStyles.rowHeightMm ?? 9.4}mm</strong></div>
-              <div>Winning Digits: <strong className="text-slate-900 font-mono">{currentStyles.resultFontSizePt ?? 17.0}pt</strong></div>
-              <div>Lottery Name: <strong className="text-slate-900 font-mono">{currentStyles.lotteryNameFontSizePt ?? 10.5}pt</strong></div>
-              <div>Date Size: <strong className="text-slate-900 font-mono">{currentStyles.dateFontSizePt ?? currentStyles.metaFontSizePt ?? 13.5}pt</strong></div>
-              <div>Dealer Size: <strong className="text-slate-900 font-mono">{currentStyles.dealerFontSizePt ?? currentStyles.metaFontSizePt ?? 13.5}pt</strong></div>
+              <div>Winning Digits: <strong className="text-slate-900 font-mono">{currentStyles.resultFontSizePt ?? 17.0}pt ({currentStyles.resultFontWeight ?? 700})</strong></div>
+              <div>Lottery Name: <strong className="text-slate-900 font-mono">{currentStyles.lotteryNameFontSizePt ?? 10.5}pt ({currentStyles.lotteryNameFontWeight ?? 800})</strong></div>
+              <div>Number Font: <strong className="text-slate-900">{currentStyles.resultFontFamily ?? 'Arial'}</strong></div>
+              <div>Sinhala Font: <strong className="text-slate-900">{currentStyles.lotteryNameFontFamily ?? 'Noto Sans Sinhala'}</strong></div>
               <div>Bottom Style: <strong className="text-slate-900 capitalize">{currentStyles.bottomLayoutStyle ?? 'clean'}</strong></div>
               <div>Print Density: <strong className="text-slate-900 uppercase">{currentStyles.printDensity ?? 'eco'}</strong></div>
             </div>
