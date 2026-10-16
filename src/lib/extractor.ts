@@ -1,0 +1,438 @@
+import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
+import { LotteryDefinition, LotteryResultItem, UnassignedExtractedRow } from '@/types/lottery';
+
+// Legacy font mapping table for common Sinhala lottery names (Type 2 wireframe format)
+const LEGACY_FONT_MAP: Record<string, string> = {
+  'wo fldaám;s': 'ada_kotipathi',
+  'wo fldaá': 'ada_kotipathi',
+  'wo iïm;': 'ada_sampatha',
+  'Ok kssOdkh': 'dhana_nidhanaya',
+  'Ok ks Odkh': 'dhana_nidhanaya',
+  'Ok kss': 'dhana_nidhanaya',
+  'y`oyk': 'handahana',
+  'yoyk': 'handahana',
+  'f.dúfi;': 'govisetha',
+  'f.dවි fi;': 'govisetha',
+  'f.dවිfi;': 'govisetha',
+  'ch iïm;': 'jaya_sampatha',
+  'lmarel': 'kapruka',
+  ',.ak jdikd': 'lagna_wasana',
+  'uyckiïm;': 'mahajana_sampatha',
+  'uyck iïm;': 'mahajana_sampatha',
+  'fu.d mj¾': 'mega_power',
+  'NLB ch': 'nlb_jaya',
+  'NLB ch ': 'nlb_jaya',
+  'iisß': 'sasiri',
+  'ii sß': 'sasiri',
+  'Yksod jdikd': 'shanida_wasana',
+  'Yk sod jdikd': 'shanida_wasana',
+  'iqn ojila': 'suba_dawasak',
+  'iqm¾fnda,a': 'super_ball',
+  'Ok iïm;': 'dhana_sampatha',
+  'jdis': 'vasi',
+  'wdfnda': 'ayubo',
+  'wdfndjka': 'ayubo',
+};
+
+// Legacy zodiac strings
+const LEGACY_ZODIAC_MAP: Record<string, string> = {
+  'fïI': 'මේෂ',
+  'fම්I': 'මේෂ',
+  'jDoN': 'වෘෂභ',
+  'ñhqk': 'මිථුන',
+  'lgl': 'කටක',
+  'isxy': 'සිංහ',
+  'lkHd': 'කන්‍යා',
+  ';=,d': 'තුලා',
+  'jDoaÑl': 'වෘශ්චික',
+  'Okq': 'ධනු',
+  'mlr': 'මකර',
+  'l=ïN': 'කුම්භ',
+  'mSk': 'මීන',
+};
+
+export interface ExtractionResult {
+  detectedDate?: string;
+  detectedDaySi?: string;
+  detectedFooterAnnouncement?: string;
+  matchedLotteries: Partial<LotteryResultItem>[];
+  unassignedRows: UnassignedExtractedRow[];
+  dateMismatchWarning?: string;
+  rawText: string;
+}
+
+/**
+ * Normalizes text to separate fused characters, e.g. Sinhala letters attached to digits:
+ * 'වෘෂභ06' -> 'වෘෂභ 06', '1583/ D' -> '1583 / D'
+ */
+export function normalizeTextLine(line: string): string {
+  return line
+    .replace(/([\u0D80-\u0DFFa-zA-Z])(\d)/g, '$1 $2')
+    .replace(/(\d)([\u0D80-\u0DFFa-zA-Z])/g, '$1 $2')
+    .replace(/(\d)\s*\/\s*/g, '$1 / ')
+    .replace(/\/\s*([A-Za-z0-9])/g, '/ $1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Checks if a string contains any alias matching a lottery definition
+ */
+export function findLotteryIdInText(text: string): string | undefined {
+  // Check legacy font map first
+  for (const [legacyKey, lotId] of Object.entries(LEGACY_FONT_MAP)) {
+    if (text.includes(legacyKey)) return lotId;
+  }
+  // Check standard and Type 1 aliases
+  const lower = text.toLowerCase();
+  for (const def of STANDARD_LOTTERIES) {
+    for (const alias of def.aliases) {
+      if (lower.includes(alias.toLowerCase())) {
+        return def.id;
+      }
+    }
+  }
+  return undefined;
+}
+
+export function extractLotteryDataFromText(
+  fullText: string,
+  targetDate: string,
+  fileName: string,
+  pageNumber = 1
+): ExtractionResult {
+  const lines = fullText
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  const matchedLotteries: Partial<LotteryResultItem>[] = [];
+  const unassignedRows: UnassignedExtractedRow[] = [];
+  let detectedDate: string | undefined;
+  let detectedDaySi: string | undefined;
+  let detectedFooterAnnouncement: string | undefined;
+
+  // 1. Detect Date in the text (supports YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD, YYYY'MM'DD)
+  const dateRegex = /\b(20\d{2})[.\/'\u2019-](0[1-9]|1[0-2])[.\/'\u2019-](0[1-9]|[12]\d|3[01])\b/;
+  const dateMatch = fullText.match(dateRegex);
+  if (dateMatch) {
+    detectedDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+  }
+
+  // 2. Detect Day of Week in Sinhala (supports standard, legacy FM, and Type 1 kombuva forms)
+  if (fullText.includes('සඳුදා') || fullText.includes('i`දුod') || fullText.includes('i`ද\u0dd4od')) detectedDaySi = 'සඳුදා';
+  else if (fullText.includes('අඟහරුවාදා') || fullText.includes('wx.yrejdod')) detectedDaySi = 'අඟහරුවාදා';
+  else if (fullText.includes('බදාදා') || fullText.includes('nodod')) detectedDaySi = 'බදාදා';
+  else if (fullText.includes('බ්‍රහස්පතින්දා') || fullText.includes('n%yiam;skaod')) detectedDaySi = 'බ්‍රහස්පතින්දා';
+  else if (fullText.includes('සිකුරාදා') || fullText.includes('islqrdod')) detectedDaySi = 'සිකුරාදා';
+  else if (fullText.includes('සෙනසුරාදා') || fullText.includes('ෙසනසුරාදා') || fullText.includes('fikiqrdod')) detectedDaySi = 'සෙනසුරාදා';
+  else if (fullText.includes('ඉරිදා') || fullText.includes('bßod')) detectedDaySi = 'ඉරිදා';
+
+  // 3. Process lines with lookahead chunking to support BOTH:
+  //    - Type 1 (2-column stacked layout: Name on line i, results on lines i+1 / i+2)
+  //    - Type 2 (3-column single-line layout: Name, Draw, Results all on line i)
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Check if line looks like footer announcement
+    if ((line.includes('රු.') || line.includes('re\'') || line.includes('ලක්ෂ') || line.includes(',laI')) && 
+        (line.includes('ද සිල්වා') || line.includes('is,ajd') || line.includes('ගෙන්') || line.includes('f.ka'))) {
+      if (!detectedFooterAnnouncement) {
+        detectedFooterAnnouncement = line
+          .replace(/re'/g, 'රු.')
+          .replace(/,laI/g, 'ලක්ෂ')
+          .replace(/folyudrula/g, 'දෙකහමාරක්')
+          .replace(/Tiauka o is,ajd f\.ka/g, 'ඔස්මන් ද සිල්වා ගෙන්')
+          .replace(/Tiaauka o is,ajd f\.ka/g, 'ඔස්මන් ද සිල්වා ගෙන්')
+          .replace(/f\.dවි fi;/g, 'ගොවි සෙත');
+      }
+      i++;
+      continue;
+    }
+
+    const matchedId = findLotteryIdInText(line);
+
+    if (matchedId) {
+      let combinedLine = line;
+      let nextIdx = i + 1;
+      const initialDigits = line.match(/\b\d+\b/g) || [];
+      const def = STANDARD_LOTTERIES.find(d => d.id === matchedId);
+
+      // If line alone doesn't have enough numbers (Type 1 multi-line format), look ahead
+      if (initialDigits.length < 2) {
+        while (nextIdx < lines.length) {
+          const nextLine = lines[nextIdx];
+          // Stop lookahead if next line is date or footer disclaimer
+          if (nextLine.match(/\b20\d{2}[.\/'\u2019-]/) || nextLine.includes('©') || nextLine.includes('මණ්ඩල')) {
+            break;
+          }
+          // Stop lookahead if next line starts another lottery definition
+          if (findLotteryIdInText(nextLine)) {
+            break;
+          }
+          combinedLine += ' ' + nextLine;
+          nextIdx++;
+
+          const currentDigits = combinedLine.match(/\b\d+\b/g) || [];
+          if (currentDigits.length >= 2) {
+            // For zodiac lotteries, ensure zodiac sign was also captured
+            if (def?.requiresZodiac) {
+              const hasZodiac = ZODIAC_SIGNS.some(z => combinedLine.includes(z.si));
+              if (!hasZodiac && nextIdx < lines.length && !findLotteryIdInText(lines[nextIdx])) {
+                combinedLine += ' ' + lines[nextIdx];
+                nextIdx++;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      const parsed = parseLotteryLine(combinedLine, matchedId, fileName, pageNumber);
+      if (parsed) {
+        matchedLotteries.push(parsed);
+        i = nextIdx;
+        continue;
+      }
+    }
+
+    // If line was not claimed and has multiple numbers, preserve as candidate unassigned row
+    const digitTokens = line.match(/\b\d{1,5}\b/g);
+    if (digitTokens && digitTokens.length >= 3 && !line.match(/\b20\d{2}[.\/'\u2019-]/) && !line.includes('©')) {
+      unassignedRows.push({
+        id: `unassigned_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        rawText: line,
+        detectedNumbers: digitTokens,
+        detectedDrawNo: digitTokens[0],
+        sourceFileName: fileName,
+        sourcePage: pageNumber
+      });
+    }
+
+    i++;
+  }
+
+  // Check for date mismatch
+  let dateMismatchWarning: string | undefined;
+  if (detectedDate && targetDate && detectedDate !== targetDate) {
+    dateMismatchWarning = `Uploaded file date (${detectedDate}) does not match current sheet date (${targetDate})!`;
+  }
+
+  return {
+    detectedDate,
+    detectedDaySi,
+    detectedFooterAnnouncement,
+    matchedLotteries,
+    unassignedRows,
+    dateMismatchWarning,
+    rawText: fullText
+  };
+}
+
+/**
+ * Unpacks fused numbers extracted from PDF files where spaces between numbers were not preserved.
+ * - For 'letter_and_digits' (e.g. Mahajana Sampatha, NLB Jaya, Ayubo, Dhana Sampatha):
+ *   Splits fused tokens into individual single digits (e.g. '8299' -> ['8', '2', '9', '9'], '925934' -> ['9', '2', '5', '9', '3', '4']).
+ * - For standard 2-digit lotteries:
+ *   Splits even-length tokens of length >= 4 into 2-digit pairs (e.g. '15214364' -> ['15', '21', '43', '64'], '1416252756' -> ['14', '16', '25', '27', '56']).
+ */
+export function unpackNumberTokens(tokens: string[], def: LotteryDefinition): string[] {
+  const result: string[] = [];
+
+  for (const token of tokens) {
+    if (def.fieldType === 'letter_and_digits') {
+      if (token.length > 1 && /^\d+$/.test(token)) {
+        result.push(...token.split(''));
+      } else {
+        result.push(token);
+      }
+    } else {
+      if (token.length >= 4 && token.length % 2 === 0 && /^\d+$/.test(token)) {
+        for (let j = 0; j < token.length; j += 2) {
+          result.push(token.slice(j, j + 2));
+        }
+      } else {
+        result.push(token);
+      }
+    }
+  }
+
+  return result;
+}
+
+export function parseLotteryLine(
+  line: string,
+  lotteryId: string,
+  fileName: string,
+  pageNumber: number
+): Partial<LotteryResultItem> | null {
+  const def = STANDARD_LOTTERIES.find(d => d.id === lotteryId);
+  if (!def) return null;
+
+  const normalized = normalizeTextLine(line);
+
+  // 1. Extract English letter (usually single uppercase letter like D, O, Z, Y, N, etc.)
+  // Strip board names 'NLB' and 'DLB' so they don't get misidentified as winning letters
+  let letter: string | undefined;
+  const lineForLetter = normalized.replace(/\b(NLB|DLB)\b/gi, ' ');
+  const letterMatches = lineForLetter.match(/(?:\s|^)([A-Z])(?:\s|$)/g);
+  if (letterMatches) {
+    const letters = letterMatches.map(m => m.trim());
+    if (letters.length > 0) {
+      letter = letters[letters.length - 1];
+    }
+  }
+
+  // 2. Extract Zodiac sign if lottery requires zodiac
+  let zodiac: string | undefined;
+  if (def.requiresZodiac) {
+    for (const z of ZODIAC_SIGNS) {
+      if (normalized.includes(z.si)) {
+        zodiac = z.si;
+        break;
+      }
+    }
+    if (!zodiac) {
+      if (normalized.includes('ෙම්ෂ') || normalized.includes('මේෂ')) zodiac = 'මේෂ';
+      else if (normalized.includes('වෘෂභ')) zodiac = 'වෘෂභ';
+      else if (normalized.includes('මිථුන')) zodiac = 'මිථුන';
+      else if (normalized.includes('කටක')) zodiac = 'කටක';
+      else if (normalized.includes('සිංහ')) zodiac = 'සිංහ';
+      else if (normalized.includes('කන්‍යා') || normalized.includes('කන්‍ය')) zodiac = 'කන්‍යා';
+      else if (normalized.includes('තුලා')) zodiac = 'තුලා';
+      else if (normalized.includes('වෘශ්චික')) zodiac = 'වෘශ්චික';
+      else if (normalized.includes('ධනු')) zodiac = 'ධනු';
+      else if (normalized.includes('මකර')) zodiac = 'මකර';
+      else if (normalized.includes('කුම්භ')) zodiac = 'කුම්භ';
+      else if (normalized.includes('මීන')) zodiac = 'මීන';
+    }
+    if (!zodiac) {
+      for (const [legZ, siZ] of Object.entries(LEGACY_ZODIAC_MAP)) {
+        if (normalized.includes(legZ)) {
+          zodiac = siZ;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Extract bonus number in parentheses e.g. (86597)
+  let bonusNumber: string | undefined;
+  const bonusMatch = normalized.match(/\((\d{4,6})\)/);
+  if (bonusMatch) {
+    bonusNumber = bonusMatch[1];
+  }
+
+  // Special slash bonus for Dhana Sampatha e.g. 593 / 784
+  if (def.id === 'dhana_sampatha') {
+    const slashMatch = normalized.match(/(\d{2,4}\s*\/\s*\d{2,4})/);
+    if (slashMatch) {
+      bonusNumber = slashMatch[1].replace(/\s+/g, ' ');
+    }
+  }
+
+  // 4. Extract tiered numbers if applicable (e.g. 83 / 583 / 1583 / D or 32 / 432 / 2432 / O)
+  if (def.isTieredDigits) {
+    const tieredParts = normalized.split('/');
+    if (tieredParts.length >= 3) {
+      const p1Match = tieredParts[0].match(/\b\d{2,4}\b/g);
+      const p2Match = tieredParts[1].match(/\b\d{3}\b/);
+      const p3Match = tieredParts[2].match(/\b\d{4}\b/);
+      const letPart = tieredParts[tieredParts.length - 1].match(/[A-Z]/);
+
+      let drawNo = '';
+      let p1 = '';
+      if (p1Match) {
+        if (p1Match.length >= 2) {
+          drawNo = p1Match[0];
+          p1 = p1Match[p1Match.length - 1];
+        } else {
+          p1 = p1Match[0];
+        }
+      }
+
+      return {
+        lotteryId,
+        drawNo: drawNo || '',
+        letter: letPart ? letPart[0] : (letter || ''),
+        numbers: [p1, p2Match ? p2Match[0] : '', p3Match ? p3Match[0] : ''],
+        isCheckedAgainstSource: false,
+        sourceFileName: fileName,
+        sourcePage: pageNumber,
+        extractionConfidence: 98
+      };
+    }
+  }
+
+  // 5. Extract all digit tokens preserving leading zeros
+  const digitTokens = normalized.match(/\b\d+\b/g) || [];
+  if (digitTokens.length === 0) return null;
+
+  const firstToken = digitTokens[0];
+  if (!firstToken) return null;
+
+  let drawNo = firstToken;
+  let rawNumbers = digitTokens.slice(1);
+
+  // If dhana_sampatha has slash bonus, filter out those bonus numbers from raw numbers
+  if (def.id === 'dhana_sampatha' && bonusNumber && bonusNumber.includes('/')) {
+    const bonusParts = bonusNumber.split('/').map(p => p.trim());
+    rawNumbers = rawNumbers.filter(n => !bonusParts.includes(n));
+  }
+
+  // Handle legacy reverse order ONLY for legacy font where draw number is 3-4 digits at the end
+  const lastToken = digitTokens[digitTokens.length - 1];
+  const isLegacyFontLine = Object.keys(LEGACY_FONT_MAP).some(k => line.includes(k));
+  if (isLegacyFontLine && digitTokens.length > 1 && firstToken.length <= 2 && lastToken && lastToken.length >= 3 && lastToken.length <= 4) {
+    drawNo = lastToken;
+    rawNumbers = digitTokens.slice(0, -1);
+  }
+
+  // Handle bonus numbers: either from parens or candidate bonus for lotteries that require a bonus
+  if (bonusNumber) {
+    rawNumbers = rawNumbers.filter(n => n !== bonusNumber);
+  } else if (def.hasBonusNumber && rawNumbers.length > 1) {
+    const candidateBonus = rawNumbers[rawNumbers.length - 1];
+    if (candidateBonus && candidateBonus.length >= 4 && candidateBonus.length <= 6) {
+      bonusNumber = candidateBonus;
+      rawNumbers = rawNumbers.slice(0, -1);
+    }
+  }
+
+  // Unpack fused numbers (e.g. '15214364' -> ['15', '21', '43', '64'], '8299' -> ['8', '2', '9', '9'])
+  let numbers = unpackNumberTokens(rawNumbers, def);
+
+  // If bonus number was still in numbers array (in case it wasn't filtered), remove it
+  if (bonusNumber) {
+    numbers = numbers.filter(n => n !== bonusNumber);
+  }
+
+  // Defensively ensure numbers list never exceeds definition numberCount
+  if (def.numberCount && numbers.length > def.numberCount) {
+    numbers = numbers.slice(0, def.numberCount);
+  }
+
+  // Handle boxed indices for Kapruka (index 0), Mega Power (index 0), Vasi (last index)
+  let boxedIndex: number | undefined;
+  if (def.id === 'kapruka' || def.id === 'mega_power') {
+    boxedIndex = 0; // First number is boxed/circled e.g. (14), [16]
+  } else if (def.id === 'vasi') {
+    boxedIndex = numbers.length - 1; // Last number is boxed/circled e.g. (11), [09]
+  }
+
+  return {
+    lotteryId,
+    drawNo: drawNo || '',
+    letter: letter || '',
+    zodiac,
+    numbers,
+    bonusNumber,
+    boxedIndex,
+    isNoDraw: false,
+    isCheckedAgainstSource: false,
+    sourceFileName: fileName,
+    sourcePage: pageNumber,
+    extractionConfidence: 95
+  };
+}

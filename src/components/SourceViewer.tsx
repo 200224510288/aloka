@@ -1,0 +1,394 @@
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X } from 'lucide-react';
+import { SourceDocument, UnassignedExtractedRow } from '@/types/lottery';
+import { STANDARD_LOTTERIES } from '@/lib/constants';
+
+interface SourceViewerProps {
+  sources: SourceDocument[];
+  currentDate: string;
+  onFileUpload: (file: File) => Promise<void>;
+  onRemoveSource?: (sourceId: string) => void;
+  isUploading: boolean;
+  unassignedRows: UnassignedExtractedRow[];
+  onAssignRow: (row: UnassignedExtractedRow, targetLotteryId: string) => void;
+  dateMismatchWarning?: string;
+}
+
+export const SourceViewer: React.FC<SourceViewerProps> = ({
+  sources,
+  currentDate,
+  onFileUpload,
+  onRemoveSource,
+  isUploading,
+  unassignedRows,
+  onAssignRow,
+  dateMismatchWarning,
+}) => {
+  const [selectedSourceId, setSelectedSourceId] = useState<string>(sources[0]?.id || '');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [hasImgError, setHasImgError] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto sync active document when sources list changes
+  useEffect(() => {
+    if (sources.length > 0 && !sources.some(s => s.id === selectedSourceId)) {
+      setSelectedSourceId(sources[0].id);
+    } else if (sources.length === 0) {
+      setSelectedSourceId('');
+    }
+  }, [sources, selectedSourceId]);
+
+  const activeDoc = sources.find(s => s.id === selectedSourceId) || sources[0];
+
+  // Reset image error state whenever active document changes
+  useEffect(() => {
+    setHasImgError(false);
+  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.previewImageUrl]);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onFileUpload(e.target.files[0]);
+    }
+  };
+
+  // Build preview image URL for active document (Strictly Page 1)
+  const getPreviewImageUrl = () => {
+    if (!activeDoc) return null;
+    if (activeDoc.previewImageUrl) {
+      return activeDoc.previewImageUrl;
+    }
+    if (activeDoc.fileName === 'result sheet wireframe.pdf') {
+      return '/samples/sample_page_1.png';
+    }
+    if (activeDoc.fileType === 'pdf') {
+      const base = activeDoc.filePath.replace(/\.pdf$/i, '');
+      return `${base}_preview-1.png`;
+    }
+    return activeDoc.filePath;
+  };
+
+  const previewUrl = getPreviewImageUrl();
+
+  return (
+    <div className="flex flex-col h-full bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+      
+      {/* Header bar */}
+      <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-blue-600" />
+          <h2 className="text-sm font-bold text-slate-800">Source Verification Viewer</h2>
+          <span className="text-[10px] font-semibold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">
+            {sources.length} file{sources.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Upload Trigger Button */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>{isUploading ? 'Extracting...' : 'Upload Source'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Date Mismatch Banner if any */}
+      {dateMismatchWarning && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 flex items-center gap-2 text-xs text-amber-800">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <div>
+            <span className="font-bold">Date Mismatch Detected:</span> {dateMismatchWarning}
+          </div>
+        </div>
+      )}
+
+      {/* Disclaimers & Guidance Banner */}
+      <div className="bg-blue-50/60 border-b border-blue-100 px-3 py-1.5 text-[11px] text-blue-800 flex items-center justify-between">
+        <span>⚠️ Check winning digits manually against uploaded source image.</span>
+        <span className="font-semibold text-slate-500">Not official verification</span>
+      </div>
+
+      {/* Source selector tabs */}
+      {sources.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-slate-200 bg-slate-100 overflow-x-auto">
+          {sources.map((doc) => {
+            const isSelected = activeDoc?.id === doc.id;
+            return (
+              <div
+                key={doc.id}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md whitespace-nowrap transition border ${
+                  isSelected
+                    ? 'bg-white text-blue-700 shadow-2xs font-semibold border-slate-300 ring-1 ring-blue-500/20'
+                    : 'text-slate-600 bg-slate-50 border-transparent hover:text-slate-900 hover:bg-slate-200'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSourceId(doc.id);
+                    setCurrentPage(1);
+                  }}
+                  className="flex items-center gap-1.5 outline-none cursor-pointer"
+                >
+                  {doc.fileType === 'pdf' ? (
+                    <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  ) : (
+                    <ImageIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  )}
+                  <span className="max-w-[130px] truncate">{doc.fileName}</span>
+                </button>
+
+                {onRemoveSource && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveSource(doc.id);
+                    }}
+                    title={`Remove file "${doc.fileName}"`}
+                    className="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition ml-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Main View Area */}
+      <div className="flex-1 relative flex flex-col min-h-[350px] bg-slate-100 overflow-hidden">
+        
+        {sources.length === 0 ? (
+          /* Empty dropzone */
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className="flex-1 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-slate-300 m-4 rounded-xl bg-white"
+          >
+            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+              <Upload className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 mb-1">Upload Daily Result Source</h3>
+            <p className="text-xs text-slate-500 max-w-xs mb-4">
+              Drag and drop lottery result sheet PDF, JPG, or PNG here, or click to browse.
+            </p>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition"
+            >
+              Select File
+            </button>
+            <p className="text-[11px] text-slate-400 mt-3">
+              Supports readable PDFs, scanned documents, and photo uploads.
+            </p>
+          </div>
+        ) : (
+          /* Viewer content */
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* View controls toolbar */}
+            <div className="h-9 px-3 bg-white border-b border-slate-200 flex items-center justify-between gap-2 z-10">
+              {/* Page indicator */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0">
+                <span
+                  className="text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1"
+                  title="Multi-page uploads strictly consider only Page 1 for extraction and display"
+                >
+                  <span className="bg-blue-600 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase tracking-wider">Page 1</span>
+                  {activeDoc?.totalFilePages && activeDoc.totalFilePages > 1 && (
+                    <span className="text-[10px] text-blue-700 font-bold">
+                      of {activeDoc.totalFilePages}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Action buttons & Zoom controls */}
+              <div className="flex items-center gap-1.5">
+                {/* Remove active file button */}
+                {activeDoc && onRemoveSource && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveSource(activeDoc.id)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition cursor-pointer"
+                    title={`Remove file "${activeDoc.fileName}"`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remove File</span>
+                  </button>
+                )}
+
+                {/* Zoom controls */}
+                <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.2))}
+                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[11px] font-semibold text-slate-600 min-w-[34px] text-center">
+                    {Math.round(zoomLevel * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(z => Math.min(2.5, z + 0.2))}
+                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(1)}
+                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                    title="Reset Zoom"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable image canvas / PDF viewer */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-100/70">
+              {previewUrl && !hasImgError ? (
+                <div
+                  className="transition-transform duration-100 origin-center shadow-lg bg-white rounded border border-slate-300"
+                  style={{ transform: `scale(${zoomLevel})` }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt={`Source document preview ${activeDoc?.fileName} page ${currentPage}`}
+                    className="max-w-none w-auto max-h-[750px] object-contain select-none block"
+                    onError={() => {
+                      console.warn('Image preview failed to load, falling back to embedded PDF/file viewer:', previewUrl);
+                      setHasImgError(true);
+                    }}
+                  />
+                </div>
+              ) : activeDoc?.fileType === 'pdf' ? (
+                /* Native PDF viewer fallback */
+                <div className="w-full h-full min-h-[550px] flex flex-col bg-white rounded-lg border border-slate-300 overflow-hidden shadow-sm">
+                  <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs text-slate-700">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Native PDF Viewer (Page 1)</span>
+                    </span>
+                    <a
+                      href={activeDoc.filePath}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
+                    >
+                      Open PDF in New Window ↗
+                    </a>
+                  </div>
+                  <iframe
+                    src={`${activeDoc.filePath}#page=1&toolbar=0&navpanes=0`}
+                    title="Source PDF Document"
+                    className="w-full flex-1 min-h-[500px] border-none"
+                  />
+                </div>
+              ) : (
+                <div className="text-center p-8 bg-white rounded-lg border border-slate-300 shadow-sm max-w-sm">
+                  <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700 mb-1">{activeDoc?.fileName}</p>
+                  <p className="text-[11px] text-slate-500 mb-3">Uploaded source document</p>
+                  <a
+                    href={activeDoc?.filePath}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    View Original File ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Unassigned Extracted Results Panel */}
+      {unassignedRows.length > 0 && (
+        <div className="border-t border-slate-200 bg-amber-50/50 p-3 max-h-48 overflow-y-auto">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Layers className="w-3.5 h-3.5 text-amber-600" />
+            <h4 className="text-xs font-bold text-amber-900">
+              Unassigned Extracted Results ({unassignedRows.length})
+            </h4>
+          </div>
+          <p className="text-[11px] text-amber-700 mb-2">
+            The OCR extracted numbers from these rows, but the lottery name wasn&apos;t automatically matched. Click to assign:
+          </p>
+
+          <div className="space-y-1.5">
+            {unassignedRows.map((row) => (
+              <div
+                key={row.id}
+                className="bg-white p-2 rounded border border-amber-200 flex items-center justify-between text-xs"
+              >
+                <div className="truncate mr-2">
+                  <span className="font-mono font-semibold text-slate-800">
+                    {row.detectedDrawNo && `[Draw: ${row.detectedDrawNo}] `}
+                    {row.detectedNumbers.join(' ')}
+                  </span>
+                  <span className="text-[10px] text-slate-400 ml-2 block truncate">
+                    Raw: {row.rawText}
+                  </span>
+                </div>
+
+                <div className="shrink-0 flex items-center gap-1">
+                  <select
+                    className="text-[11px] font-sinhala border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-800"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        onAssignRow(row, e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="" disabled>Assign to lottery...</option>
+                    {STANDARD_LOTTERIES.map((def) => (
+                      <option key={def.id} value={def.id}>
+                        {def.defaultOrder}. {def.nameSi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
