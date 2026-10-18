@@ -74,15 +74,12 @@ export async function POST(req: NextRequest) {
 
     if (fileType === 'pdf') {
       try {
-        // @ts-ignore
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: fileBuffer });
-        // Rule: strictly Page 1 only!
-        const parsed = await parser.getText({ partial: [1] });
-        totalFilePages = parsed.total || 1;
-        extractedText = (parsed.pages && parsed.pages[0]?.text) || parsed.text || '';
-      } catch (pdfErr) {
-        console.warn('Node.js PDFParse error:', pdfErr);
+        const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
+        const result = await extractTextFromPdfBuffer(fileBuffer);
+        extractedText = result.text;
+        totalFilePages = result.totalFilePages;
+      } catch (pdfErr: any) {
+        console.warn('Serverless PDF extraction error:', pdfErr?.message || pdfErr);
       }
 
       // Secondary fallback: if python is present and local (Windows dev)
