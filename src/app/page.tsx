@@ -138,6 +138,28 @@ export default function Home() {
     loadSheet(selectedDate);
   }, [selectedDate, loadSheet]);
 
+  // Load Cloud default design on mount so staff preview & print match user's custom design
+  useEffect(() => {
+    async function loadCloudDesign() {
+      try {
+        const res = await fetch('/api/custom-designs');
+        const data = await res.json();
+        if (data.success && data.defaultDesignId && Array.isArray(data.designs)) {
+          const defaultDesign = data.designs.find((d: any) => d.id === data.defaultDesignId);
+          if (defaultDesign && defaultDesign.options) {
+            setPreviewStyles(defaultDesign.options);
+            if (defaultDesign.options.printDensity) {
+              setPrintDensity(defaultDesign.options.printDensity);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not pre-fetch cloud design for staff page:', err);
+      }
+    }
+    loadCloudDesign();
+  }, []);
+
   // Handle date change
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate);

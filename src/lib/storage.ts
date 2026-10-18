@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { DailySheet, RevisionRecord } from '@/types/lottery';
+import { DailySheet, RevisionRecord, SavedCustomDesign } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET } from './constants';
 
 function resolveDataDir(): string {
@@ -175,4 +175,34 @@ export function getUploadsDirectory(): string {
   ensureDirectories();
   return getDirectories().UPLOADS_DIR;
 }
+
+export function saveCustomDesignsLocally(payload: { designs: SavedCustomDesign[]; defaultDesignId: string | null }): boolean {
+  try {
+    ensureDirectories();
+    const { DATA_DIR } = getDirectories();
+    const filePath = path.join(DATA_DIR, 'custom-designs.json');
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.warn('Could not save custom designs locally:', err);
+    return false;
+  }
+}
+
+export function loadCustomDesignsLocally(): { designs: SavedCustomDesign[]; defaultDesignId: string | null } | null {
+  try {
+    ensureDirectories();
+    const { DATA_DIR } = getDirectories();
+    const filePath = path.join(DATA_DIR, 'custom-designs.json');
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(raw);
+    }
+    return null;
+  } catch (err) {
+    console.warn('Could not load custom designs locally:', err);
+    return null;
+  }
+}
+
 

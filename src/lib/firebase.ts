@@ -20,3 +20,4 @@ export const db = getFirestore(app);
 // Dedicated collection / branch for Result Generator
 export const CLOUD_BRANCH_COLLECTION = 'result_generator_daily_sheets';
 export const CLOUD_SOURCES_COLLECTION = 'result_generator_sources';
+export const CLOUD_SETTINGS_COLLECTION = 'result_generator_settings';

@@ -39,7 +39,8 @@ import {
   MoveVertical,
   Check,
   ShieldCheck,
-  Expand
+  Expand,
+  Cloud
 } from 'lucide-react';
 import SaveDesignModal from './SaveDesignModal';
 import { calculateRowSpacing, getAllRowsSpacing } from '@/lib/row-spacing';
@@ -80,6 +81,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
   const [activeCustomDesignId, setActiveCustomDesignId] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
   const [customizerTab, setCustomizerTab] = useState<'presets' | 'typography' | 'spacing'>('presets');
+  const [cloudDesignsStatus, setCloudDesignsStatus] = useState<'synced' | 'syncing' | 'offline'>('syncing');
 
   // Internal styles state initialized with DEFAULT_STYLE_OPTIONS
   const [styles, setStyles] = useState<PreviewStyleOptions>({
@@ -90,63 +92,166 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
 
   const isHighDensity = (styles.printDensity || printDensity) === 'high';
 
-  // Load custom designs & default design on mount
-  useEffect(() => {
+  // Helper to persist custom designs to Cloud Firestore (with local mirror as safety fallback)
+  const persistDesignsToCloud = async (
+    designsToSave: SavedCustomDesign[],
+    defId: string | null
+  ) => {
+    setCloudDesignsStatus('syncing');
     try {
-      const stored = localStorage.getItem('sinhala_lottery_custom_designs');
-      if (stored) {
-        const parsed: SavedCustomDesign[] = JSON.parse(stored);
-        setSavedDesigns(parsed);
+      const res = await fetch('/api/custom-designs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          designs: designsToSave,
+          defaultDesignId: defId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCloudDesignsStatus('synced');
+      } else {
+        setCloudDesignsStatus('offline');
+      }
+    } catch (e) {
+      console.warn('Failed to sync designs to cloud:', e);
+      setCloudDesignsStatus('offline');
+    }
 
-        const defId = localStorage.getItem('sinhala_lottery_default_design_id');
-        if (defId) {
-          setDefaultDesignId(defId);
-          const defaultDesign = parsed.find(d => d.id === defId);
-          if (defaultDesign) {
-            setActiveCustomDesignId(defaultDesign.id);
+    // Mirror to localStorage as offline safety net
+    try {
+      localStorage.setItem('sinhala_lottery_custom_designs', JSON.stringify(designsToSave));
+      if (defId) {
+        localStorage.setItem('sinhala_lottery_default_design_id', defId);
+      } else {
+        localStorage.removeItem('sinhala_lottery_default_design_id');
+      }
+    } catch {}
+  };
+
+  // Load custom designs & default design from Cloud Firestore on mount (with automatic migration)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDesigns() {
+      setCloudDesignsStatus('syncing');
+
+      // 1. Read any local designs from browser localStorage (e.g., "My Custom Design 4")
+      let localDesigns: SavedCustomDesign[] = [];
+      let localDefId: string | null = null;
+      try {
+        const stored = localStorage.getItem('sinhala_lottery_custom_designs');
+        if (stored) {
+          localDesigns = JSON.parse(stored);
+        }
+        localDefId = localStorage.getItem('sinhala_lottery_default_design_id');
+      } catch {}
+
+      try {
+        // 2. Fetch from Cloud Firestore
+        const res = await fetch('/api/custom-designs');
+        const data = await res.json();
+
+        if (data.success) {
+          const cloudDesigns: SavedCustomDesign[] = Array.isArray(data.designs) ? data.designs : [];
+          let cloudDefId: string | null = data.defaultDesignId || null;
+
+          // Merge: if local has any design not in cloud, include it so user never loses their locally created design!
+          const mergedDesigns = [...cloudDesigns];
+          let hasLocalToSync = false;
+
+          for (const ld of localDesigns) {
+            if (!mergedDesigns.some(cd => cd.id === ld.id || cd.name === ld.name)) {
+              mergedDesigns.push(ld);
+              hasLocalToSync = true;
+            }
+          }
+
+          const effectiveDefId = cloudDefId || localDefId || (mergedDesigns.find(d => d.isDefault)?.id) || null;
+          if (localDefId && !cloudDefId) {
+            hasLocalToSync = true;
+          }
+
+          if (isMounted) {
+            setSavedDesigns(mergedDesigns);
+            setDefaultDesignId(effectiveDefId);
+            setCloudDesignsStatus('synced');
+
+            // Apply default design
+            if (effectiveDefId) {
+              const defDesign = mergedDesigns.find(d => d.id === effectiveDefId);
+              if (defDesign) {
+                setActiveCustomDesignId(defDesign.id);
+                setActivePreset('custom');
+                setStyles(prev => ({
+                  ...prev,
+                  ...defDesign.options
+                }));
+                onStylesChange?.(defDesign.options);
+              }
+            }
+          }
+
+          // If local had designs that weren't in cloud, immediately sync to Cloud Firestore!
+          if (hasLocalToSync && mergedDesigns.length > 0) {
+            fetch('/api/custom-designs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                designs: mergedDesigns,
+                defaultDesignId: effectiveDefId,
+              }),
+            }).catch(e => console.warn('Cloud sync error:', e));
+          }
+
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not fetch custom designs from cloud, falling back to local:', err);
+      }
+
+      // Fallback to local if cloud was unreachable
+      if (isMounted && localDesigns.length > 0) {
+        setSavedDesigns(localDesigns);
+        setDefaultDesignId(localDefId);
+        setCloudDesignsStatus('offline');
+        if (localDefId) {
+          const defDesign = localDesigns.find(d => d.id === localDefId);
+          if (defDesign) {
+            setActiveCustomDesignId(defDesign.id);
             setActivePreset('custom');
             setStyles(prev => ({
               ...prev,
-              ...defaultDesign.options
+              ...defDesign.options
             }));
-            onStylesChange?.(defaultDesign.options);
-            return;
+            onStylesChange?.(defDesign.options);
           }
         }
       }
-
-      // Fallback: load persisted styles from localStorage if no default design
-      const saved = localStorage.getItem('sinhala_lottery_preview_styles');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setStyles(prev => {
-          const next = { ...prev, ...parsed };
-          onStylesChange?.(next);
-          return next;
-        });
-      }
-    } catch (e) {
-      console.error('Failed to load saved preview styles:', e);
     }
+
+    loadDesigns();
+
+    return () => {
+      isMounted = false;
+    };
   }, [onStylesChange]);
 
   const handleSaveCustomDesign = (newDesign: SavedCustomDesign) => {
     const updated = [...savedDesigns.filter(d => d.id !== newDesign.id), newDesign];
-    setSavedDesigns(updated);
-    try {
-      localStorage.setItem('sinhala_lottery_custom_designs', JSON.stringify(updated));
-    } catch { }
+    const newDefId = newDesign.isDefault ? newDesign.id : defaultDesignId;
 
+    setSavedDesigns(updated);
     if (newDesign.isDefault) {
       setDefaultDesignId(newDesign.id);
-      try {
-        localStorage.setItem('sinhala_lottery_default_design_id', newDesign.id);
-      } catch { }
     }
-
     setActiveCustomDesignId(newDesign.id);
     setActivePreset('custom');
-    showToast?.(`✓ Custom design "${newDesign.name}" saved!`, 'success');
+
+    // Persist to Cloud Firestore
+    persistDesignsToCloud(updated, newDefId);
+
+    showToast?.(`✓ Custom design "${newDesign.name}" saved to Cloud!`, 'success');
   };
 
   const applyCustomDesign = (design: SavedCustomDesign) => {
@@ -170,34 +275,36 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
     const isCurrentlyDefault = defaultDesignId === designId;
     const newDef = isCurrentlyDefault ? null : designId;
     setDefaultDesignId(newDef);
-    try {
-      if (newDef) {
-        localStorage.setItem('sinhala_lottery_default_design_id', newDef);
-        showToast?.('Set as default design for startup.', 'success');
-      } else {
-        localStorage.removeItem('sinhala_lottery_default_design_id');
-        showToast?.('Removed default design setting.', 'info');
-      }
-    } catch { }
+
+    // Persist to Cloud Firestore
+    persistDesignsToCloud(savedDesigns, newDef);
+
+    if (newDef) {
+      showToast?.('Set as default design (saved to Cloud).', 'success');
+    } else {
+      showToast?.('Removed default design (saved to Cloud).', 'info');
+    }
   };
 
   const deleteCustomDesign = (designId: string) => {
     const target = savedDesigns.find(d => d.id === designId);
     if (!target) return;
-    if (confirm(`Delete saved design "${target.name}"?`)) {
+    if (confirm(`Delete saved design "${target.name}" from Cloud?`)) {
       const updated = savedDesigns.filter(d => d.id !== designId);
+      const newDefId = defaultDesignId === designId ? null : defaultDesignId;
+
       setSavedDesigns(updated);
-      try {
-        localStorage.setItem('sinhala_lottery_custom_designs', JSON.stringify(updated));
-        if (defaultDesignId === designId) {
-          localStorage.removeItem('sinhala_lottery_default_design_id');
-          setDefaultDesignId(null);
-        }
-      } catch { }
+      if (defaultDesignId === designId) {
+        setDefaultDesignId(null);
+      }
       if (activeCustomDesignId === designId) {
         setActiveCustomDesignId(null);
       }
-      showToast?.(`Deleted "${target.name}".`, 'info');
+
+      // Persist to Cloud Firestore
+      persistDesignsToCloud(updated, newDefId);
+
+      showToast?.(`Deleted "${target.name}" from Cloud.`, 'info');
     }
   };
 
@@ -1117,10 +1224,29 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                   {/* User's Saved Designs */}
                   <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-indigo-900 flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <Bookmark className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Saved Designs (සුරකින ලද)</span>
-                      </span>
+                        <span className="text-xs font-bold text-indigo-900">Saved Designs (සුරකින ලද)</span>
+                        <span
+                          className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                            cloudDesignsStatus === 'synced'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : cloudDesignsStatus === 'syncing'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+                              : 'bg-slate-50 text-slate-500 border-slate-200'
+                          }`}
+                          title={
+                            cloudDesignsStatus === 'synced'
+                              ? 'Synced to Firebase Cloud Firestore — available on all devices & hosted site'
+                              : cloudDesignsStatus === 'syncing'
+                              ? 'Syncing with Cloud Firestore...'
+                              : 'Offline / local cache'
+                          }
+                        >
+                          <Cloud className="w-2.5 h-2.5" />
+                          <span>{cloudDesignsStatus === 'synced' ? 'Cloud' : cloudDesignsStatus === 'syncing' ? 'Syncing...' : 'Local'}</span>
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setIsSaveModalOpen(true)}

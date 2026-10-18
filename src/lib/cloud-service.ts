@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION } from './firebase';
-import { DailySheet, SourceDocument } from '@/types/lottery';
+import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION, CLOUD_SETTINGS_COLLECTION } from './firebase';
+import { DailySheet, SourceDocument, SavedCustomDesign } from '@/types/lottery';
 
 /**
  * Automatically persists the DailySheet to the separate 'result_generator_daily_sheets'
@@ -110,4 +110,56 @@ export async function saveSourceDocToCloud(
     return { success: false, error: err.message };
   }
 }
+
+export interface CloudCustomDesignsData {
+  designs: SavedCustomDesign[];
+  defaultDesignId: string | null;
+  updatedAt: string;
+}
+
+/**
+ * Saves custom designs & default design selection to Cloud Firestore
+ */
+export async function saveCustomDesignsToCloud(
+  designs: SavedCustomDesign[],
+  defaultDesignId: string | null = null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, '_custom_designs');
+    const sanitizedDesigns = JSON.parse(JSON.stringify(designs || []));
+    await setDoc(docRef, {
+      designs: sanitizedDesigns,
+      defaultDesignId: defaultDesignId || null,
+      branch: 'result-generator',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    return { success: true };
+  } catch (err: any) {
+    console.warn('Cloud custom designs save warning:', err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Loads custom designs & default design selection from Cloud Firestore
+ */
+export async function loadCustomDesignsFromCloud(): Promise<CloudCustomDesignsData | null> {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, '_custom_designs');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        designs: Array.isArray(data.designs) ? data.designs : [],
+        defaultDesignId: data.defaultDesignId || null,
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+    }
+    return null;
+  } catch (err: any) {
+    console.warn('Could not load custom designs from cloud:', err?.message || err);
+    return null;
+  }
+}
+
 
