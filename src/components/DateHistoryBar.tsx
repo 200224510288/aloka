@@ -24,6 +24,7 @@ interface DateHistoryBarProps {
   availableDates?: string[];
   cloudStatus?: 'synced' | 'syncing' | 'offline' | 'permission_denied';
   className?: string;
+  isSidebar?: boolean;
 }
 
 const MONTH_NAMES_SI = [
@@ -45,6 +46,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
   availableDates = [],
   cloudStatus = 'synced',
   className = '',
+  isSidebar = false,
 }) => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -177,59 +179,61 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
     <section className={`bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-3 ${className}`}>
       
       {/* Top Header: Title, Calendar Toggle & Cloud Status */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
             <CalendarDays className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="text-xs font-extrabold text-slate-800 tracking-tight">
-                Quick History & 4-Day Print Hub
+                {isSidebar ? 'Past 4 Days' : 'Quick History & 4-Day Print Hub'}
               </h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-sinhala">
-                පසුගිය දින 4 ඉක්මන් මුද්‍රණය
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-sinhala">
+                පසුගිය දින 4
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-500 leading-none mt-0.5">
-              Click any day to load results instantly, or use 1-Click Quick Print.
+            <p className="text-[10px] text-slate-500 leading-none mt-0.5 truncate">
+              {isSidebar ? '1-Click quick print for past draws' : 'Click any day to load results instantly, or use 1-Click Quick Print.'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Cloud Auto-Save Status Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 font-medium">
-            <Cloud className={`w-3.5 h-3.5 ${
-              cloudStatus === 'synced' ? 'text-emerald-500' :
-              cloudStatus === 'syncing' ? 'text-blue-500 animate-spin' :
-              'text-slate-400'
-            }`} />
-            <span>
-              {cloudStatus === 'synced' ? 'Cloud Synced (ස්වයංක්‍රීයව සුරැකේ)' :
-               cloudStatus === 'syncing' ? 'Saving to Cloud...' : 'Local Cache Active'}
-            </span>
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Cloud Auto-Save Status Badge (Shown when not sidebar) */}
+          {!isSidebar && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 font-medium">
+              <Cloud className={`w-3.5 h-3.5 ${
+                cloudStatus === 'synced' ? 'text-emerald-500' :
+                cloudStatus === 'syncing' ? 'text-blue-500 animate-spin' :
+                'text-slate-400'
+              }`} />
+              <span>
+                {cloudStatus === 'synced' ? 'Cloud Synced' :
+                 cloudStatus === 'syncing' ? 'Saving...' : 'Local Cache Active'}
+              </span>
+            </div>
+          )}
 
           {/* Calendar View Toggle Button */}
           <button
             type="button"
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
               isCalendarOpen 
                 ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
                 : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300 hover:border-slate-400'
             }`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>Calendar (කැලැන්ඩරය)</span>
+            <span>Calendar</span>
             {isCalendarOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
       {/* 4 Days Back Quick Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3">
+      <div className={isSidebar ? "grid grid-cols-2 gap-2.5" : "grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3"}>
         {pastDays.map((item) => {
           const isSelected = item.date === selectedDate;
 
@@ -373,10 +377,10 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
             </div>
 
             {/* Quick Navigation Shortcuts */}
-            <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-200/70 text-[11px]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 mt-2.5 border-t border-slate-200/70 text-[10.5px]">
               <div className="flex items-center gap-1 text-slate-500">
                 <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full inline-block" />
-                <span>Green dot = Results saved / Available</span>
+                <span>Green dot = Available</span>
               </div>
 
               <div className="flex items-center gap-2">

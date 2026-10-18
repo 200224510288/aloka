@@ -10,7 +10,7 @@ import { LotteryRowEditor } from '@/components/LotteryRowEditor';
 import { FooterEditor } from '@/components/FooterEditor';
 import { SheetPreview } from '@/components/SheetPreview';
 import { RevisionsModal } from '@/components/RevisionsModal';
-import PrintModal from '@/components/PrintModal';
+import { directPrintSheet } from '@/lib/direct-print';
 import { DateHistoryBar } from '@/components/DateHistoryBar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 import { 
@@ -56,7 +56,6 @@ export default function Home() {
   const [dateMismatchWarning, setDateMismatchWarning] = useState<string | undefined>();
   const [exportBlockedErrors, setExportBlockedErrors] = useState<string[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   // Verification UX controls
   const [filterMode, setFilterMode] = useState<FilterType>('all');
@@ -181,7 +180,7 @@ export default function Home() {
   // 1-Click Quick Print from Calendar / 4-Day History Bar
   const handleQuickPrint = async (targetDate: string) => {
     if (targetDate === selectedDate) {
-      setIsPrintModalOpen(true);
+      handlePrint(sheet);
       return;
     }
 
@@ -191,11 +190,13 @@ export default function Home() {
       const data = await res.json();
       if (data.success && data.sheet) {
         setSheet(data.sheet);
+        handlePrint(data.sheet);
+        return;
       }
     } catch (e) {
       console.warn('Quick print loading error:', e);
     }
-    setIsPrintModalOpen(true);
+    handlePrint();
   };
 
   // Save current sheet
@@ -452,7 +453,7 @@ export default function Home() {
         const errorData = await res.json().catch(() => ({}));
         if (errorData.isServerless) {
           showToast(errorData.error, 'info');
-          setIsPrintModalOpen(true);
+          handlePrint();
           return;
         }
         setExportBlockedErrors(errorData.errors || [errorData.error]);
@@ -476,6 +477,15 @@ export default function Home() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // Direct Native Print (Zero Popups)
+  const handlePrint = (targetSheet: DailySheet = sheet) => {
+    directPrintSheet(targetSheet, {
+      styleOptions: previewStyles,
+      onSuccess: () => showToast('මුද්‍රණ කවුළුව විවෘත විය (Print dialog opened)', 'success'),
+      onError: (err) => showToast(err, 'error'),
+    });
   };
 
   // Load Sample Wireframe
@@ -568,7 +578,7 @@ export default function Home() {
         isSaving={isSaving}
         isExporting={isExporting}
         exportBlockedErrors={exportBlockedErrors}
-        onPrint={() => setIsPrintModalOpen(true)}
+        onPrint={() => handlePrint()}
       />
 
       {/* 3-Step Guided Workflow Navigation */}
@@ -996,9 +1006,9 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => setIsPrintModalOpen(true)}
+                  onClick={() => handlePrint()}
                   className="px-4 py-2 text-xs font-extrabold rounded-xl shadow-sm flex items-center gap-1.5 transition active:scale-[0.98] cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
-                  title="Open Print Dialog to select copies and printer"
+                  title="Print Sheet directly without popup modal"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Print Sheet (මුද්‍රණය)</span>
@@ -1025,7 +1035,7 @@ export default function Home() {
               <SheetPreview
                 sheet={sheet}
                 onExportPdf={handleExportPdf}
-                onRequestPrint={() => setIsPrintModalOpen(true)}
+                onRequestPrint={() => handlePrint()}
                 isExporting={isExporting}
                 canExport={canExport}
                 printDensity={printDensity}
@@ -1050,20 +1060,6 @@ export default function Home() {
           setSheet(snapshot);
           showToast('Revision snapshot restored successfully.', 'success');
         }}
-      />
-
-      {/* Direct Print Modal with Copies, Printer Preferences & Default Settings */}
-      <PrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        sheet={sheet}
-        styleOptions={previewStyles || DEFAULT_STYLE_OPTIONS}
-        isReadyToExport={canExport}
-        pendingCount={pendingCount}
-        exportBlockedErrors={exportBlockedErrors}
-        onVerifyAll={handleVerifyAllValid}
-        onExportPdf={handleExportPdf}
-        showToast={showToast}
       />
 
     </div>

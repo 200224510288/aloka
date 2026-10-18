@@ -71,7 +71,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
   showToast,
   hideLayoutControls = false,
 }) => {
-  const [scale, setScale] = useState<number>(hideLayoutControls ? 0.52 : 0.46);
+  const [scale, setScale] = useState<number>(hideLayoutControls ? 0.82 : 0.46);
   const [showCutGuide, setShowCutGuide] = useState<boolean>(true);
   const [showSettings, setShowSettings] = useState<boolean>(!hideLayoutControls);
   const [activePreset, setActivePreset] = useState<string>('standard');
