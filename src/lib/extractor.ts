@@ -62,17 +62,86 @@ export interface ExtractionResult {
 }
 
 /**
+ * Cleans OCR artifacts and broken Sinhala syllables from PDF streams
+ */
+export function cleanSinhalaText(str: string): string {
+  if (!str) return '';
+  return str
+    // Fix broken anusvara / vowel signs separated by space from their base letter
+    .replace(/([\u0D80-\u0DFF])\s+([ංඃ්ා-ෞ])/g, '$1$2')
+    .replace(/([ෙ-ෛ])\s+([\u0D80-\u0DFF])/g, '$1$2')
+    // Fix specific common Sinhala OCR splits
+    .replace(/සි\s+ංහ/g, 'සිංහ')
+    .replace(/නි\s+ධානය/g, 'නිධානය')
+    .replace(/ප්‍රති\s+ඵල/g, 'ප්‍රතිඵල')
+    .replace(/බ්‍ර\s+හස්/g, 'බ්‍රහස්')
+    .replace(/කප්\s+රුක/g, 'කප්රුක')
+    .replace(/සු\s+බ/g, 'සුබ')
+    .replace(/සු\s+පර්/g, 'සුපර්')
+    .replace(/සු\s+පිරි/g, 'සුපිරි')
+    .replace(/ධන\s+ස\./g, 'ධන ස.');
+}
+
+/**
  * Normalizes text to separate fused characters, e.g. Sinhala letters attached to digits:
  * 'වෘෂභ06' -> 'වෘෂභ 06', '1583/ D' -> '1583 / D'
  */
 export function normalizeTextLine(line: string): string {
-  return line
+  return cleanSinhalaText(line)
     .replace(/([\u0D80-\u0DFFa-zA-Z])(\d)/g, '$1 $2')
     .replace(/(\d)([\u0D80-\u0DFFa-zA-Z])/g, '$1 $2')
     .replace(/(\d)\s*\/\s*/g, '$1 / ')
     .replace(/\/\s*([A-Za-z0-9])/g, '/ $1')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Preprocesses raw OCR lines to re-assemble multi-line splits in lottery titles
+ * (e.g. "සු" on line i and "බ දවසක්" on line i+1)
+ */
+export function preprocessExtractedLines(rawText: string): string[] {
+  const rawLines = rawText
+    .split(/\r?\n/)
+    .map(l => cleanSinhalaText(l.trim()))
+    .filter(l => l.length > 0);
+
+  const lines: string[] = [];
+  let i = 0;
+  while (i < rawLines.length) {
+    const curr = rawLines[i];
+    const next = rawLines[i + 1];
+
+    // Strip document title line e.g. "ලොතරැයි ප්‍රතිඵල"
+    if (curr.includes('ෙලාතරැයි ප්‍රතිඵල') || curr.includes('ලොතරැයි ප්‍රතිඵල')) {
+      const stripped = curr.replace(/.*(ෙලාතරැයි|ලොතරැයි)\s*ප්‍රතිඵල\s*/, '').trim();
+      if (stripped.length > 0) lines.push(stripped);
+      i++;
+      continue;
+    }
+
+    // Merge short dangling prefix words (e.g. "සු", "සුපිරි") that have no numbers
+    if (next && !/\d/.test(curr) && (curr === 'සු' || curr === 'සුපිරි' || curr.length <= 4)) {
+      lines.push(cleanSinhalaText(`${curr} ${next}`));
+      i += 2;
+      continue;
+    }
+
+    // If curr + next matches a lottery name where curr alone does not
+    if (next && !/\d/.test(curr) && !/\d{2,}/.test(next)) {
+      const combined = cleanSinhalaText(`${curr} ${next}`);
+      if (findLotteryIdInText(combined) && !findLotteryIdInText(curr)) {
+        lines.push(combined);
+        i += 2;
+        continue;
+      }
+    }
+
+    lines.push(curr);
+    i++;
+  }
+
+  return lines;
 }
 
 /**
@@ -84,10 +153,14 @@ export function findLotteryIdInText(text: string): string | undefined {
     if (text.includes(legacyKey)) return lotId;
   }
   // Check standard and Type 1 aliases
-  const lower = text.toLowerCase();
+  const clean = text.toLowerCase();
+  const spaceless = clean.replace(/[\s\t\.\-]/g, '');
+
   for (const def of STANDARD_LOTTERIES) {
     for (const alias of def.aliases) {
-      if (lower.includes(alias.toLowerCase())) {
+      const aClean = alias.toLowerCase();
+      const aSpaceless = aClean.replace(/[\s\t\.\-]/g, '');
+      if (clean.includes(aClean) || (aSpaceless.length >= 3 && spaceless.includes(aSpaceless))) {
         return def.id;
       }
     }
@@ -101,10 +174,7 @@ export function extractLotteryDataFromText(
   fileName: string,
   pageNumber = 1
 ): ExtractionResult {
-  const lines = fullText
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
+  const lines = preprocessExtractedLines(fullText);
 
   const matchedLotteries: Partial<LotteryResultItem>[] = [];
   const unassignedRows: UnassignedExtractedRow[] = [];
@@ -287,25 +357,26 @@ export function parseLotteryLine(
   // 2. Extract Zodiac sign if lottery requires zodiac
   let zodiac: string | undefined;
   if (def.requiresZodiac) {
+    const normSpaceless = normalized.replace(/\s+/g, '');
     for (const z of ZODIAC_SIGNS) {
-      if (normalized.includes(z.si)) {
+      if (normSpaceless.includes(z.si) || normSpaceless.includes(z.en.toLowerCase())) {
         zodiac = z.si;
         break;
       }
     }
     if (!zodiac) {
-      if (normalized.includes('ෙම්ෂ') || normalized.includes('මේෂ')) zodiac = 'මේෂ';
-      else if (normalized.includes('වෘෂභ')) zodiac = 'වෘෂභ';
-      else if (normalized.includes('මිථුන')) zodiac = 'මිථුන';
-      else if (normalized.includes('කටක')) zodiac = 'කටක';
-      else if (normalized.includes('සිංහ')) zodiac = 'සිංහ';
-      else if (normalized.includes('කන්‍යා') || normalized.includes('කන්‍ය')) zodiac = 'කන්‍යා';
-      else if (normalized.includes('තුලා')) zodiac = 'තුලා';
-      else if (normalized.includes('වෘශ්චික')) zodiac = 'වෘශ්චික';
-      else if (normalized.includes('ධනු')) zodiac = 'ධනු';
-      else if (normalized.includes('මකර')) zodiac = 'මකර';
-      else if (normalized.includes('කුම්භ')) zodiac = 'කුම්භ';
-      else if (normalized.includes('මීන')) zodiac = 'මීන';
+      if (normSpaceless.includes('ෙම්ෂ') || normSpaceless.includes('මේෂ')) zodiac = 'මේෂ';
+      else if (normSpaceless.includes('සිංහ')) zodiac = 'සිංහ';
+      else if (normSpaceless.includes('කටක')) zodiac = 'කටක';
+      else if (normSpaceless.includes('කන්‍යා') || normSpaceless.includes('කන්‍ය')) zodiac = 'කන්‍යා';
+      else if (normSpaceless.includes('වෘෂභ')) zodiac = 'වෘෂභ';
+      else if (normSpaceless.includes('මිථුන')) zodiac = 'මිථුන';
+      else if (normSpaceless.includes('තුලා')) zodiac = 'තුලා';
+      else if (normSpaceless.includes('වෘශ්චික')) zodiac = 'වෘශ්චික';
+      else if (normSpaceless.includes('ධනු')) zodiac = 'ධනු';
+      else if (normSpaceless.includes('මකර')) zodiac = 'මකර';
+      else if (normSpaceless.includes('කුම්භ')) zodiac = 'කුම්භ';
+      else if (normSpaceless.includes('මීන')) zodiac = 'මීන';
     }
     if (!zodiac) {
       for (const [legZ, siZ] of Object.entries(LEGACY_ZODIAC_MAP)) {
@@ -322,14 +393,6 @@ export function parseLotteryLine(
   const bonusMatch = normalized.match(/\((\d{4,6})\)/);
   if (bonusMatch) {
     bonusNumber = bonusMatch[1];
-  }
-
-  // Special slash bonus for Dhana Sampatha e.g. 593 / 784
-  if (def.id === 'dhana_sampatha') {
-    const slashMatch = normalized.match(/(\d{2,4}\s*\/\s*\d{2,4})/);
-    if (slashMatch) {
-      bonusNumber = slashMatch[1].replace(/\s+/g, ' ');
-    }
   }
 
   // 4. Extract tiered numbers if applicable (e.g. 83 / 583 / 1583 / D or 32 / 432 / 2432 / O)
@@ -375,10 +438,26 @@ export function parseLotteryLine(
   let drawNo = firstToken;
   let rawNumbers = digitTokens.slice(1);
 
-  // If dhana_sampatha has slash bonus, filter out those bonus numbers from raw numbers
-  if (def.id === 'dhana_sampatha' && bonusNumber && bonusNumber.includes('/')) {
-    const bonusParts = bonusNumber.split('/').map(p => p.trim());
-    rawNumbers = rawNumbers.filter(n => !bonusParts.includes(n));
+  // Special slash bonus for Dhana Sampatha e.g. 593 / 784 or 5 9 3 / 7 8 4
+  let isDhanaSampathaSlashBonus = false;
+  let dhanaSampathaWinningDigits: string[] = [];
+
+  if (def.id === 'dhana_sampatha' && normalized.includes('/')) {
+    const slashIdx = normalized.indexOf('/');
+    const beforeSlash = normalized.substring(0, slashIdx);
+    const afterSlash = normalized.substring(slashIdx + 1);
+
+    const beforeDigits = beforeSlash.match(/\b\d+\b/g) || [];
+    const afterDigits = afterSlash.match(/\b\d+\b/g) || [];
+
+    if (beforeDigits.length >= 4 && afterDigits.length >= 1) {
+      isDhanaSampathaSlashBonus = true;
+      drawNo = beforeDigits[0] || '';
+      const afterBonusStr = afterDigits.join('');
+      const beforeBonusStr = beforeDigits.slice(-3).join('');
+      bonusNumber = `${beforeBonusStr} / ${afterBonusStr}`;
+      dhanaSampathaWinningDigits = beforeDigits.slice(1, -3);
+    }
   }
 
   // Handle legacy reverse order ONLY for legacy font where draw number is 3-4 digits at the end
@@ -390,21 +469,35 @@ export function parseLotteryLine(
   }
 
   // Handle bonus numbers: either from parens or candidate bonus for lotteries that require a bonus
-  if (bonusNumber) {
+  if (bonusNumber && !isDhanaSampathaSlashBonus) {
     rawNumbers = rawNumbers.filter(n => n !== bonusNumber);
-  } else if (def.hasBonusNumber && rawNumbers.length > 1) {
+  } else if (def.hasBonusNumber && rawNumbers.length > 1 && !bonusNumber) {
     const candidateBonus = rawNumbers[rawNumbers.length - 1];
     if (candidateBonus && candidateBonus.length >= 4 && candidateBonus.length <= 6) {
       bonusNumber = candidateBonus;
       rawNumbers = rawNumbers.slice(0, -1);
+    } else {
+      // Check for spaced single-digit tokens at tail e.g. ['1', '9', '5', '2', '0']
+      let tailCount = 0;
+      for (let j = rawNumbers.length - 1; j >= 0; j--) {
+        if (rawNumbers[j].length === 1) tailCount++;
+        else break;
+      }
+      if (tailCount >= 4 && tailCount <= 6) {
+        const tailTokens = rawNumbers.slice(rawNumbers.length - tailCount);
+        bonusNumber = tailTokens.join('');
+        rawNumbers = rawNumbers.slice(0, rawNumbers.length - tailCount);
+      }
     }
   }
 
   // Unpack fused numbers (e.g. '15214364' -> ['15', '21', '43', '64'], '8299' -> ['8', '2', '9', '9'])
-  let numbers = unpackNumberTokens(rawNumbers, def);
+  let numbers = isDhanaSampathaSlashBonus
+    ? dhanaSampathaWinningDigits
+    : unpackNumberTokens(rawNumbers, def);
 
   // If bonus number was still in numbers array (in case it wasn't filtered), remove it
-  if (bonusNumber) {
+  if (bonusNumber && !isDhanaSampathaSlashBonus) {
     numbers = numbers.filter(n => n !== bonusNumber);
   }
 

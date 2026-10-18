@@ -30,24 +30,31 @@ export async function POST(req: NextRequest) {
     const base64Data = fileBuffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
+    // Check serverless environment (Vercel or AWS Lambda)
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
     let relativeWebPath: string | null = null;
     let savedFilePath: string | null = null;
     let uploadDir: string | null = null;
     let previewImages: string[] = [];
 
-    // Attempt to save to public/uploads (works in local dev environments)
-    try {
-      const pubDir = path.join(process.cwd(), 'public', 'uploads', date);
-      if (!fs.existsSync(pubDir)) {
-        fs.mkdirSync(pubDir, { recursive: true });
+    if (!isServerless) {
+      // Local dev environment: save to public/uploads
+      try {
+        const pubDir = path.join(process.cwd(), 'public', 'uploads', date);
+        if (!fs.existsSync(pubDir)) {
+          fs.mkdirSync(pubDir, { recursive: true });
+        }
+        const pubFilePath = path.join(pubDir, `${fileId}_${sanitizedName}`);
+        fs.writeFileSync(pubFilePath, fileBuffer);
+        relativeWebPath = `/uploads/${date}/${fileId}_${sanitizedName}`;
+        savedFilePath = pubFilePath;
+        uploadDir = pubDir;
+      } catch (localErr) {
+        console.warn('Could not write to local public/uploads:', localErr);
       }
-      const pubFilePath = path.join(pubDir, `${fileId}_${sanitizedName}`);
-      fs.writeFileSync(pubFilePath, fileBuffer);
-      relativeWebPath = `/uploads/${date}/${fileId}_${sanitizedName}`;
-      savedFilePath = pubFilePath;
-      uploadDir = pubDir;
-    } catch {
-      // In read-only serverless environment (like Vercel /var/task), save to os.tmpdir() instead
+    } else {
+      // Serverless (Vercel): write to os.tmpdir() for ephemeral processing if needed
       try {
         const tmpDir = path.join(os.tmpdir(), 'lottery_uploads', date);
         if (!fs.existsSync(tmpDir)) {
@@ -57,7 +64,7 @@ export async function POST(req: NextRequest) {
         fs.writeFileSync(savedFilePath, fileBuffer);
         uploadDir = tmpDir;
       } catch (tmpErr) {
-        console.warn('Could not write to tmpdir, operating purely in-memory:', tmpErr);
+        console.warn('Operating purely in-memory:', tmpErr);
       }
     }
 
@@ -79,7 +86,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Secondary fallback: if python is present and local (Windows dev)
-      if (!extractedText && savedFilePath && uploadDir) {
+      if (!extractedText && savedFilePath && uploadDir && !isServerless) {
         try {
           const pythonScript = path.join(process.cwd(), 'scripts', 'extract.py');
           if (fs.existsSync(pythonScript)) {
@@ -108,12 +115,17 @@ export async function POST(req: NextRequest) {
       1
     );
 
-    const displayPath = relativeWebPath || dataUrl;
-    const previewImg = (previewImages && previewImages.length > 0)
-      ? previewImages[0]
-      : (fileType === 'pdf'
-          ? (relativeWebPath ? `${relativeWebPath}_preview-1.png` : dataUrl)
-          : displayPath);
+    // On Vercel, public runtime files are not served by Edge CDN, so dataUrl is the primary source of truth.
+    // Locally, relativeWebPath is used when available.
+    const displayPath = (isServerless ? dataUrl : relativeWebPath) || dataUrl;
+    
+    // For preview image: only use if an actual raster image exists. Never invent a fake _preview-1.png!
+    let previewImg: string | undefined = undefined;
+    if (previewImages && previewImages.length > 0) {
+      previewImg = previewImages[0];
+    } else if (fileType !== 'pdf') {
+      previewImg = displayPath;
+    }
 
     const sourceDoc: SourceDocument = {
       id: fileId,
@@ -130,10 +142,16 @@ export async function POST(req: NextRequest) {
       status: 'extracted',
     };
 
-    // Automatically save uploaded document metadata to Cloud Firestore (separate branch)
+    // Automatically save uploaded document metadata to Cloud Firestore (sanitized to avoid 1MB limit)
     try {
       const { saveSourceDocToCloud } = await import('@/lib/cloud-service');
-      await saveSourceDocToCloud(sourceDoc, date, {
+      const cloudDoc: SourceDocument = {
+        ...sourceDoc,
+        // Don't blow up Firestore document limit with massive base64 strings
+        filePath: sourceDoc.filePath.length > 50000 ? '[Stored in Browser Session]' : sourceDoc.filePath,
+        previewImageUrl: sourceDoc.previewImageUrl && sourceDoc.previewImageUrl.length > 50000 ? undefined : sourceDoc.previewImageUrl,
+      };
+      await saveSourceDocToCloud(cloudDoc, date, {
         detectedDate: extraction.detectedDate,
         matchedCount: extraction.matchedLotteries?.length || 0,
       });

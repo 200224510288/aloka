@@ -252,8 +252,8 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: false,
     numberCount: 4,
     aliases: [
-      'ධන නිධානය', 'ධනනිධානය', 'Ok kssOdkh', 'Ok ks Odkh', 'Ok kss', 
-      'dhana nidhanaya', 'dhananidhanaya', 'dhana nidana'
+      'ධන නිධානය', 'ධනනිධානය', 'ධන නි ධානය', 'නි ධානය', 'නිධානය', 'Ok kssOdkh', 'Ok ks Odkh', 'Ok kss', 
+      'dhana nidhanaya', 'dhananidhanaya', 'dhana nidana', 'nidhanaya'
     ]
   },
   {
@@ -267,7 +267,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: false,
     numberCount: 4,
     aliases: [
-      'ගොවිසෙත', 'ගොවි සෙත', 'ෙගාවිෙසත', 'ෙගාවි ෙසත',
+      'ගොවිසෙත', 'ගොවි සෙත', 'ෙගාවිෙසත', 'ෙගාවි ෙසත', 'ගොවි', 'ෙගාවි',
       'f.dúfi;', 'f.dවි fi;', 'f.dú', 
       'govisetha', 'govi setha', 'govisetha nlb'
     ]
@@ -283,7 +283,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: true,
     numberCount: 4,
     aliases: [
-      'හඳහන', 'හදහන', 'y`oyk', 'yoyk', 
+      'හඳහන', 'හදහන', 'හඳ හන', 'y`oyk', 'yoyk', 
       'handahana', 'hadahana', 'handahana dlb'
     ]
   },
@@ -333,7 +333,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     numberCount: 4,
     hasBonusNumber: true,
     aliases: [
-      'ලග්න වාසනා', 'ලග්නවාසනා', 'ලග්න වාසනාව', 'ලග්නවාසනාව',
+      'ලග්න වාසනා', 'ලග්නවාසනා', 'ලග්න වාසනාව', 'ලග්නවාසනාව', 'ලග්න',
       ',.ak jdikd', ',.ak', 
       'lagna wasana', 'lagnawasana', 'lagna vasana'
     ]
@@ -349,7 +349,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: false,
     numberCount: 6, // 6 individual digits: e.g. 8 0 2 4 3 2
     aliases: [
-      'මහජන සම්පත', 'මහජනසම්පත', 'uyckiïm;', 'uyck iïm;', 'uyck', 
+      'මහජන සම්පත', 'මහජනසම්පත', 'මහජන', 'uyckiïm;', 'uyck iïm;', 'uyck', 
       'mahajana sampatha', 'mahajanasampatha', 'mahajana'
     ]
   },
@@ -413,7 +413,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     numberCount: 4,
     hasBonusNumber: true, // bonus number in parens e.g. (86597)
     aliases: [
-      'ශනිදා වාසනා', 'ශනිදාවාසනා', 'ශනිදා වාසනාව', 'ශනිදාවාසනාව',
+      'ශනිදා වාසනා', 'ශනිදාවාසනා', 'ශනිදා වාසනාව', 'ශනිදාවාසනාව', 'ශනිදා',
       'Yksod jdikd', 'Yk sod jdikd', 'Yksod', 
       'shanida wasana', 'shanidawasana', 'shanida'
     ]
@@ -429,8 +429,8 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: true,
     numberCount: 3, // 3 numbers: e.g. 10 26 30
     aliases: [
-      'සුබ දවසක්', 'සුබදවසක්', 'iqn ojila', 'iqn', 
-      'suba dawasak', 'subadawasak'
+      'සුබ දවසක්', 'සුබදවසක්', 'සුබ දවස', 'සුබදවස', 'බ දවසක්', 'බදවසක්', 'දවසක්', 'iqn ojila', 'iqn', 
+      'suba dawasak', 'subadawasak', 'suba'
     ]
   },
   {
@@ -445,7 +445,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     numberCount: 4,
     hasBonusNumber: true, // bonus number in parens e.g. (85244)
     aliases: [
-      'සුපර්බෝල්', 'සුපර් බෝල්', 'සුපර් ෙබා්ල්', 'සුපර් ෙබෝල්', 'සුපර්ෙබා්ල්',
+      'සුපර්බෝල්', 'සුපර් බෝල්', 'සුපර් ෙබා්ල්', 'සුපර් ෙබෝල්', 'සුපර්ෙබා්ල්', 'පර් ෙබා්ල්', 'පර් ෙබෝල්', 'පර් බෝල්', 'පර්ෙබා්ල්', 'පර්බෝල්',
       'iqm¾fnda,a', 'iqm¾', 
       'super ball', 'superball', 'super bol'
     ]
@@ -461,7 +461,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresZodiac: false,
     numberCount: 6, // 6 individual digits: e.g. 2 6 0 6 4 9
     aliases: [
-      'ධන සම්පත', 'ධනසම්පත', 'සුපිරි ධන ස.', 'සුපිරි ධන ස', 'සුපිරි ධන', 'සුපිරි ධන සම්පත', 'සුපිරි ධනසම්පත',
+      'ධන සම්පත', 'ධනසම්පත', 'සුපිරි ධන ස.', 'සුපිරි ධන ස', 'සුපිරි ධන', 'සුපිරි ධන සම්පත', 'සුපිරි ධනසම්පත', 'ධන ස.', 'ධන ස',
       'Ok iïm;', 'Ok iï', 
       'dhana sampatha', 'dhanasampatha', 'supiri dhana'
     ]

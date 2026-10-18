@@ -39,10 +39,10 @@ function getDirectories() {
 function ensureDirectories() {
   try {
     const { DATA_DIR, SHEETS_DIR, REVISIONS_DIR, UPLOADS_DIR } = getDirectories();
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(SHEETS_DIR)) fs.mkdirSync(SHEETS_DIR, { recursive: true });
-    if (!fs.existsSync(REVISIONS_DIR)) fs.mkdirSync(REVISIONS_DIR, { recursive: true });
-    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    if (!fs.existsSync(/*turbopackIgnore: true*/ DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(/*turbopackIgnore: true*/ SHEETS_DIR)) fs.mkdirSync(SHEETS_DIR, { recursive: true });
+    if (!fs.existsSync(/*turbopackIgnore: true*/ REVISIONS_DIR)) fs.mkdirSync(REVISIONS_DIR, { recursive: true });
+    if (!fs.existsSync(/*turbopackIgnore: true*/ UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   } catch (err) {
     console.warn('Could not ensure local storage directories:', err);
   }
@@ -147,8 +147,8 @@ export function listAvailableDates(): string[] {
   try {
     ensureDirectories();
     const { SHEETS_DIR } = getDirectories();
-    if (fs.existsSync(SHEETS_DIR)) {
-      const files = fs.readdirSync(SHEETS_DIR);
+    if (fs.existsSync(/*turbopackIgnore: true*/ SHEETS_DIR)) {
+      const files = fs.readdirSync(/*turbopackIgnore: true*/ SHEETS_DIR);
       for (const f of files) {
         if (f.endsWith('.json')) {
           dates.add(f.replace('.json', ''));

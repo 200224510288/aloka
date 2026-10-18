@@ -30,6 +30,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [hasImgError, setHasImgError] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'preview' | 'text'>('preview');
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto sync active document when sources list changes
@@ -42,6 +44,42 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   }, [sources, selectedSourceId]);
 
   const activeDoc = sources.find(s => s.id === selectedSourceId) || sources[0];
+
+  // Convert PDF data URLs or local files into authentic Blob URLs for iframe viewing
+  useEffect(() => {
+    if (!activeDoc || activeDoc.fileType !== 'pdf' || !activeDoc.filePath) {
+      setPdfBlobUrl('');
+      return;
+    }
+
+    if (activeDoc.filePath.startsWith('blob:') || activeDoc.filePath.startsWith('/')) {
+      setPdfBlobUrl(activeDoc.filePath);
+      return;
+    }
+
+    if (activeDoc.filePath.startsWith('data:application/pdf;base64,')) {
+      try {
+        const base64 = activeDoc.filePath.split(',')[1];
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfBlobUrl(url);
+
+        return () => {
+          URL.revokeObjectURL(url);
+        };
+      } catch (err) {
+        console.warn('Failed to parse PDF data URL to blob:', err);
+        setPdfBlobUrl(activeDoc.filePath);
+      }
+    } else {
+      setPdfBlobUrl(activeDoc.filePath);
+    }
+  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.fileType]);
 
   // Reset image error state whenever active document changes
   useEffect(() => {
@@ -64,15 +102,16 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   // Build preview image URL for active document (Strictly Page 1)
   const getPreviewImageUrl = () => {
     if (!activeDoc) return null;
-    if (activeDoc.previewImageUrl) {
-      return activeDoc.previewImageUrl;
-    }
     if (activeDoc.fileName === 'result sheet wireframe.pdf') {
       return '/samples/sample_page_1.png';
     }
+    // Only use previewImageUrl if it is an actual raster image and not a phantom _preview-1.png
+    if (activeDoc.previewImageUrl && !activeDoc.previewImageUrl.endsWith('_preview-1.png')) {
+      return activeDoc.previewImageUrl;
+    }
+    // For PDFs without pre-rendered raster images, return null to show native PDF iframe directly
     if (activeDoc.fileType === 'pdf') {
-      const base = activeDoc.filePath.replace(/\.pdf$/i, '');
-      return `${base}_preview-1.png`;
+      return null;
     }
     return activeDoc.filePath;
   };
@@ -211,19 +250,49 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* View controls toolbar */}
             <div className="h-9 px-3 bg-white border-b border-slate-200 flex items-center justify-between gap-2 z-10">
-              {/* Page indicator */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0">
-                <span
-                  className="text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1"
-                  title="Multi-page uploads strictly consider only Page 1 for extraction and display"
-                >
-                  <span className="bg-blue-600 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase tracking-wider">Page 1</span>
-                  {activeDoc?.totalFilePages && activeDoc.totalFilePages > 1 && (
-                    <span className="text-[10px] text-blue-700 font-bold">
-                      of {activeDoc.totalFilePages}
-                    </span>
-                  )}
-                </span>
+              {/* Left: Page indicator & Mode toggle */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0">
+                  <span
+                    className="text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1"
+                    title="Multi-page uploads strictly consider only Page 1 for extraction and display"
+                  >
+                    <span className="bg-blue-600 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase tracking-wider">Page 1</span>
+                    {activeDoc?.totalFilePages && activeDoc.totalFilePages > 1 && (
+                      <span className="text-[10px] text-blue-700 font-bold">
+                        of {activeDoc.totalFilePages}
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {/* View Mode Toggle */}
+                {activeDoc?.extractedText && (
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('preview')}
+                      className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                        viewMode === 'preview'
+                          ? 'bg-white text-blue-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Document
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('text')}
+                      className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                        viewMode === 'text'
+                          ? 'bg-white text-blue-700 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Extracted Text
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action buttons & Zoom controls */}
@@ -237,46 +306,68 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     title={`Remove file "${activeDoc.fileName}"`}
                   >
                     <Trash2 className="w-3 h-3" />
-                    <span>Remove File</span>
+                    <span>Remove</span>
                   </button>
                 )}
 
-                {/* Zoom controls */}
-                <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.2))}
-                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
-                    title="Zoom Out"
-                  >
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[11px] font-semibold text-slate-600 min-w-[34px] text-center">
-                    {Math.round(zoomLevel * 100)}%
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setZoomLevel(z => Math.min(2.5, z + 0.2))}
-                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
-                    title="Zoom In"
-                  >
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomLevel(1)}
-                    className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
-                    title="Reset Zoom"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {/* Zoom controls (only for image preview mode) */}
+                {viewMode === 'preview' && previewUrl && !hasImgError && (
+                  <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.2))}
+                      className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] font-semibold text-slate-600 min-w-[34px] text-center">
+                      {Math.round(zoomLevel * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setZoomLevel(z => Math.min(2.5, z + 0.2))}
+                      className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomLevel(1)}
+                      className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-white"
+                      title="Reset Zoom"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Scrollable image canvas / PDF viewer */}
+            {/* Scrollable image canvas / PDF viewer / Extracted Text */}
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-100/70">
-              {previewUrl && !hasImgError ? (
+              {viewMode === 'text' && activeDoc?.extractedText ? (
+                <div className="w-full h-full bg-white rounded-lg border border-slate-200 p-4 overflow-auto shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 text-xs">
+                    <span className="font-bold text-slate-700">Raw Extracted OCR Text (Strictly Page 1)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeDoc?.extractedText) {
+                          navigator.clipboard.writeText(activeDoc.extractedText);
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
+                    >
+                      Copy All Text
+                    </button>
+                  </div>
+                  <pre className="font-mono text-xs text-slate-800 whitespace-pre-wrap leading-relaxed select-text flex-1">
+                    {activeDoc.extractedText}
+                  </pre>
+                </div>
+              ) : previewUrl && !hasImgError ? (
                 <div
                   className="transition-transform duration-100 origin-center shadow-lg bg-white rounded border border-slate-300"
                   style={{ transform: `scale(${zoomLevel})` }}
@@ -293,7 +384,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                   />
                 </div>
               ) : activeDoc?.fileType === 'pdf' ? (
-                /* Native PDF viewer fallback */
+                /* Native PDF viewer fallback using Blob URL */
                 <div className="w-full h-full min-h-[550px] flex flex-col bg-white rounded-lg border border-slate-300 overflow-hidden shadow-sm">
                   <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs text-slate-700">
                     <span className="font-semibold flex items-center gap-1.5">
@@ -301,7 +392,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                       <span>Native PDF Viewer (Page 1)</span>
                     </span>
                     <a
-                      href={activeDoc.filePath}
+                      href={pdfBlobUrl || activeDoc.filePath}
                       target="_blank"
                       rel="noreferrer"
                       className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
@@ -310,7 +401,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     </a>
                   </div>
                   <iframe
-                    src={`${activeDoc.filePath}#page=1&toolbar=0&navpanes=0`}
+                    src={`${pdfBlobUrl || activeDoc.filePath}#page=1&toolbar=0&navpanes=0`}
                     title="Source PDF Document"
                     className="w-full flex-1 min-h-[500px] border-none"
                   />
@@ -321,7 +412,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                   <p className="text-xs font-bold text-slate-700 mb-1">{activeDoc?.fileName}</p>
                   <p className="text-[11px] text-slate-500 mb-3">Uploaded source document</p>
                   <a
-                    href={activeDoc?.filePath}
+                    href={pdfBlobUrl || activeDoc?.filePath}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700"

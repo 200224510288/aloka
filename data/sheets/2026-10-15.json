@@ -1,143 +1,124 @@
 {
-  "date": "2026-10-15",
-  "dayOfWeekSi": "බ්‍රහස්පතින්දා",
-  "headerGreeting": "ඔබට සුබ දවසක් !",
-  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+  "lastCloudUpdate": "2026-10-16T12:28:09.690Z",
   "footerAnnouncement": "ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්",
-  "isFooterReviewed": false,
-  "sources": [
-    {
-      "id": "doc_1792129461274_w5td4",
-      "fileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "fileType": "pdf",
-      "filePath": "/uploads/2026-10-15/doc_1792129461274_w5td4_lklottery_results_Sinhala_20261015_Thu.pdf",
-      "fileSize": 58959,
-      "uploadedAt": "2026-10-16T05:44:22.498Z",
-      "pageCount": 1,
-      "totalFilePages": 1,
-      "previewImageUrl": "/uploads/2026-10-15/doc_1792129461274_w5td4_lklottery_results_Sinhala_20261015_Thu_preview-1.png",
-      "extractedText": "ෙලාතරැයි ප්‍රතිඵල\nඅද ෙකා්ටිපති\n3141 E 15214364\nඅද සම්පත\n916 34 / 934/5934/ Z\nආයුෙබා්\n4 A 8299\nධන නිධානය\n2371 K 02053660\nෙගාවිෙසත\n4583 N31324554\nහඳහන\n1650\n  සිංහ07082057\nජය සම්පත\n523 91 / 191/3191/ N\nකප්රුක\n2491 J 1416252756\nලග්න වාසනාව\n5027\n  ෙම්ෂ08112329 67211\nමහජන සම්පත\n6341 Z 925934\nෙමගා පවර්\n2689 Z1604306373\nNLB ජය\n609 A 6962\nසසිරි\n1145 011011\nශනිදා වාසනාව\n5476 F 06124680 19520\nසුබ දවසක්\n457\n  සිංහ414766\nසුපර් ෙබා්ල්\n3315 Z 18205465 62088\nසුපිරි ධන ස.\n1049 N 103191 593 / 784\nවාසි\n15 E 075311\n2026-10-15 බ්‍රහස්පතින්දා\n©lklottery.com. අප ශ්‍රී ලංකාෙ\u0000 ෙලාතරැයි මණ්ඩල හා අනුබද්ධ ආයතනයක් ෙනාවන අතර, ෙමය නිල ප්‍රතිඵල සමග නිරවද\u0000තාවය තහවුරු කරගැනීෙමන් පසුව පළ කිරීමට වගබලාගන්න.",
-      "detectedDate": "2026-10-15",
-      "status": "extracted"
-    }
-  ],
-  "updatedAt": "2026-10-16T07:58:44.488Z",
   "lotteries": [
     {
-      "lotteryId": "ada_kotipathi",
-      "drawNo": "3141",
       "letter": "E",
+      "drawNo": "3141",
+      "lotteryId": "ada_kotipathi",
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
+      "extractionConfidence": 95,
+      "isCheckedAgainstSource": false,
+      "sourcePage": 1,
+      "isNoDraw": false,
       "numbers": [
         "15",
         "21",
         "43",
         "64"
-      ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      ]
     },
     {
-      "lotteryId": "ada_sampatha",
-      "drawNo": "916",
+      "isNoDraw": false,
+      "extractionConfidence": 98,
+      "isCheckedAgainstSource": false,
       "letter": "Z",
+      "drawNo": "916",
+      "sourcePage": 1,
+      "lotteryId": "ada_sampatha",
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "numbers": [
         "34",
         "934",
         "5934"
-      ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      ]
     },
     {
+      "sourcePage": 1,
       "lotteryId": "ayubo",
       "drawNo": "4",
+      "isNoDraw": false,
       "letter": "A",
+      "extractionConfidence": 95,
+      "isCheckedAgainstSource": false,
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "numbers": [
         "8",
         "2",
         "9",
         "9"
-      ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      ]
     },
     {
       "lotteryId": "dhana_nidhanaya",
       "drawNo": "2371",
+      "isNoDraw": false,
       "letter": "K",
+      "isCheckedAgainstSource": false,
       "numbers": [
         "02",
         "05",
         "36",
         "60"
       ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "sourcePage": 1,
+      "extractionConfidence": 95
     },
     {
-      "lotteryId": "govisetha",
-      "drawNo": "4583",
+      "extractionConfidence": 95,
       "letter": "N",
+      "drawNo": "4583",
+      "isNoDraw": false,
       "numbers": [
         "31",
         "32",
         "45",
         "54"
       ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "isCheckedAgainstSource": false,
+      "sourcePage": 1,
+      "lotteryId": "govisetha",
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf"
     },
     {
       "lotteryId": "handahana",
+      "isCheckedAgainstSource": false,
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "drawNo": "1650",
       "letter": "",
       "zodiac": "සිංහ",
+      "isNoDraw": false,
+      "sourcePage": 1,
+      "extractionConfidence": 95,
       "numbers": [
         "07",
         "08",
         "20",
         "57"
-      ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      ]
     },
     {
+      "isNoDraw": false,
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "lotteryId": "jaya_sampatha",
-      "drawNo": "523",
       "letter": "N",
+      "extractionConfidence": 98,
       "numbers": [
         "91",
         "191",
         "3191"
       ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
+      "drawNo": "523",
+      "isCheckedAgainstSource": false,
       "sourcePage": 1
     },
     {
-      "lotteryId": "kapruka",
       "drawNo": "2491",
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
+      "boxedIndex": 0,
       "letter": "J",
+      "isNoDraw": false,
       "numbers": [
         "14",
         "16",
@@ -145,35 +126,38 @@
         "27",
         "56"
       ],
-      "boxedIndex": 0,
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "lotteryId": "kapruka",
+      "isCheckedAgainstSource": false,
+      "sourcePage": 1,
+      "extractionConfidence": 95
     },
     {
-      "lotteryId": "lagna_wasana",
-      "drawNo": "5027",
-      "letter": "",
       "zodiac": "මේෂ",
+      "isNoDraw": false,
+      "sourcePage": 1,
+      "bonusNumber": "67211",
+      "isCheckedAgainstSource": false,
       "numbers": [
         "08",
         "11",
         "23",
         "29"
       ],
-      "bonusNumber": "67211",
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "lotteryId": "lagna_wasana",
+      "extractionConfidence": 95,
+      "drawNo": "5027",
+      "letter": ""
     },
     {
-      "lotteryId": "mahajana_sampatha",
-      "drawNo": "6341",
+      "isCheckedAgainstSource": false,
       "letter": "Z",
+      "sourcePage": 1,
+      "drawNo": "6341",
+      "isNoDraw": false,
+      "lotteryId": "mahajana_sampatha",
+      "extractionConfidence": 95,
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "numbers": [
         "9",
         "2",
@@ -181,17 +165,11 @@
         "9",
         "3",
         "4"
-      ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      ]
     },
     {
-      "lotteryId": "mega_power",
-      "drawNo": "2689",
-      "letter": "Z",
+      "isNoDraw": false,
+      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
       "numbers": [
         "16",
         "04",
@@ -199,98 +177,97 @@
         "63",
         "73"
       ],
+      "lotteryId": "mega_power",
       "boxedIndex": 0,
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
+      "sourcePage": 1,
       "extractionConfidence": 95,
-      "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "letter": "Z",
+      "drawNo": "2689",
+      "isCheckedAgainstSource": false
     },
     {
-      "lotteryId": "nlb_jaya",
-      "drawNo": "609",
-      "letter": "A",
       "numbers": [
         "6",
         "9",
         "6",
         "2"
       ],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
+      "isCheckedAgainstSource": false,
       "extractionConfidence": 95,
+      "lotteryId": "nlb_jaya",
+      "letter": "A",
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
+      "isNoDraw": false,
+      "drawNo": "609",
       "sourcePage": 1
     },
     {
-      "lotteryId": "sasiri",
-      "drawNo": "1145",
-      "letter": "",
+      "isCheckedAgainstSource": false,
       "numbers": [
         "01",
         "10",
         "11"
       ],
       "isNoDraw": false,
-      "isCheckedAgainstSource": true,
+      "sourcePage": 1,
+      "lotteryId": "sasiri",
       "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "drawNo": "1145",
+      "letter": ""
     },
     {
-      "lotteryId": "shanida_wasana",
-      "drawNo": "5476",
-      "letter": "F",
+      "sourcePage": 1,
       "numbers": [
         "06",
         "12",
         "46",
         "80"
       ],
-      "bonusNumber": "19520",
       "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "isCheckedAgainstSource": false,
+      "extractionConfidence": 95,
+      "letter": "F",
+      "bonusNumber": "19520",
+      "lotteryId": "shanida_wasana",
+      "drawNo": "5476"
     },
     {
-      "lotteryId": "suba_dawasak",
       "drawNo": "457",
       "letter": "",
-      "zodiac": "සිංහ",
       "numbers": [
         "41",
         "47",
         "66"
       ],
+      "lotteryId": "suba_dawasak",
+      "zodiac": "සිංහ",
+      "isCheckedAgainstSource": false,
       "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "sourcePage": 1,
+      "extractionConfidence": 95
     },
     {
-      "lotteryId": "super_ball",
-      "drawNo": "3315",
+      "isNoDraw": false,
       "letter": "Z",
+      "drawNo": "3315",
+      "isCheckedAgainstSource": false,
       "numbers": [
         "18",
         "20",
         "54",
         "65"
       ],
+      "lotteryId": "super_ball",
       "bonusNumber": "62088",
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "sourcePage": 1,
+      "extractionConfidence": 95
     },
     {
-      "lotteryId": "dhana_sampatha",
-      "drawNo": "1049",
-      "letter": "N",
+      "isCheckedAgainstSource": false,
       "numbers": [
         "1",
         "0",
@@ -299,28 +276,54 @@
         "9",
         "1"
       ],
-      "bonusNumber": "593 / 784",
+      "lotteryId": "dhana_sampatha",
+      "letter": "N",
+      "drawNo": "1049",
       "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
+      "bonusNumber": "593 / 784",
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "sourcePage": 1,
+      "extractionConfidence": 95
     },
     {
-      "lotteryId": "vasi",
+      "extractionConfidence": 95,
+      "isNoDraw": false,
+      "boxedIndex": 2,
       "drawNo": "15",
-      "letter": "E",
       "numbers": [
         "07",
         "53",
         "11"
       ],
-      "boxedIndex": 2,
-      "isNoDraw": false,
-      "isCheckedAgainstSource": true,
-      "extractionConfidence": 95,
+      "letter": "E",
+      "lotteryId": "vasi",
+      "sourcePage": 1,
       "sourceFileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
-      "sourcePage": 1
+      "isCheckedAgainstSource": false
     }
-  ]
+  ],
+  "dayOfWeekSi": "බ්‍රහස්පතින්දා",
+  "syncedAt": "2026-10-16T12:28:09.690Z",
+  "date": "2026-10-15",
+  "headerGreeting": "ඔබට සුබ දවසක් !",
+  "updatedAt": "2026-10-16T12:39:18.772Z",
+  "isFooterReviewed": false,
+  "sources": [
+    {
+      "id": "doc_1792154358555_i141f",
+      "fileName": "lklottery_results_Sinhala_20261015_Thu.pdf",
+      "fileType": "pdf",
+      "filePath": "/uploads/2026-10-15/doc_1792154358555_i141f_lklottery_results_Sinhala_20261015_Thu.pdf",
+      "fileSize": 58959,
+      "uploadedAt": "2026-10-16T12:39:18.610Z",
+      "pageCount": 1,
+      "totalFilePages": 1,
+      "previewImageUrl": "/uploads/2026-10-15/doc_1792154358555_i141f_lklottery_results_Sinhala_20261015_Thu.pdf_preview-1.png",
+      "extractedText": "ෙලාතරැයි ප්‍රති ඵල\nඅද ෙකා්ටිපති\n3141 E \t15 \t21 \t43 \t64\nඅද සම්පත\n916 34 \t/ \t934 \t/ \t5934 \t/ \tZ\nආයුෙබා්\n4 A \t8 \t2 \t9 \t9\nධන නි ධානය\n2371 K \t02 \t05 \t36 \t60\nෙගාවිෙසත\n4583 N \t31 \t32 \t45 \t54\nහඳහන\n1650 සි ංහ \t07 \t08 \t20 \t57\nජය සම්පත\n523 91 \t/ \t191 \t/ \t3191 \t/ \tN\nකප්රුක\n2491 J \t14 \t16 \t25 \t27 \t56\nලග්න වාසනාව\n5027 ෙම්ෂ \t08 \t11 \t23 \t29 \t6 7 2 1 1\nමහජන සම්පත\n6341 Z \t9 \t2 \t5 \t9 \t3 \t4\nෙමගා පවර්\n2689 Z \t16 \t04 \t30 \t63 \t73\nNLB ජය\n609 A \t6 \t9 \t6 \t2\nසසිරි\n1145 01 \t10 \t11\nශනිදා වාසනාව\n5476 F \t06 \t12 \t46 \t80 \t1 9 5 2 0\nසු\nබ දවසක්\n457 සි ංහ \t41 \t47 \t66\nසු\nපර් ෙබා්ල්\n3315 Z \t18 \t20 \t54 \t65 \t6 2 0 8 8\nසුපිරි\nධන ස.\n1049 N \t1 \t0 \t3 \t1 \t9 \t1 \t5 9 3 / 7 8 4\nවාසි\n15 E \t07 \t53 \t11\n2026-10-15බ්‍ර \tහස්පතින්දා\n©lklottery.com. අප ශ්‍රී ලංකාෙ\u0000 ෙලාතරැයි මණ්ඩල හා අනුබද්ධ ආයතනයක් ෙනාවන අතර, ෙමය නි ල ප්‍රති ඵල සමග නි රවද\u0000තාවය තහවුරු කරගැනීෙමන් පසුව පළ කිරී මට වගබලාගන්න.",
+      "detectedDate": "2026-10-15",
+      "status": "extracted"
+    }
+  ],
+  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+  "branch": "result-generator"
 }

@@ -29,8 +29,15 @@ import {
   Star,
   Trash2,
   Plus,
+  Minus,
   Type,
-  Bold
+  Bold,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Layers,
+  Ruler,
+  MoveVertical,
+  Check
 } from 'lucide-react';
 import SaveDesignModal from './SaveDesignModal';
 
@@ -61,13 +68,13 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
 }) => {
   const [scale, setScale] = useState<number>(0.46);
   const [showCutGuide, setShowCutGuide] = useState<boolean>(true);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>('standard');
   const [savedDesigns, setSavedDesigns] = useState<SavedCustomDesign[]>([]);
   const [defaultDesignId, setDefaultDesignId] = useState<string | null>(null);
   const [activeCustomDesignId, setActiveCustomDesignId] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
-  const [customizerTab, setCustomizerTab] = useState<'all' | 'typography' | 'layout'>('all');
+  const [customizerTab, setCustomizerTab] = useState<'presets' | 'typography' | 'spacing'>('presets');
 
   // Internal styles state initialized with DEFAULT_STYLE_OPTIONS
   const [styles, setStyles] = useState<PreviewStyleOptions>({
@@ -371,6 +378,79 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
           </option>
         ))}
       </select>
+    );
+  };
+
+  // Helper: Render slider with precise - / + stepper buttons for reduced cognitive friction
+  const renderSliderWithStepper = (
+    label: string,
+    sinhalaLabel: string,
+    value: number,
+    unit: string,
+    min: number,
+    max: number,
+    step: number,
+    onChange: (val: number) => void,
+    defaultValue?: number
+  ) => {
+    const handleStep = (delta: number) => {
+      const next = Math.min(max, Math.max(min, Number((value + delta).toFixed(2))));
+      onChange(next);
+    };
+
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+            <span>{label}</span>
+            <span className="text-slate-500 font-sinhala font-normal">({sinhalaLabel})</span>
+          </label>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[11px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+              {value.toFixed(1)} {unit}
+            </span>
+            {defaultValue !== undefined && value !== defaultValue && (
+              <button
+                type="button"
+                onClick={() => onChange(defaultValue)}
+                className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                title={`Reset to default (${defaultValue}${unit})`}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleStep(-step)}
+            disabled={value <= min}
+            className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-slate-700 font-bold text-xs flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-300"
+            title={`Decrease by ${step}${unit}`}
+          >
+            -
+          </button>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(parseFloat(e.target.value))}
+            className="flex-1 accent-blue-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+          />
+          <button
+            type="button"
+            onClick={() => handleStep(step)}
+            disabled={value >= max}
+            className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-slate-700 font-bold text-xs flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-300"
+            title={`Increase by ${step}${unit}`}
+          >
+            +
+          </button>
+        </div>
+      </div>
     );
   };
 
@@ -682,43 +762,46 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
     <div className="flex flex-col h-full w-full bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
       
       {/* Top Toolbar */}
-      <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Printer className="w-4 h-4 text-blue-600" />
-          <h2 className="text-sm font-bold text-slate-800">
-            Print Preview — A4 Landscape (2 Identical Copies)
-          </h2>
-          <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-            297 × 210 mm
-          </span>
-        </div>
-
+      <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 z-20">
         <div className="flex items-center gap-2">
           {/* Custom Layout Controls Toggle Button */}
           <button
             type="button"
             onClick={() => setShowSettings(v => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-bold transition border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition border cursor-pointer ${
               showSettings
                 ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                 : hasCustomChanges
                 ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
                 : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
             }`}
-            title="Customize font sizes, row height, and padding"
+            title={showSettings ? 'Hide layout controls sidebar' : 'Show layout controls sidebar'}
           >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Layout Controls (සැකසුම්)</span>
-            {hasCustomChanges && (
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            )}
             {showSettings ? (
-              <ChevronUp className="w-3.5 h-3.5 ml-0.5" />
+              <PanelLeftClose className="w-3.5 h-3.5" />
             ) : (
-              <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+              <PanelLeftOpen className="w-3.5 h-3.5" />
+            )}
+            <span>{showSettings ? 'Hide Controls' : 'Layout Controls (සැකසුම්)'}</span>
+            {hasCustomChanges && !showSettings && (
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             )}
           </button>
 
+          <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5">
+            <Printer className="w-4 h-4 text-blue-600 hidden sm:block" />
+            <h2 className="text-xs sm:text-sm font-bold text-slate-800">
+              Print Preview — A4 Landscape
+            </h2>
+            <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded hidden md:inline">
+              2 Copies • 297 × 210 mm
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Ink-Saver Print Density Toggle */}
           <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
             <button
@@ -765,7 +848,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
           {/* Scale controls */}
           <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs">
             <button
-              onClick={() => setScale(s => Math.max(0.4, Number((s - 0.05).toFixed(2))))}
+              onClick={() => setScale(s => Math.max(0.35, Number((s - 0.05).toFixed(2))))}
               className="p-1 hover:text-blue-600 cursor-pointer"
               title="Zoom Out"
             >
@@ -811,228 +894,305 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
         </div>
       </div>
 
-      {/* Expandable Layout Customizer Drawer */}
-      {showSettings && (
-        <div className="p-4 bg-slate-50/95 border-b border-slate-200 transition-all animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="max-w-5xl mx-auto space-y-4">
+      {/* 2-Column Split Workspace: Left Controls Sidebar + Right Live Preview */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-[620px]">
+        
+        {/* Left Side: Layout Controls Sidebar */}
+        {showSettings && (
+          <aside className="w-full lg:w-[410px] xl:w-[440px] shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 bg-slate-50 flex flex-col z-10 overflow-hidden shadow-xs">
             
-            {/* Quick Presets & Custom Saved Designs Row */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  Presets:
+            {/* Sidebar Header */}
+            <div className="p-3 border-b border-slate-200 bg-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-extrabold text-slate-800">Layout Controls (සැකසුම්)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 capitalize">
+                  {activeCustomDesignId ? (savedDesigns.find(d => d.id === activeCustomDesignId)?.name || 'Custom') : activePreset}
                 </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {Object.entries(STYLE_PRESETS).map(([key, preset]) => {
-                    const isSelected = activePreset === key && !activeCustomDesignId;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setActiveCustomDesignId(null);
-                          applyPreset(key);
-                        }}
-                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600 text-white shadow-2xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
-                        title={preset.description}
-                      >
-                        {preset.label}
-                      </button>
-                    );
-                  })}
-
-                  {/* User's Saved Custom Designs */}
-                  {savedDesigns.map((design) => {
-                    const isSelected = activeCustomDesignId === design.id;
-                    const isDefault = defaultDesignId === design.id;
-                    return (
-                      <div 
-                        key={design.id}
-                        className={`inline-flex items-center rounded-md border transition text-xs ${
-                          isSelected 
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                            : 'bg-white border-indigo-200 text-indigo-900 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => applyCustomDesign(design)}
-                          className="px-2.5 py-1 font-bold flex items-center gap-1 cursor-pointer"
-                          title={`Click to load custom design "${design.name}"`}
-                        >
-                          <Bookmark className={`w-3 h-3 ${isSelected ? 'text-amber-300' : 'text-indigo-600'}`} />
-                          <span>{design.name}</span>
-                          {isDefault && (
-                            <span className="text-[9px] bg-amber-400 text-slate-900 px-1 rounded font-extrabold ml-0.5">
-                              Default
-                            </span>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleDefaultDesign(design.id);
-                          }}
-                          className={`p-1 hover:bg-black/10 transition cursor-pointer ${
-                            isDefault 
-                              ? 'text-amber-300' 
-                              : isSelected 
-                              ? 'text-white/60 hover:text-white' 
-                              : 'text-slate-400 hover:text-amber-500'
-                          }`}
-                          title={isDefault ? 'Default design (auto-loads on startup)' : 'Set as default auto-load design'}
-                        >
-                          <Star className={`w-3 h-3 ${isDefault ? 'fill-amber-400 text-amber-400' : ''}`} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteCustomDesign(design.id);
-                          }}
-                          className={`p-1 hover:bg-red-500 hover:text-white rounded-r-md transition cursor-pointer ${
-                            isSelected ? 'text-white/60' : 'text-slate-400'
-                          }`}
-                          title="Delete this saved design"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {/* Save Current Design Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsSaveModalOpen(true)}
-                    className="px-2.5 py-1 text-xs font-bold rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-300 flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                    title="Save current layout adjustments as a reusable preset"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Save Design (සුරකින්න)</span>
-                  </button>
-                </div>
               </div>
-
-              {/* Reset to Default */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveCustomDesignId(null);
-                  resetStyles();
-                }}
-                className="flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-red-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md transition cursor-pointer"
-                title="Reset all font sizes and heights to standard wireframe default"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset (යළි මුල් තත්වයට)</span>
-              </button>
-            </div>
-
-            {/* Navigation Filter Tabs & Quick Boldness Presets Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 pb-1">
-              {/* Filter Tabs */}
-              <div className="inline-flex p-1 bg-slate-200/80 rounded-lg text-xs font-bold">
+              
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setCustomizerTab('all')}
-                  className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                    customizerTab === 'all'
+                  onClick={() => {
+                    setActiveCustomDesignId(null);
+                    resetStyles();
+                  }}
+                  className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded transition cursor-pointer"
+                  title="Reset all settings to default"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(false)}
+                  className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition cursor-pointer"
+                  title="Collapse layout controls panel"
+                >
+                  <PanelLeftClose className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Focused Segmented Tabs */}
+            <div className="p-2 bg-slate-100 border-b border-slate-200">
+              <div className="grid grid-cols-3 gap-1 bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setCustomizerTab('presets')}
+                  className={`py-1.5 px-2 rounded-md transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    customizerTab === 'presets'
                       ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span>All Controls (සියල්ල)</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Presets</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setCustomizerTab('typography')}
-                  className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`py-1.5 px-2 rounded-md transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     customizerTab === 'typography'
                       ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Type className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Font Types & Boldness (අකුරු සහ තද බව)</span>
+                  <span>Fonts</span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setCustomizerTab('layout')}
-                  className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
-                    customizerTab === 'layout'
+                  onClick={() => setCustomizerTab('spacing')}
+                  className={`py-1.5 px-2 rounded-md transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    customizerTab === 'spacing'
                       ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Sliders className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Spacing & Margins (පරතර)</span>
-                </button>
-              </div>
-
-              {/* Whole-Sheet Quick Boldness Presets */}
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg p-1 text-xs shadow-2xs">
-                <span className="text-[11px] font-bold text-slate-600 pl-1.5 flex items-center gap-1">
-                  <Bold className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Quick Boldness:</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => applyBoldnessPreset('light')}
-                  className="px-2 py-0.5 text-[11px] font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded text-slate-700 transition cursor-pointer"
-                  title="Apply Light (400-600) weight across all sheet text"
-                >
-                  Clean (500)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyBoldnessPreset('standard')}
-                  className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-blue-700 transition cursor-pointer"
-                  title="Apply Standard Bold (700-800) across all sheet text"
-                >
-                  Standard Bold (700-800)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyBoldnessPreset('heavy')}
-                  className="px-2 py-0.5 text-[11px] font-black bg-slate-900 hover:bg-black text-white rounded transition cursor-pointer shadow-2xs"
-                  title="Apply Maximum Ultra Black (800-900) across all sheet text"
-                >
-                  Ultra Black (900)
+                  <Ruler className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Spacing</span>
                 </button>
               </div>
             </div>
 
-            {/* Group 1: Table & Winning Digits (ලොතරැයි වගුව සහ දිනුම් අංක) */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                  <span>Table & Winning Digits (ලොතරැයි වගුව සහ දිනුම් අංක)</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-normal lowercase">
-                  fonts, bold weights & sizes
-                </span>
-              </div>
+            {/* Scrollable Tab Content with Reduced Cognitive Load */}
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 max-h-[calc(100vh-320px)] lg:max-h-[720px]">
+              
+              {/* TAB 1: PRESETS & SAVED */}
+              {customizerTab === 'presets' && (
+                <div className="space-y-3 animate-in fade-in duration-100">
+                  {/* Preset Buttons Grid */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Ready-Made Presets (මෝස්තර)</span>
+                      </span>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                
-                {/* 1. Result Numbers / Winning Digits Card */}
-                {(customizerTab === 'all' || customizerTab === 'typography') && (
+                    <div className="grid grid-cols-1 gap-1.5 pt-1">
+                      {Object.entries(STYLE_PRESETS).map(([key, preset]) => {
+                        const isSelected = activePreset === key && !activeCustomDesignId;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setActiveCustomDesignId(null);
+                              applyPreset(key);
+                            }}
+                            className={`p-2 rounded-lg border text-left transition cursor-pointer flex items-center justify-between ${
+                              isSelected
+                                ? 'bg-blue-50/70 border-blue-500 text-blue-900 ring-1 ring-blue-500 shadow-2xs'
+                                : 'bg-slate-50/60 hover:bg-slate-100 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div>
+                              <div className="text-xs font-bold flex items-center gap-1.5">
+                                <span>{preset.label}</span>
+                                {isSelected && (
+                                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded font-bold">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-500">{preset.description}</div>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Whole-Sheet Quick Boldness */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <Bold className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Whole-Sheet Boldness (තද බව)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">1-click format</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('light')}
+                        className="p-2 text-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition cursor-pointer text-slate-700"
+                        title="Clean 500 weight across all sheet text"
+                      >
+                        <div className="text-xs font-medium">Clean (500)</div>
+                        <div className="text-[9px] text-slate-400">පිරිසිදු අර්ධ තද</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('standard')}
+                        className="p-2 text-center rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100 transition cursor-pointer text-blue-800 font-bold"
+                        title="Standard Bold 700-800 across all sheet text"
+                      >
+                        <div className="text-xs font-bold">Standard (700)</div>
+                        <div className="text-[9px] text-blue-500">සම්මත තද</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('heavy')}
+                        className="p-2 text-center rounded-lg border border-slate-800 bg-slate-900 hover:bg-black transition cursor-pointer text-white font-black"
+                        title="Ultra Black 900 across all sheet text"
+                      >
+                        <div className="text-xs font-black">Ultra (900)</div>
+                        <div className="text-[9px] text-slate-300">අතිශය තද</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* User's Saved Designs */}
+                  <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-900 flex items-center gap-1">
+                        <Bookmark className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Saved Designs (සුරකින ලද)</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsSaveModalOpen(true)}
+                        className="px-2 py-0.5 text-[11px] font-bold rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-300 flex items-center gap-1 transition cursor-pointer"
+                        title="Save current layout as a custom preset"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Save Current</span>
+                      </button>
+                    </div>
+
+                    {savedDesigns.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-1">
+                        No custom presets saved yet. Adjust any setting and click &quot;Save Current&quot; to save your favorite layout.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 pt-1">
+                        {savedDesigns.map((design) => {
+                          const isSelected = activeCustomDesignId === design.id;
+                          const isDefault = defaultDesignId === design.id;
+                          return (
+                            <div
+                              key={design.id}
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition text-xs ${
+                                isSelected
+                                  ? 'bg-indigo-50/70 border-indigo-500 text-indigo-900 ring-1 ring-indigo-500'
+                                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => applyCustomDesign(design)}
+                                className="flex-1 text-left font-bold flex items-center gap-1.5 cursor-pointer truncate"
+                              >
+                                <Bookmark className={`w-3 h-3 shrink-0 ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`} />
+                                <span className="truncate">{design.name}</span>
+                                {isDefault && (
+                                  <span className="text-[9px] bg-amber-400 text-slate-900 px-1 rounded font-extrabold shrink-0">
+                                    Default
+                                  </span>
+                                )}
+                              </button>
+
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDefaultDesign(design.id)}
+                                  className={`p-1 hover:bg-slate-200 rounded transition cursor-pointer ${
+                                    isDefault ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'
+                                  }`}
+                                  title={isDefault ? 'Default design on startup' : 'Set as default on startup'}
+                                >
+                                  <Star className={`w-3.5 h-3.5 ${isDefault ? 'fill-amber-400 text-amber-500' : ''}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCustomDesign(design.id)}
+                                  className="p-1 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded transition cursor-pointer"
+                                  title="Delete design"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: TYPOGRAPHY & WEIGHTS */}
+              {customizerTab === 'typography' && (
+                <div className="space-y-3 animate-in fade-in duration-100">
+                  {/* Quick Boldness Toolbar */}
+                  <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                      <Bold className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Quick Bold:</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('light')}
+                        className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium transition cursor-pointer"
+                      >
+                        500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('standard')}
+                        className="px-2 py-0.5 text-[10px] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-blue-700 font-bold transition cursor-pointer"
+                      >
+                        700
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyBoldnessPreset('heavy')}
+                        className="px-2 py-0.5 text-[10px] bg-slate-900 hover:bg-black rounded text-white font-black transition cursor-pointer"
+                      >
+                        900
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. Winning Digits */}
                   <div className="bg-white p-3 rounded-lg border border-blue-200 shadow-2xs space-y-2 ring-1 ring-blue-50/50">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
+                      <label className="font-bold text-xs text-slate-800 flex items-center gap-1">
                         <span>Winning Digits</span>
                         <span className="text-slate-500 font-sinhala font-normal">(දිනුම් අංක)</span>
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
+                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">
                           {resultFontSizePt.toFixed(1)} pt
                         </span>
                         <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
@@ -1041,58 +1201,38 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                       </div>
                     </div>
 
-                    {/* Font Type Selector */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Type (අකුරු වර්ගය)</span>
-                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">Font Family</span>
                       {renderFontSelect(styles.resultFontFamily, DEFAULT_STYLE_OPTIONS.resultFontFamily, NUMBER_FONT_OPTIONS, (val) => updateStyle('resultFontFamily', val))}
                     </div>
 
-                    {/* Bold Weight Pills */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
+                      <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                         <span>Bold Weight (තද බව)</span>
                         <span className="font-mono font-bold text-blue-700">{resultFontWeight}</span>
                       </div>
                       {renderWeightPills(styles.resultFontWeight, DEFAULT_STYLE_OPTIONS.resultFontWeight as number, (w) => updateStyle('resultFontWeight', w))}
                     </div>
 
-                    {/* Size Slider */}
-                    <div className="space-y-1 pt-1 border-t border-slate-100">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Size (ප්‍රමාණය)</span>
-                        <span>{resultFontSizePt.toFixed(1)} pt</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="14.0"
-                        max="19.5"
-                        step="0.5"
-                        value={resultFontSizePt}
-                        onChange={(e) => updateStyle('resultFontSizePt', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Live Preview Tag */}
                     <div className="pt-1 border-t border-slate-100">
-                      <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                      <div 
-                        style={{ fontFamily: resultFontFamily, fontWeight: resultFontWeight }}
-                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-center text-sm text-slate-900 tracking-wider truncate"
-                      >
-                        05 47 50 55 60
-                      </div>
+                      {renderSliderWithStepper(
+                        'Font Size',
+                        'ප්‍රමාණය',
+                        resultFontSizePt,
+                        'pt',
+                        14.0,
+                        19.5,
+                        0.5,
+                        (val) => updateStyle('resultFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.resultFontSizePt
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* 2. Result Letter (English Letter e.g. D, O, Z) Card */}
-                {(customizerTab === 'all' || customizerTab === 'typography') && (
+                  {/* 2. English Letter */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
+                      <label className="font-bold text-xs text-slate-800 flex items-center gap-1">
                         <span>Result Letter</span>
                         <span className="text-slate-500 font-sinhala font-normal">(ඉංග්‍රීසි අකුර)</span>
                       </label>
@@ -1101,46 +1241,29 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                       </span>
                     </div>
 
-                    {/* Font Type Selector */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Type (අකුරු වර්ගය)</span>
-                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">Font Family</span>
                       {renderFontSelect(styles.letterFontFamily, DEFAULT_STYLE_OPTIONS.letterFontFamily, NUMBER_FONT_OPTIONS, (val) => updateStyle('letterFontFamily', val))}
                     </div>
 
-                    {/* Bold Weight Pills */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
+                      <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                         <span>Bold Weight (තද බව)</span>
                         <span className="font-mono font-bold text-blue-700">{letterFontWeight}</span>
                       </div>
                       {renderWeightPills(styles.letterFontWeight, DEFAULT_STYLE_OPTIONS.letterFontWeight as number, (w) => updateStyle('letterFontWeight', w))}
                     </div>
-
-                    {/* Live Preview Tag */}
-                    <div className="pt-1 border-t border-slate-100">
-                      <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                      <div 
-                        style={{ fontFamily: letterFontFamily, fontWeight: letterFontWeight }}
-                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-center text-base text-slate-900 truncate"
-                      >
-                        D &bull; Z &bull; O &bull; Y
-                      </div>
-                    </div>
                   </div>
-                )}
 
-                {/* 3. Lottery Name Card */}
-                {(customizerTab === 'all' || customizerTab === 'typography') && (
+                  {/* 3. Lottery Name */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
+                      <label className="font-bold text-xs text-slate-800 flex items-center gap-1">
                         <span>Lottery Name</span>
                         <span className="text-slate-500 font-sinhala font-normal">(ලොතරැයි නම)</span>
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
+                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">
                           {lotteryNameFontSizePt.toFixed(1)} pt
                         </span>
                         <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
@@ -1149,63 +1272,43 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                       </div>
                     </div>
 
-                    {/* Font Type Selector */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Sinhala Font (අකුරු මෝස්තරය)</span>
-                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">Sinhala Font (අකුරු මෝස්තරය)</span>
                       {renderFontSelect(styles.lotteryNameFontFamily, DEFAULT_STYLE_OPTIONS.lotteryNameFontFamily, SINHALA_FONT_OPTIONS, (val) => updateStyle('lotteryNameFontFamily', val))}
                     </div>
 
-                    {/* Bold Weight Pills */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
+                      <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                         <span>Bold Weight (තද බව)</span>
                         <span className="font-mono font-bold text-blue-700">{lotteryNameFontWeight}</span>
                       </div>
                       {renderWeightPills(styles.lotteryNameFontWeight, DEFAULT_STYLE_OPTIONS.lotteryNameFontWeight as number, (w) => updateStyle('lotteryNameFontWeight', w))}
                     </div>
 
-                    {/* Size Slider */}
-                    <div className="space-y-1 pt-1 border-t border-slate-100">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Size (ප්‍රමාණය)</span>
-                        <span>{lotteryNameFontSizePt.toFixed(1)} pt</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="9.0"
-                        max="12.5"
-                        step="0.5"
-                        value={lotteryNameFontSizePt}
-                        onChange={(e) => updateStyle('lotteryNameFontSizePt', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Live Preview Tag */}
                     <div className="pt-1 border-t border-slate-100">
-                      <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                      <div 
-                        style={{ fontFamily: lotteryNameFontFamily, fontWeight: lotteryNameFontWeight }}
-                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-center text-xs text-slate-900 truncate"
-                      >
-                        අද කෝටිපති • ගොවිසෙත
-                      </div>
+                      {renderSliderWithStepper(
+                        'Font Size',
+                        'ප්‍රමාණය',
+                        lotteryNameFontSizePt,
+                        'pt',
+                        9.0,
+                        12.5,
+                        0.5,
+                        (val) => updateStyle('lotteryNameFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.lotteryNameFontSizePt
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* 4. Draw No Card */}
-                {(customizerTab === 'all' || customizerTab === 'typography') && (
+                  {/* 4. Draw Number */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
+                      <label className="font-bold text-xs text-slate-800 flex items-center gap-1">
                         <span>Draw Number</span>
                         <span className="text-slate-500 font-sinhala font-normal">(වාර අංකය)</span>
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
+                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">
                           {drawNoFontSizePt.toFixed(1)} pt
                         </span>
                         <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
@@ -1214,278 +1317,43 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                       </div>
                     </div>
 
-                    {/* Font Type Selector */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Type (අකුරු වර්ගය)</span>
-                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">Font Family</span>
                       {renderFontSelect(styles.drawNoFontFamily, DEFAULT_STYLE_OPTIONS.drawNoFontFamily, NUMBER_FONT_OPTIONS, (val) => updateStyle('drawNoFontFamily', val))}
                     </div>
 
-                    {/* Bold Weight Pills */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
+                      <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                         <span>Bold Weight (තද බව)</span>
                         <span className="font-mono font-bold text-blue-700">{drawNoFontWeight}</span>
                       </div>
                       {renderWeightPills(styles.drawNoFontWeight, DEFAULT_STYLE_OPTIONS.drawNoFontWeight as number, (w) => updateStyle('drawNoFontWeight', w))}
                     </div>
 
-                    {/* Size Slider */}
-                    <div className="space-y-1 pt-1 border-t border-slate-100">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Size (ප්‍රමාණය)</span>
-                        <span>{drawNoFontSizePt.toFixed(1)} pt</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="9.5"
-                        max="13.5"
-                        step="0.5"
-                        value={drawNoFontSizePt}
-                        onChange={(e) => updateStyle('drawNoFontSizePt', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Live Preview Tag */}
                     <div className="pt-1 border-t border-slate-100">
-                      <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                      <div 
-                        style={{ fontFamily: drawNoFontFamily, fontWeight: drawNoFontWeight }}
-                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-center text-xs text-slate-900 truncate"
-                      >
-                        0906 • 1234 • 432
-                      </div>
+                      {renderSliderWithStepper(
+                        'Font Size',
+                        'ප්‍රමාණය',
+                        drawNoFontSizePt,
+                        'pt',
+                        9.5,
+                        13.5,
+                        0.5,
+                        (val) => updateStyle('drawNoFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.drawNoFontSizePt
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* 5. Row Height (පේළි උස) Card */}
-                {(customizerTab === 'all' || customizerTab === 'layout') && (
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-slate-800">
-                          Row Height <span className="text-slate-500 font-sinhala font-normal">(පේළි උස)</span>
-                        </label>
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
-                          {rowHeightMm.toFixed(1)} mm
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="8.5"
-                        max="10.2"
-                        step="0.1"
-                        value={rowHeightMm}
-                        onChange={(e) => updateStyle('rowHeightMm', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer mt-2"
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-slate-400">
-                      <span>8.5mm (Compact)</span>
-                      <span className="font-medium text-slate-500">18 × {rowHeightMm.toFixed(1)} = {(18 * rowHeightMm).toFixed(1)}mm</span>
-                      <span>10.2mm (Spaced)</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 6. Left Padding (වම් පස ඉඩ) Card */}
-                {(customizerTab === 'all' || customizerTab === 'layout') && (
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-slate-800">
-                          Left Padding <span className="text-slate-500 font-sinhala font-normal">(වම් පස ඉඩ)</span>
-                        </label>
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
-                          {cellPaddingLeftMm.toFixed(1)} mm
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1.0"
-                        max="3.5"
-                        step="0.2"
-                        value={cellPaddingLeftMm}
-                        onChange={(e) => updateStyle('cellPaddingLeftMm', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer mt-2"
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-slate-400">
-                      <span>1.0mm</span>
-                      <span className="font-medium text-slate-500">Result Indent</span>
-                      <span>3.5mm</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 7. Numbers Gap (අංක අතර පරතරය) Card */}
-                {(customizerTab === 'all' || customizerTab === 'layout') && (
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-slate-800">
-                          Numbers Gap <span className="text-slate-500 font-sinhala font-normal">(අංක පරතරය)</span>
-                        </label>
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
-                          {contentGapMm.toFixed(1)} mm
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1.0"
-                        max="3.5"
-                        step="0.2"
-                        value={contentGapMm}
-                        onChange={(e) => updateStyle('contentGapMm', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer mt-2"
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-slate-400">
-                      <span>1.0mm (Tight)</span>
-                      <span className="font-medium text-slate-500">Letter/Digits Gap</span>
-                      <span>3.5mm (Wide)</span>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
-
-            {/* Group 2: Margins & Footer Announcement (පිටු පරතර සහ පහළ දැන්වීම්) */}
-            <div className="space-y-1.5 pt-3 border-t border-slate-200">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                  <span>Margins & Prize Announcement (පිටු පරතර සහ පහළ දැන්වීම්)</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-normal lowercase">
-                  announcement fonts & page top
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                
-                {/* 8. Top Free Space (ඉහළ හිස් ඉඩ) */}
-                {(customizerTab === 'all' || customizerTab === 'layout') && (
-                  <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs space-y-1.5 ring-1 ring-emerald-50">
-                    <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
-                        <span>Top Free Space</span>
-                        <span className="text-slate-500 font-sinhala font-normal">(ඉහළ හිස් ඉඩ)</span>
-                      </label>
-                      <span className="font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded text-[11px]">
-                        {topMarginMm.toFixed(1)} mm
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.0"
-                      max="18.0"
-                      step="0.5"
-                      value={topMarginMm}
-                      onChange={(e) => updateStyle('topMarginMm', parseFloat(e.target.value))}
-                      className="w-full accent-emerald-600 cursor-pointer"
-                    />
-                    <div className="flex justify-between items-center text-[10px] text-slate-500 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('topMarginMm', Math.max(0, Number((topMarginMm - 1).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Decrease top margin by 1mm (shift table UP)"
-                      >
-                        -1mm
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('topMarginMm', 6)}
-                        className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
-                      >
-                        Default (6mm)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('topMarginMm', Math.min(18, Number((topMarginMm + 1).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Increase top margin by 1mm (shift table DOWN)"
-                      >
-                        +1mm
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 9. Announcement Up / Down Position */}
-                {(customizerTab === 'all' || customizerTab === 'layout') && (
-                  <div className="bg-white p-3 rounded-lg border border-blue-200 shadow-2xs space-y-1.5 ring-1 ring-blue-50">
-                    <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
-                        <span>Announcement Y</span>
-                        <span className="text-slate-500 font-sinhala font-normal">(දැන්වීම් ඉහළ/පහළ)</span>
-                      </label>
-                      <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
-                        announcementOffsetYMm === 0
-                          ? 'bg-slate-100 text-slate-700'
-                          : announcementOffsetYMm < 0
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-indigo-100 text-indigo-800'
-                      }`}>
-                        {announcementOffsetYMm === 0
-                          ? '0.0 mm (Default)'
-                          : announcementOffsetYMm < 0
-                          ? `↑ ${Math.abs(announcementOffsetYMm).toFixed(1)} mm (Up)`
-                          : `↓ ${announcementOffsetYMm.toFixed(1)} mm (Down)`}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-10.0"
-                      max="8.0"
-                      step="0.5"
-                      value={announcementOffsetYMm}
-                      onChange={(e) => updateStyle('announcementOffsetYMm', parseFloat(e.target.value))}
-                      className="w-full accent-blue-600 cursor-pointer"
-                    />
-                    <div className="flex justify-between items-center text-[10px] text-slate-500 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('announcementOffsetYMm', Math.max(-10, Number((announcementOffsetYMm - 1).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move announcement 1mm UP towards table"
-                      >
-                        ↑ Up
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('announcementOffsetYMm', 0)}
-                        className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
-                      >
-                        Reset (0)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('announcementOffsetYMm', Math.min(8, Number((announcementOffsetYMm + 1).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move announcement 1mm DOWN towards date"
-                      >
-                        ↓ Down
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 10. Footer Announcement Font & Bold Weight Card */}
-                {(customizerTab === 'all' || customizerTab === 'typography') && (
+                  {/* 5. Prize Announcement */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
+                      <label className="font-bold text-xs text-slate-800 flex items-center gap-1">
                         <span>Prize Announcement</span>
                         <span className="text-slate-500 font-sinhala font-normal">(ත්‍යාග දැන්වීම)</span>
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[11px]">
+                        <span className="font-mono font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">
                           {footerFontSizePt.toFixed(1)} pt
                         </span>
                         <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
@@ -1494,408 +1362,461 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                       </div>
                     </div>
 
-                    {/* Font Type Selector */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Sinhala Font (අකුරු මෝස්තරය)</span>
-                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">Sinhala Font (අකුරු මෝස්තරය)</span>
                       {renderFontSelect(styles.footerFontFamily, DEFAULT_STYLE_OPTIONS.footerFontFamily, SINHALA_FONT_OPTIONS, (val) => updateStyle('footerFontFamily', val))}
                     </div>
 
-                    {/* Bold Weight Pills */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-500">
+                      <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                         <span>Bold Weight (තද බව)</span>
                         <span className="font-mono font-bold text-blue-700">{footerFontWeight}</span>
                       </div>
                       {renderWeightPills(styles.footerFontWeight, DEFAULT_STYLE_OPTIONS.footerFontWeight as number, (w) => updateStyle('footerFontWeight', w))}
                     </div>
 
-                    {/* Size Slider */}
-                    <div className="space-y-1 pt-1 border-t border-slate-100">
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>Font Size (ප්‍රමාණය)</span>
-                        <span>{footerFontSizePt.toFixed(1)} pt</span>
+                    <div className="pt-1 border-t border-slate-100">
+                      {renderSliderWithStepper(
+                        'Font Size',
+                        'ප්‍රමාණය',
+                        footerFontSizePt,
+                        'pt',
+                        8.5,
+                        12.0,
+                        0.5,
+                        (val) => updateStyle('footerFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.footerFontSizePt
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6. Date & Dealer Typography */}
+                  <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-2xs space-y-3">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>Date & Dealer (දිනය සහ වෙළඳ නාමය)</span>
+                    </span>
+
+                    {/* Date Sub-section */}
+                    <div className="space-y-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                        <span>Date & Day (දිනය)</span>
+                        <span className="font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                          {dateFontSizePt.toFixed(1)} pt • w:{dateFontWeight}
+                        </span>
+                      </div>
+                      {renderFontSelect(styles.dateFontFamily, DEFAULT_STYLE_OPTIONS.dateFontFamily, NUMBER_FONT_OPTIONS, (val) => updateStyle('dateFontFamily', val))}
+                      {renderWeightPills(styles.dateFontWeight, DEFAULT_STYLE_OPTIONS.dateFontWeight as number, (w) => updateStyle('dateFontWeight', w))}
+                      {renderSliderWithStepper(
+                        'Date Size',
+                        'ප්‍රමාණය',
+                        dateFontSizePt,
+                        'pt',
+                        10.0,
+                        16.5,
+                        0.5,
+                        (val) => updateStyle('dateFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.dateFontSizePt
+                      )}
+                    </div>
+
+                    {/* Dealer Sub-section */}
+                    <div className="space-y-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                        <span>Dealer Name (වෙළඳ නාමය)</span>
+                        <span className="font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                          {dealerFontSizePt.toFixed(1)} pt • w:{dealerFontWeight}
+                        </span>
+                      </div>
+                      {renderFontSelect(styles.dealerFontFamily, DEFAULT_STYLE_OPTIONS.dealerFontFamily, SINHALA_FONT_OPTIONS, (val) => updateStyle('dealerFontFamily', val))}
+                      {renderWeightPills(styles.dealerFontWeight, DEFAULT_STYLE_OPTIONS.dealerFontWeight as number, (w) => updateStyle('dealerFontWeight', w))}
+                      {renderSliderWithStepper(
+                        'Dealer Size',
+                        'ප්‍රමාණය',
+                        dealerFontSizePt,
+                        'pt',
+                        10.0,
+                        16.5,
+                        0.5,
+                        (val) => updateStyle('dealerFontSizePt', val),
+                        DEFAULT_STYLE_OPTIONS.dealerFontSizePt
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: SPACING & LAYOUT */}
+              {customizerTab === 'spacing' && (
+                <div className="space-y-3 animate-in fade-in duration-100">
+                  {/* Table & Margin Dimensions */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-3">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <Ruler className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Table Dimensions (පිටු සැකසුම)</span>
+                    </span>
+
+                    {/* Top Free Space Margin */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-slate-800">
+                          Top Free Space <span className="text-slate-500 font-sinhala font-normal">(ඉහළ හිස් ඉඩ)</span>
+                        </label>
+                        <span className="font-mono text-[11px] font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded">
+                          {topMarginMm.toFixed(1)} mm
+                        </span>
                       </div>
                       <input
                         type="range"
-                        min="8.5"
-                        max="12.0"
+                        min="0.0"
+                        max="18.0"
                         step="0.5"
-                        value={footerFontSizePt}
-                        onChange={(e) => updateStyle('footerFontSizePt', parseFloat(e.target.value))}
-                        className="w-full accent-blue-600 cursor-pointer"
+                        value={topMarginMm}
+                        onChange={(e) => updateStyle('topMarginMm', parseFloat(e.target.value))}
+                        className="w-full accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                       />
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('topMarginMm', Math.max(0, Number((topMarginMm - 1).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          -1 mm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('topMarginMm', 6)}
+                          className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                        >
+                          Default (6mm)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('topMarginMm', Math.min(18, Number((topMarginMm + 1).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          +1 mm
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Live Preview Tag */}
-                    <div className="pt-1 border-t border-slate-100">
-                      <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                      <div 
-                        style={{ fontFamily: footerFontFamily, fontWeight: footerFontWeight }}
-                        className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 truncate"
-                      >
-                        {sheet.footerAnnouncement || 'ගොවි සෙත රු. ලක්ෂ දෙකහමාරක්...'}
+                    {/* Row Height */}
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      {renderSliderWithStepper(
+                        'Row Height',
+                        'පේළි උස',
+                        rowHeightMm,
+                        'mm',
+                        8.5,
+                        10.2,
+                        0.1,
+                        (val) => updateStyle('rowHeightMm', val),
+                        DEFAULT_STYLE_OPTIONS.rowHeightMm
+                      )}
+                      <div className="flex justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span>8.5mm (Tight)</span>
+                        <span className="font-medium text-slate-600">18 × {rowHeightMm.toFixed(1)} = {(18 * rowHeightMm).toFixed(1)}mm table</span>
+                        <span>10.2mm (Tall)</span>
                       </div>
                     </div>
                   </div>
-                )}
 
-              </div>
-            </div>
+                  {/* Cell Spacing & Padding */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-3">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <MoveVertical className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Cell Spacing & Padding (පරතර)</span>
+                    </span>
 
-            {/* Group 3: Date & Dealer Separate Designing (දිනය සහ වෙළඳ නාමය වෙන වෙනම නිර්මාණය) */}
-            <div className="space-y-1.5 pt-3 border-t border-slate-200">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-                  <span>Date & Dealer Separate Designing (දිනය සහ වෙළඳ නාමය වෙන වෙනම නිර්මාණය)</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-normal lowercase">
-                  independent fonts, bold weights & positions
-                </span>
-              </div>
+                    {/* Left Cell Padding */}
+                    {renderSliderWithStepper(
+                      'Left Padding',
+                      'වම් පස ඉඩ',
+                      cellPaddingLeftMm,
+                      'mm',
+                      1.0,
+                      3.5,
+                      0.2,
+                      (val) => updateStyle('cellPaddingLeftMm', val),
+                      DEFAULT_STYLE_OPTIONS.cellPaddingLeftMm
+                    )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                
-                {/* 11. Date & Day Design Card */}
-                <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-2xs space-y-2 ring-1 ring-indigo-50">
-                  <div className="flex justify-between items-center">
-                    <label className="font-bold text-slate-800 flex items-center gap-1">
-                      <span>Date & Day</span>
-                      <span className="text-slate-500 font-sinhala font-normal">(දිනය සහ සතිය)</span>
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <span className="font-mono font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded text-[11px]">
-                        {dateFontSizePt.toFixed(1)} pt
-                      </span>
-                      <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
-                        w:{dateFontWeight}
-                      </span>
-                      {dateOffsetYMm !== 0 && (
-                        <span className="font-mono font-semibold bg-amber-50 text-amber-700 px-1 py-0.5 rounded text-[10px]">
-                          {dateOffsetYMm > 0 ? `+${dateOffsetYMm.toFixed(1)}` : dateOffsetYMm.toFixed(1)}mm
-                        </span>
+                    {/* Numbers Gap */}
+                    <div className="pt-2 border-t border-slate-100">
+                      {renderSliderWithStepper(
+                        'Numbers Gap',
+                        'අංක පරතරය',
+                        contentGapMm,
+                        'mm',
+                        1.0,
+                        3.5,
+                        0.2,
+                        (val) => updateStyle('contentGapMm', val),
+                        DEFAULT_STYLE_OPTIONS.contentGapMm
                       )}
                     </div>
                   </div>
 
-                  {/* Font Type Selector */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Date Font (අකුරු වර්ගය)</span>
-                    </div>
-                    {renderFontSelect(styles.dateFontFamily, DEFAULT_STYLE_OPTIONS.dateFontFamily, NUMBER_FONT_OPTIONS, (val) => updateStyle('dateFontFamily', val))}
-                  </div>
+                  {/* Vertical Fine Positioning Offsets */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-3">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Vertical Offsets (ඉහළ/පහළ ස්ථානගත කිරීම)</span>
+                    </span>
 
-                  {/* Bold Weight Pills */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Bold Weight (තද බව)</span>
-                      <span className="font-mono font-bold text-indigo-700">{dateFontWeight}</span>
-                    </div>
-                    {renderWeightPills(styles.dateFontWeight, DEFAULT_STYLE_OPTIONS.dateFontWeight as number, (w) => updateStyle('dateFontWeight', w))}
-                  </div>
-
-                  {/* Size slider */}
-                  <div className="space-y-1 pt-1 border-t border-slate-100">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Size (අකුරු ප්‍රමාණය)</span>
-                      <span>{dateFontSizePt.toFixed(1)} pt</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="10.0"
-                      max="16.5"
-                      step="0.5"
-                      value={dateFontSizePt}
-                      onChange={(e) => updateStyle('dateFontSizePt', parseFloat(e.target.value))}
-                      className="w-full accent-indigo-600 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Vertical Position stepper */}
-                  <div className="pt-1 border-t border-slate-100 space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Vertical Move (ඉහළ/පහළ)</span>
-                      <span className="font-mono font-bold text-slate-700">
-                        {dateOffsetYMm === 0 ? '0mm (Centered)' : `${dateOffsetYMm > 0 ? '+' : ''}${dateOffsetYMm.toFixed(1)}mm`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-slate-500">
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dateOffsetYMm', Math.max(-6, Number((dateOffsetYMm - 0.5).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move Date UP"
-                      >
-                        ↑ Up
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dateOffsetYMm', 0)}
-                        className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
-                      >
-                        Reset (0)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dateOffsetYMm', Math.min(6, Number((dateOffsetYMm + 0.5).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move Date DOWN"
-                      >
-                        ↓ Down
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Live Preview Tag */}
-                  <div className="pt-1 border-t border-slate-100">
-                    <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                    <div 
-                      style={{ fontWeight: dateFontWeight }}
-                      className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 flex justify-between items-center truncate"
-                    >
-                      <span style={{ fontFamily: dateFontFamily }}>{formattedDate}</span>
-                      <span style={{ fontFamily: dealerFontFamily }}>{sheet.dayOfWeekSi}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 12. Dealer Name Design Card */}
-                <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-2xs space-y-2 ring-1 ring-indigo-50">
-                  <div className="flex justify-between items-center">
-                    <label className="font-bold text-slate-800 flex items-center gap-1">
-                      <span>Dealer Name</span>
-                      <span className="text-slate-500 font-sinhala font-normal">(වෙළඳ නාමය)</span>
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <span className="font-mono font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded text-[11px]">
-                        {dealerFontSizePt.toFixed(1)} pt
-                      </span>
-                      <span className="font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">
-                        w:{dealerFontWeight}
-                      </span>
-                      {dealerOffsetYMm !== 0 && (
-                        <span className="font-mono font-semibold bg-amber-50 text-amber-700 px-1 py-0.5 rounded text-[10px]">
-                          {dealerOffsetYMm > 0 ? `+${dealerOffsetYMm.toFixed(1)}` : dealerOffsetYMm.toFixed(1)}mm
+                    {/* Announcement Offset */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold text-slate-700">
+                        <span>Announcement Y (දැන්වීම)</span>
+                        <span className="font-mono text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                          {announcementOffsetYMm === 0 ? '0mm' : `${announcementOffsetYMm > 0 ? '+' : ''}${announcementOffsetYMm.toFixed(1)}mm`}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('announcementOffsetYMm', Math.max(-10, Number((announcementOffsetYMm - 1).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↑ Up (-1mm)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('announcementOffsetYMm', 0)}
+                          className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('announcementOffsetYMm', Math.min(8, Number((announcementOffsetYMm + 1).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↓ Down (+1mm)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Date Offset */}
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      <div className="flex justify-between text-xs font-semibold text-slate-700">
+                        <span>Date Y Offset (දිනය)</span>
+                        <span className="font-mono text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                          {dateOffsetYMm === 0 ? '0mm' : `${dateOffsetYMm > 0 ? '+' : ''}${dateOffsetYMm.toFixed(1)}mm`}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dateOffsetYMm', Math.max(-6, Number((dateOffsetYMm - 0.5).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↑ Up (-0.5)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dateOffsetYMm', 0)}
+                          className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dateOffsetYMm', Math.min(6, Number((dateOffsetYMm + 0.5).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↓ Down (+0.5)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dealer Offset */}
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      <div className="flex justify-between text-xs font-semibold text-slate-700">
+                        <span>Dealer Y Offset (වෙළඳ නාමය)</span>
+                        <span className="font-mono text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                          {dealerOffsetYMm === 0 ? '0mm' : `${dealerOffsetYMm > 0 ? '+' : ''}${dealerOffsetYMm.toFixed(1)}mm`}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dealerOffsetYMm', Math.max(-6, Number((dealerOffsetYMm - 0.5).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↑ Up (-0.5)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dealerOffsetYMm', 0)}
+                          className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStyle('dealerOffsetYMm', Math.min(6, Number((dealerOffsetYMm + 0.5).toFixed(1))))}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
+                        >
+                          ↓ Down (+0.5)
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Font Type Selector */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Sinhala Font (අකුරු මෝස්තරය)</span>
-                    </div>
-                    {renderFontSelect(styles.dealerFontFamily, DEFAULT_STYLE_OPTIONS.dealerFontFamily, SINHALA_FONT_OPTIONS, (val) => updateStyle('dealerFontFamily', val))}
-                  </div>
-
-                  {/* Bold Weight Pills */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Bold Weight (තද බව)</span>
-                      <span className="font-mono font-bold text-indigo-700">{dealerFontWeight}</span>
-                    </div>
-                    {renderWeightPills(styles.dealerFontWeight, DEFAULT_STYLE_OPTIONS.dealerFontWeight as number, (w) => updateStyle('dealerFontWeight', w))}
-                  </div>
-
-                  {/* Size slider */}
-                  <div className="space-y-1 pt-1 border-t border-slate-100">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Size (අකුරු ප්‍රමාණය)</span>
-                      <span>{dealerFontSizePt.toFixed(1)} pt</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="10.0"
-                      max="16.5"
-                      step="0.5"
-                      value={dealerFontSizePt}
-                      onChange={(e) => updateStyle('dealerFontSizePt', parseFloat(e.target.value))}
-                      className="w-full accent-indigo-600 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Vertical Position stepper */}
-                  <div className="pt-1 border-t border-slate-100 space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500">
-                      <span>Vertical Move (ඉහළ/පහළ)</span>
-                      <span className="font-mono font-bold text-slate-700">
-                        {dealerOffsetYMm === 0 ? '0mm (Centered)' : `${dealerOffsetYMm > 0 ? '+' : ''}${dealerOffsetYMm.toFixed(1)}mm`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-slate-500">
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dealerOffsetYMm', Math.max(-6, Number((dealerOffsetYMm - 0.5).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move Dealer UP"
-                      >
-                        ↑ Up
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dealerOffsetYMm', 0)}
-                        className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
-                      >
-                        Reset (0)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStyle('dealerOffsetYMm', Math.min(6, Number((dealerOffsetYMm + 0.5).toFixed(1))))}
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-bold cursor-pointer"
-                        title="Move Dealer DOWN"
-                      >
-                        ↓ Down
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Live Preview Tag */}
-                  <div className="pt-1 border-t border-slate-100">
-                    <div className="text-[10px] text-slate-400 mb-0.5">Live Preview:</div>
-                    <div 
-                      style={{ fontFamily: dealerFontFamily, fontWeight: dealerFontWeight }}
-                      className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 text-right truncate"
-                    >
-                      {sheet.headerDealerName || 'S.W.ඔස්මන් ද සිල්වා'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 13. Bottom Design Style (පහළ විලාසිතා ආකෘතිය) */}
-                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2 flex flex-col justify-between">
-                  <div>
+                  {/* Bottom Layout Style */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-slate-800">
+                      <label className="font-bold text-xs text-slate-800">
                         Bottom Style <span className="text-slate-500 font-sinhala font-normal">(විලාසිතාව)</span>
                       </label>
                       <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
                         {bottomLayoutStyle === 'boxed' ? 'Boxed' : 'Clean'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Choose between clean plain text or official rounded border boxes.
-                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => updateStyle('bottomLayoutStyle', 'clean')}
+                        className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
+                          bottomLayoutStyle === 'clean'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-900 font-bold shadow-2xs ring-1 ring-blue-500'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">Clean Text</div>
+                        <div className="text-[9px] text-slate-500 font-sinhala">සාමාන්‍ය පිරිසිදු පෙළ</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => updateStyle('bottomLayoutStyle', 'boxed')}
+                        className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
+                          bottomLayoutStyle === 'boxed'
+                            ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 font-bold shadow-2xs ring-1 ring-indigo-500'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">Boxed Pill</div>
+                        <div className="text-[9px] text-slate-500 font-sinhala">රාමු සහිත පෙට්ටි</div>
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => updateStyle('bottomLayoutStyle', 'clean')}
-                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
-                        bottomLayoutStyle === 'clean'
-                          ? 'border-blue-600 bg-blue-50/50 text-blue-900 font-bold shadow-2xs'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <div className="text-[11px] font-bold">Clean Text</div>
-                      <div className="text-[9px] text-slate-500 font-sinhala">සාමාන්‍ය පිරිසිදු පෙළ</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateStyle('bottomLayoutStyle', 'boxed')}
-                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
-                        bottomLayoutStyle === 'boxed'
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-bold shadow-2xs'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <div className="text-[11px] font-bold">Boxed Pill</div>
-                      <div className="text-[9px] text-slate-500 font-sinhala">රාමු සහිත පෙට්ටි</div>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Main Preview Container with paper drop shadow */}
-      <div className="flex-1 overflow-auto p-4 bg-slate-200/80 flex items-start justify-center">
-        
-        {/* Exact A4 Landscape Page Container (297mm x 210mm) scaled properly */}
-        <div
-          style={{
-            width: `${297 * scale}mm`,
-            height: `${210 * scale}mm`,
-            position: 'relative',
-          }}
-          className="shadow-xl bg-white shrink-0 my-auto border border-slate-300 transition-all"
-        >
-          <div
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-              width: '297mm',
-              height: '210mm',
-            }}
-            className="absolute top-0 left-0 bg-white"
-          >
-            {/* 297mm width x 210mm height Page Container */}
-            <div 
-              style={{ width: '297mm', height: '210mm' }}
-              className="relative flex flex-row box-border bg-white overflow-hidden"
-            >
-              
-              {/* Left Half (exactly 148.5mm wide, padding-top: topMarginMm) */}
-              <div 
-                style={{ 
-                  width: '148.5mm', 
-                  height: '210mm',
-                  paddingTop: `${topMarginMm}mm`,
-                  paddingBottom: '5mm',
-                  boxSizing: 'border-box'
-                }}
-                className="flex flex-col items-center justify-start overflow-hidden transition-all"
-              >
-                {renderSingleCopy()}
-              </div>
-
-              {/* Centre Cutting Guide exactly on the 148.5mm center seam */}
-              {showCutGuide && (
-                <div 
-                  style={{ left: '148.5mm', width: '20px', marginLeft: '-10px' }}
-                  className="absolute top-[6mm] bottom-[6mm] flex flex-col justify-around items-center pointer-events-none z-10"
-                >
-                  {/* Vertical dashed line */}
-                  <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-slate-400" />
-                  
-                  {/* Scissor markers with white backdrop */}
-                  <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
-                  <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
-                  <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
                 </div>
               )}
 
-              {/* Right Half (exactly 148.5mm wide, padding-top: topMarginMm, 100% IDENTICAL) */}
-              <div 
-                style={{ 
-                  width: '148.5mm', 
-                  height: '210mm',
-                  paddingTop: `${topMarginMm}mm`,
-                  paddingBottom: '5mm',
-                  boxSizing: 'border-box'
-                }}
-                className="flex flex-col items-center justify-start overflow-hidden transition-all"
-              >
-                {renderSingleCopy()}
-              </div>
+            </div>
 
+            {/* Sidebar Sticky Footer (Quick Actions) */}
+            <div className="p-2.5 px-3 bg-white border-t border-slate-200 flex items-center justify-between gap-2 shadow-2xs shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCustomDesignId(null);
+                  resetStyles();
+                }}
+                className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                title="Reset all settings to default"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSaveModalOpen(true)}
+                className="flex-1 px-3 py-1.5 text-xs font-extrabold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-[0.98]"
+                title="Save current layout as a custom preset"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Save Design (සුරකින්න)</span>
+              </button>
+            </div>
+
+          </aside>
+        )}
+
+        {/* Right Side: Live A4 Landscape Sheet Preview */}
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-200/90 flex flex-col items-center justify-start min-h-[550px] relative">
+          
+          {/* Exact A4 Landscape Page Container (297mm x 210mm) scaled properly */}
+          <div
+            style={{
+              width: `${297 * scale}mm`,
+              height: `${210 * scale}mm`,
+              position: 'relative',
+            }}
+            className="shadow-2xl bg-white shrink-0 my-auto border border-slate-300 transition-all rounded-xs"
+          >
+            <div
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+                width: '297mm',
+                height: '210mm',
+              }}
+              className="absolute top-0 left-0 bg-white"
+            >
+              {/* 297mm width x 210mm height Page Container */}
+              <div 
+                style={{ width: '297mm', height: '210mm' }}
+                className="relative flex flex-row box-border bg-white overflow-hidden"
+              >
+                
+                {/* Left Half (exactly 148.5mm wide, padding-top: topMarginMm) */}
+                <div 
+                  style={{ 
+                    width: '148.5mm', 
+                    height: '210mm',
+                    paddingTop: `${topMarginMm}mm`,
+                    paddingBottom: '5mm',
+                    boxSizing: 'border-box'
+                  }}
+                  className="flex flex-col items-center justify-start overflow-hidden transition-all"
+                >
+                  {renderSingleCopy()}
+                </div>
+
+                {/* Centre Cutting Guide exactly on the 148.5mm center seam */}
+                {showCutGuide && (
+                  <div 
+                    style={{ left: '148.5mm', width: '20px', marginLeft: '-10px' }}
+                    className="absolute top-[6mm] bottom-[6mm] flex flex-col justify-around items-center pointer-events-none z-10"
+                  >
+                    {/* Vertical dashed line */}
+                    <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-slate-400" />
+                    
+                    {/* Scissor markers with white backdrop */}
+                    <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
+                    <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
+                    <span className="text-[10px] text-slate-500 bg-white p-0.5 rotate-90 z-20">✂</span>
+                  </div>
+                )}
+
+                {/* Right Half (exactly 148.5mm wide, padding-top: topMarginMm, 100% IDENTICAL) */}
+                <div 
+                  style={{ 
+                    width: '148.5mm', 
+                    height: '210mm',
+                    paddingTop: `${topMarginMm}mm`,
+                    paddingBottom: '5mm',
+                    boxSizing: 'border-box'
+                  }}
+                  className="flex flex-col items-center justify-start overflow-hidden transition-all"
+                >
+                  {renderSingleCopy()}
+                </div>
+
+              </div>
             </div>
           </div>
+
         </div>
 
       </div>
 
       {/* Footer bar */}
-      <div className="p-2 px-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center">
+      <div className="p-2 px-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
           <span>A4 Landscape • 2 Copies Side-by-Side</span>
           <span className="text-slate-300">•</span>

@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { DailySheet, PreviewStyleOptions, PrintSettings } from '@/types/lottery';
+import { generatePrintHtml, validateSheetForPrint } from '@/lib/html-generator';
 
 interface PrintModalProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export default function PrintModal({
 
   if (!isOpen) return null;
 
-  // Handle direct in-browser printing
+  // Handle direct in-browser printing (Instant, client-rendered with zero network latency)
   const handlePrint = async () => {
     if (!isReadyToExport) {
       showToast?.('Please resolve all pending verifications before printing.', 'error');
@@ -90,31 +91,22 @@ export default function PrintModal({
         localStorage.setItem(LOCAL_STORAGE_PRINT_SETTINGS, JSON.stringify(settingsToSave));
       }
 
-      // 2. Request print HTML from backend
-      const res = await fetch('/api/print-html', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet,
-          copies,
-          printDensity,
-          styleOptions: {
-            ...styleOptions,
-            printDensity,
-          }
-        })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        showToast?.(errorData.error || 'Failed to prepare print document', 'error');
+      // 2. Validate sheet rules
+      const validation = validateSheetForPrint(sheet);
+      if (!validation.isValid) {
+        showToast?.(validation.errors[0] || 'Please complete all validations before printing.', 'error');
         setIsPrinting(false);
         return;
       }
 
-      const { html } = await res.json();
+      // 3. Generate Print HTML instantly on client
+      const activeStyleOptions: PreviewStyleOptions = {
+        ...styleOptions,
+        printDensity,
+      };
+      const html = generatePrintHtml(sheet, activeStyleOptions, copies);
 
-      // 3. Inject into hidden iframe and trigger native print dialog
+      // 4. Inject into hidden iframe and trigger native print dialog
       let printFrame = document.getElementById('lottery-direct-print-frame') as HTMLIFrameElement;
       if (!printFrame) {
         printFrame = document.createElement('iframe');
@@ -147,11 +139,11 @@ export default function PrintModal({
           printFrame.contentWindow?.print();
           showToast?.(`Print dialog launched for ${copies} sheet(s) (${copies * 2} slips)!`, 'success');
           onClose();
-        } catch (e) {
+        } catch (e: any) {
           console.error('Print trigger error:', e);
-          showToast?.('Print dialog could not open automatically. You can download PDF instead.', 'error');
+          showToast?.('Print dialog could not open automatically: ' + (e?.message || 'Unknown error'), 'error');
         }
-      }, 450);
+      }, 350);
 
     } catch (err: any) {
       console.error('Print error:', err);

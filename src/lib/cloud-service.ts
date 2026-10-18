@@ -14,8 +14,15 @@ export async function saveSheetToCloud(sheet: DailySheet): Promise<{ success: bo
 
     const docRef = doc(db, CLOUD_BRANCH_COLLECTION, sheet.date);
     
-    // Clean payload for Firestore (ensure no undefined fields)
+    // Clean payload for Firestore (ensure no undefined fields and avoid 1MB document limit)
     const sanitizedSheet = JSON.parse(JSON.stringify(sheet));
+    if (Array.isArray(sanitizedSheet.sources)) {
+      sanitizedSheet.sources = sanitizedSheet.sources.map((s: any) => ({
+        ...s,
+        filePath: s.filePath && s.filePath.length > 50000 ? '[Stored in Browser Session]' : s.filePath,
+        previewImageUrl: s.previewImageUrl && s.previewImageUrl.length > 50000 ? undefined : s.previewImageUrl,
+      }));
+    }
 
     const cloudPayload = {
       ...sanitizedSheet,

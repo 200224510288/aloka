@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions } from '@/types/lottery';
+import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
 import { StepNavigation, WorkflowStep } from '@/components/StepNavigation';
@@ -225,6 +225,10 @@ export default function Home() {
   const handleFileUpload = async (file: File) => {
     setIsUploading(true);
     setDateMismatchWarning(undefined);
+
+    // Create an in-memory blob URL for instantaneous, 100% reliable local preview
+    const localBlobUrl = typeof window !== 'undefined' ? URL.createObjectURL(file) : '';
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -239,7 +243,12 @@ export default function Home() {
       if (data.success) {
         showToast(`Extracted data from ${file.name}!`, 'success');
 
-        const newSources = [...sheet.sources, data.sourceDoc];
+        const clientSourceDoc: SourceDocument = {
+          ...data.sourceDoc,
+          filePath: localBlobUrl || data.sourceDoc.filePath,
+        };
+
+        const newSources = [...sheet.sources, clientSourceDoc];
         
         const updatedLotteries = sheet.lotteries.map((existing) => {
           const match = data.extraction.matchedLotteries.find(
@@ -975,7 +984,7 @@ export default function Home() {
         {/* STEP 3: PREVIEW & PRINT (Full-Fidelity A4 Landscape, 1-Click Export)      */}
         {/* ========================================================================= */}
         {currentStep === 'preview' && (
-          <div className="space-y-4 max-w-6xl mx-auto w-full animate-in fade-in-50 duration-200 flex flex-col flex-1">
+          <div className="space-y-4 max-w-[1700px] mx-auto w-full animate-in fade-in-50 duration-200 flex flex-col flex-1">
             
             {/* Action Bar */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -983,7 +992,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep('verify')}
-                  className="p-2 hover:bg-slate-100 text-slate-600 rounded-xl transition"
+                  className="p-2 hover:bg-slate-100 text-slate-600 rounded-xl transition cursor-pointer"
                   title="Return to review"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -1007,7 +1016,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep('verify')}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
                 >
                   ← Edit Results
                 </button>
@@ -1028,7 +1037,7 @@ export default function Home() {
                   disabled={!canExport || isExporting}
                   className={`px-4 py-2 text-xs font-extrabold rounded-xl shadow-sm flex items-center gap-1.5 transition active:scale-[0.98] ${
                     canExport
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   }`}
                 >
@@ -1039,7 +1048,7 @@ export default function Home() {
             </div>
 
             {/* A4 Sheet Preview Container */}
-            <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs min-h-[600px] flex items-center justify-center">
+            <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden min-h-[700px] flex flex-col">
               <SheetPreview
                 sheet={sheet}
                 onExportPdf={handleExportPdf}
