@@ -44,6 +44,18 @@ export async function extractTextFromPdfBuffer(fileBuffer: Buffer | Uint8Array):
   totalFilePages: number;
 }> {
   try {
+    // Load worker in-memory and register on globalThis so pdfjs uses the main-thread
+    // fake worker directly without needing file-system worker resolution on Vercel
+    if (!(globalThis as any).pdfjsWorker) {
+      try {
+        // @ts-ignore
+        const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+        (globalThis as any).pdfjsWorker = workerModule;
+      } catch (wErr) {
+        console.warn('Worker import warning:', wErr);
+      }
+    }
+
     // Dynamically import pure JS legacy build of pdfjs-dist
     // @ts-ignore
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
