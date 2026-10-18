@@ -71,15 +71,23 @@ export async function POST(req: NextRequest) {
     // PDF Text Extraction using pure Node.js (Serverless-compatible, zero Python dependency)
     let extractedText = '';
     let totalFilePages = 1;
+    let extractionError: string | null = null;
 
-    if (fileType === 'pdf') {
+    // Guaranteed fallback: If the client extracted text in the browser, prioritize it
+    const clientExtractedText = formData.get('clientExtractedText') as string | null;
+    if (clientExtractedText && clientExtractedText.trim().length > 0) {
+      extractedText = clientExtractedText.trim();
+    }
+
+    if (!extractedText && fileType === 'pdf') {
       try {
         const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
         const result = await extractTextFromPdfBuffer(fileBuffer);
         extractedText = result.text;
         totalFilePages = result.totalFilePages;
       } catch (pdfErr: any) {
-        console.warn('Serverless PDF extraction error:', pdfErr?.message || pdfErr);
+        extractionError = pdfErr?.message || String(pdfErr);
+        console.warn('Serverless PDF extraction error:', extractionError);
       }
 
       // Secondary fallback: if python is present and local (Windows dev)
@@ -167,6 +175,8 @@ export async function POST(req: NextRequest) {
         matchedLotteries: extraction.matchedLotteries,
         unassignedRows: extraction.unassignedRows,
         dateMismatchWarning: extraction.dateMismatchWarning,
+        extractionError,
+        rawTextLength: (extractedText || '').length,
       }
     });
 

@@ -12,16 +12,19 @@ export async function extractTextFromPdfBuffer(fileBuffer: Buffer | Uint8Array):
     // @ts-ignore
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-    const uint8 = fileBuffer instanceof Uint8Array ? fileBuffer : new Uint8Array(fileBuffer);
+    // Ensure data is a pure Uint8Array and NOT a Node.js Buffer, because pdfjs-dist v5
+    // explicitly throws: "Please provide binary data as `Uint8Array`, rather than `Buffer`"
+    const uint8 = (typeof Buffer !== 'undefined' && Buffer.isBuffer(fileBuffer))
+      ? new Uint8Array(fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength))
+      : (fileBuffer instanceof Uint8Array ? fileBuffer : new Uint8Array(fileBuffer));
 
-    // Disable worker and eval so it runs 100% reliably in Vercel serverless functions
+    // Disable worker and font face loading so it runs 100% reliably in serverless environments
     const loadingTask = pdfjs.getDocument({
       data: uint8,
-      isEvalSupported: false,
       useSystemFonts: true,
       disableFontFace: true,
       verbosity: 0,
-    });
+    } as any);
 
     const doc = await loadingTask.promise;
     const totalFilePages = doc.numPages || 1;

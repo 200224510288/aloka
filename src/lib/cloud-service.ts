@@ -2,6 +2,21 @@ import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION, CLOUD_SETTINGS_COLLECTION } from './firebase';
 import { DailySheet, SourceDocument, SavedCustomDesign } from '@/types/lottery';
 
+function cleanFirestoreData(data: any): any {
+  if (data === null || data === undefined) return null;
+  if (typeof data !== 'object') return data;
+  if (Array.isArray(data)) {
+    return data.map(cleanFirestoreData);
+  }
+  const result: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      result[key] = cleanFirestoreData(val);
+    }
+  }
+  return result;
+}
+
 /**
  * Automatically persists the DailySheet to the separate 'result_generator_daily_sheets'
  * cloud collection on the lottery-sales-tracker Firebase project.
@@ -17,19 +32,24 @@ export async function saveSheetToCloud(sheet: DailySheet): Promise<{ success: bo
     // Clean payload for Firestore (ensure no undefined fields and avoid 1MB document limit)
     const sanitizedSheet = JSON.parse(JSON.stringify(sheet));
     if (Array.isArray(sanitizedSheet.sources)) {
-      sanitizedSheet.sources = sanitizedSheet.sources.map((s: any) => ({
-        ...s,
-        filePath: s.filePath && s.filePath.length > 50000 ? '[Stored in Browser Session]' : s.filePath,
-        previewImageUrl: s.previewImageUrl && s.previewImageUrl.length > 50000 ? undefined : s.previewImageUrl,
-      }));
+      sanitizedSheet.sources = sanitizedSheet.sources.map((s: any) => {
+        const item = { ...s };
+        if (item.filePath && item.filePath.length > 50000) {
+          item.filePath = '[Stored in Browser Session]';
+        }
+        if (item.previewImageUrl && item.previewImageUrl.length > 50000) {
+          delete item.previewImageUrl;
+        }
+        return item;
+      });
     }
 
-    const cloudPayload = {
+    const cloudPayload = cleanFirestoreData({
       ...sanitizedSheet,
       branch: 'result-generator',
       syncedAt: new Date().toISOString(),
       lastCloudUpdate: new Date().toISOString(),
-    };
+    });
 
     await setDoc(docRef, cloudPayload, { merge: true });
     return { success: true, cloudId: sheet.date };
@@ -96,13 +116,15 @@ export async function saveSourceDocToCloud(
     const docRef = doc(db, CLOUD_SOURCES_COLLECTION, docData.id);
     const sanitizedDoc = JSON.parse(JSON.stringify(docData));
 
-    await setDoc(docRef, {
+    const payload = cleanFirestoreData({
       ...sanitizedDoc,
       date,
       branch: 'result-generator',
       uploadedToCloudAt: new Date().toISOString(),
       ...(extraMeta ? JSON.parse(JSON.stringify(extraMeta)) : {})
-    }, { merge: true });
+    });
+
+    await setDoc(docRef, payload, { merge: true });
 
     return { success: true };
   } catch (err: any) {

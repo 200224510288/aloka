@@ -270,9 +270,23 @@ export default function Home() {
     const localBlobUrl = typeof window !== 'undefined' ? URL.createObjectURL(file) : '';
 
     try {
+      // Step 1: Run browser-side PDF extraction for immediate zero-dependency reliability
+      let browserText = '';
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        try {
+          const { extractTextFromPdfInBrowser } = await import('@/lib/client-pdf-extractor');
+          browserText = await extractTextFromPdfInBrowser(file);
+        } catch (clientErr) {
+          console.warn('Browser extraction error:', clientErr);
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('date', selectedDate);
+      if (browserText && browserText.trim().length > 0) {
+        formData.append('clientExtractedText', browserText.trim());
+      }
 
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -281,18 +295,51 @@ export default function Home() {
 
       const data = await res.json();
       if (data.success) {
-        showToast(`Extracted data from ${file.name}!`, 'success');
+        let matchedLotteries = data.extraction?.matchedLotteries || [];
+        let detectedDate = data.extraction?.detectedDate;
+        let detectedFooterAnnouncement = data.extraction?.detectedFooterAnnouncement;
+        let unassignedRows = data.extraction?.unassignedRows || [];
+        let dateMismatchWarning = data.extraction?.dateMismatchWarning;
+
+        // Step 2: Fallback: If server matched 0 lotteries, but browser extracted text, run local extractor!
+        if (matchedLotteries.length === 0 && (browserText || data.sourceDoc?.extractedText)) {
+          try {
+            const { extractLotteryDataFromText } = await import('@/lib/extractor');
+            const fallbackExt = extractLotteryDataFromText(
+              browserText || data.sourceDoc?.extractedText || '',
+              selectedDate,
+              file.name,
+              1
+            );
+            if (fallbackExt.matchedLotteries && fallbackExt.matchedLotteries.length > 0) {
+              matchedLotteries = fallbackExt.matchedLotteries;
+              detectedDate = fallbackExt.detectedDate || detectedDate;
+              detectedFooterAnnouncement = fallbackExt.detectedFooterAnnouncement || detectedFooterAnnouncement;
+              unassignedRows = fallbackExt.unassignedRows || unassignedRows;
+              dateMismatchWarning = fallbackExt.dateMismatchWarning || dateMismatchWarning;
+            }
+          } catch (fallbackErr) {
+            console.warn('Client fallback extraction error:', fallbackErr);
+          }
+        }
+
+        if (matchedLotteries.length > 0) {
+          showToast(`Successfully extracted ${matchedLotteries.length} lotteries from ${file.name}!`, 'success');
+        } else {
+          showToast(`Uploaded ${file.name}, but could not identify lottery results.`, 'error');
+        }
 
         // Prioritize persistent server web path so reloading retains the uploaded file
         const clientSourceDoc: SourceDocument = {
           ...data.sourceDoc,
           filePath: data.sourceDoc.filePath || localBlobUrl,
+          extractedText: data.sourceDoc?.extractedText || browserText,
         };
 
         const newSources = [...sheet.sources, clientSourceDoc];
         
         const updatedLotteries = sheet.lotteries.map((existing) => {
-          const match = data.extraction.matchedLotteries.find(
+          const match = matchedLotteries.find(
             (m: any) => m.lotteryId === existing.lotteryId
           );
           if (match) {
@@ -323,18 +370,18 @@ export default function Home() {
           return existing;
         });
 
-        if (data.extraction.dateMismatchWarning) {
-          setDateMismatchWarning(data.extraction.dateMismatchWarning);
+        if (dateMismatchWarning) {
+          setDateMismatchWarning(dateMismatchWarning);
         }
-        if (data.extraction.unassignedRows && data.extraction.unassignedRows.length > 0) {
-          setUnassignedRows(prev => [...prev, ...data.extraction.unassignedRows]);
+        if (unassignedRows && unassignedRows.length > 0) {
+          setUnassignedRows(prev => [...prev, ...unassignedRows]);
         }
 
         const newSheet: DailySheet = {
           ...sheet,
           sources: newSources,
           lotteries: updatedLotteries,
-          footerAnnouncement: data.extraction.detectedFooterAnnouncement || sheet.footerAnnouncement,
+          footerAnnouncement: detectedFooterAnnouncement || sheet.footerAnnouncement,
         };
 
         setSheet(newSheet);
