@@ -12,27 +12,40 @@ export async function GET(req: NextRequest) {
     let sheet: DailySheet | null = null;
     let fromCloud = false;
 
-    // 1. First priority: Check Cloud Firestore (cloud store across deployments)
+    // 1. Fetch local and cloud sheet with timestamp comparison to prevent stale overwrites
     const localSheet = getSheetByDate(date);
 
     try {
       const cloudSheet = await loadSheetFromCloud(date);
-      if (cloudSheet) {
+      if (cloudSheet && localSheet) {
+        const localTime = new Date(localSheet.updatedAt || 0).getTime();
+        const cloudTime = new Date(cloudSheet.updatedAt || (cloudSheet as any).syncedAt || 0).getTime();
+
+        if (localTime > cloudTime) {
+          // Local sheet is NEWER than cloud: Keep local and update cloud in background
+          sheet = localSheet;
+          fromCloud = false;
+          saveSheetToCloud(localSheet).catch(e => console.warn('Background cloud catchup error:', e));
+        } else {
+          // Cloud sheet is newer or equal
+          sheet = cloudSheet;
+          fromCloud = true;
+          if ((!sheet.sources || sheet.sources.length === 0) && localSheet.sources && localSheet.sources.length > 0) {
+            sheet.sources = localSheet.sources;
+          }
+          saveSheet(sheet, 'Synced from cloud Firestore');
+        }
+      } else if (cloudSheet) {
         sheet = cloudSheet;
         fromCloud = true;
-        // If cloud sheet lacks sources but local sheet had them, preserve local sources
-        if ((!sheet.sources || sheet.sources.length === 0) && localSheet?.sources && localSheet.sources.length > 0) {
-          sheet.sources = localSheet.sources;
-        }
-        // Cache locally for fast subsequent reads
         saveSheet(sheet, 'Synced from cloud Firestore');
+      } else if (localSheet) {
+        sheet = localSheet;
+        fromCloud = false;
+        saveSheetToCloud(localSheet).catch(e => console.warn('Initial cloud sync error:', e));
       }
     } catch (cloudErr) {
       console.warn('Cloud fetch check failed:', cloudErr);
-    }
-
-    // 2. Second priority: Check local storage
-    if (!sheet) {
       sheet = localSheet;
     }
 
@@ -111,7 +124,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const sheet: DailySheet = body.sheet;
+    const sheet: DailySheet = {
+      ...body.sheet,
+      updatedAt: new Date().toISOString(),
+    };
     const summary = body.summary || 'Saved lottery results';
 
     if (!sheet || !sheet.date) {

@@ -55,6 +55,7 @@ interface SheetPreviewProps {
   currentStyles?: PreviewStyleOptions;
   onStylesChange?: (styles: PreviewStyleOptions) => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  hideLayoutControls?: boolean;
 }
 
 export const SheetPreview: React.FC<SheetPreviewProps> = ({
@@ -68,10 +69,11 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
   currentStyles,
   onStylesChange,
   showToast,
+  hideLayoutControls = false,
 }) => {
-  const [scale, setScale] = useState<number>(0.46);
+  const [scale, setScale] = useState<number>(hideLayoutControls ? 0.52 : 0.46);
   const [showCutGuide, setShowCutGuide] = useState<boolean>(true);
-  const [showSettings, setShowSettings] = useState<boolean>(true);
+  const [showSettings, setShowSettings] = useState<boolean>(!hideLayoutControls);
   const [activePreset, setActivePreset] = useState<string>('standard');
   const [savedDesigns, setSavedDesigns] = useState<SavedCustomDesign[]>([]);
   const [defaultDesignId, setDefaultDesignId] = useState<string | null>(null);
@@ -810,30 +812,34 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
       {/* Top Toolbar */}
       <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 z-20">
         <div className="flex items-center gap-2">
-          {/* Custom Layout Controls Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setShowSettings(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition border cursor-pointer ${showSettings
-                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                : hasCustomChanges
-                  ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-              }`}
-            title={showSettings ? 'Hide layout controls sidebar' : 'Show layout controls sidebar'}
-          >
-            {showSettings ? (
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            ) : (
-              <PanelLeftOpen className="w-3.5 h-3.5" />
-            )}
-            <span>{showSettings ? 'Hide Controls' : 'Layout Controls (සැකසුම්)'}</span>
-            {hasCustomChanges && !showSettings && (
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            )}
-          </button>
+          {/* Custom Layout Controls Toggle Button (Hidden in Staff Quick Print Mode) */}
+          {!hideLayoutControls && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowSettings(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition border cursor-pointer ${showSettings
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                    : hasCustomChanges
+                      ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                title={showSettings ? 'Hide layout controls sidebar' : 'Show layout controls sidebar'}
+              >
+                {showSettings ? (
+                  <PanelLeftClose className="w-3.5 h-3.5" />
+                ) : (
+                  <PanelLeftOpen className="w-3.5 h-3.5" />
+                )}
+                <span>{showSettings ? 'Hide Controls' : 'Layout Controls (සැකසුම්)'}</span>
+                {hasCustomChanges && !showSettings && (
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                )}
+              </button>
 
-          <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+              <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+            </>
+          )}
 
           <div className="flex items-center gap-1.5">
             <Printer className="w-4 h-4 text-blue-600 hidden sm:block" />
@@ -938,8 +944,8 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
       {/* 2-Column Split Workspace: Left Controls Sidebar + Right Live Preview */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-[620px]">
 
-        {/* Left Side: Layout Controls Sidebar */}
-        {showSettings && (
+        {/* Left Side: Layout Controls Sidebar (Hidden in Staff Quick Print Mode) */}
+        {!hideLayoutControls && showSettings && (
           <aside className="w-full lg:w-[410px] xl:w-[440px] shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 bg-slate-50 flex flex-col z-10 overflow-hidden shadow-xs">
 
             {/* Sidebar Header */}

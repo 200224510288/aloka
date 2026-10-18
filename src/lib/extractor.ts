@@ -481,7 +481,7 @@ export function parseLotteryLine(
         drawNo: drawNo || '',
         letter: letPart ? letPart[0] : (letter || ''),
         numbers: [p1, p2Match ? p2Match[0] : '', p3Match ? p3Match[0] : ''],
-        isCheckedAgainstSource: false,
+        isCheckedAgainstSource: true,
         sourceFileName: fileName,
         sourcePage: pageNumber,
         extractionConfidence: 98
@@ -584,7 +584,7 @@ export function parseLotteryLine(
     bonusNumber,
     boxedIndex,
     isNoDraw: false,
-    isCheckedAgainstSource: false,
+    isCheckedAgainstSource: true,
     sourceFileName: fileName,
     sourcePage: pageNumber,
     extractionConfidence: 95

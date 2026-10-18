@@ -14,13 +14,13 @@ export async function POST(req: NextRequest) {
 
     const { isValid, errors } = validateSheetForPrint(sheet);
 
-    // If any validation errors exist, BLOCK printing!
+    // If any validation errors exist, return error
     if (!isValid) {
       return NextResponse.json({
         success: false,
         blocked: true,
         errors,
-        error: 'Print blocked: Complete and confirm all lotteries before printing.'
+        error: errors[0] || 'Valid result date is required.'
       }, { status: 400 });
     }
 

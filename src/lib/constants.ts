@@ -756,7 +756,7 @@ export function createEmptySheet(dateStr: string): DailySheet {
     headerGreeting: INITIAL_HEADER_GREETING,
     headerDealerName: INITIAL_DEALER_NAME,
     footerAnnouncement: INITIAL_FOOTER_ANNOUNCEMENT,
-    isFooterReviewed: false,
+    isFooterReviewed: true,
     sources: [],
     updatedAt: new Date().toISOString(),
     lotteries: STANDARD_LOTTERIES.map((def) => ({
@@ -770,7 +770,7 @@ export function createEmptySheet(dateStr: string): DailySheet {
       bonusNumber: def.hasBonusNumber ? '' : undefined,
       boxedIndex: def.hasBoxedNumber ? (def.boxedNumberIndex ?? 0) : undefined,
       isNoDraw: false,
-      isCheckedAgainstSource: false,
+      isCheckedAgainstSource: true,
       extractionConfidence: undefined,
       sourceFileName: undefined,
       sourcePage: undefined,

@@ -58,12 +58,12 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
     };
   });
 
-  // Calculate past 4-5 days (Today, Yesterday, -2d, -3d, -4d)
+  // Calculate past 4 days (Yesterday, -2d, -3d, -4d) - Today is omitted as lottery results are for past draws
   const pastDays = useMemo(() => {
     const days = [];
     const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    for (let i = 0; i <= 4; i++) {
+    for (let i = 1; i <= 4; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const year = d.getFullYear();
@@ -73,8 +73,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
       const dayIdx = d.getDay();
 
       let relativeLabel = '';
-      if (i === 0) relativeLabel = 'Today (අද)';
-      else if (i === 1) relativeLabel = 'Yesterday (ඊයේ)';
+      if (i === 1) relativeLabel = 'Yesterday (ඊයේ)';
       else relativeLabel = `${i} Days Ago (දින ${i}කට පෙර)`;
 
       // Check if data is already available for this date
@@ -86,7 +85,6 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
         dayEn: DAYS_EN[dayIdx],
         relativeLabel,
         hasData,
-        isToday: i === 0,
         isYesterday: i === 1,
       });
     }
@@ -125,7 +123,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       cells.push({
         dateStr,
-        dayNum,
+        dayNum: d,
         isCurrentMonth: true,
         hasData: availableDates.includes(dateStr),
         isToday: dateStr === todayStr,
@@ -141,7 +139,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
       const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       cells.push({
         dateStr,
-        dayNum,
+        dayNum: d,
         isCurrentMonth: false,
         hasData: availableDates.includes(dateStr),
         isToday: dateStr === todayStr,
@@ -219,8 +217,8 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
             className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
               isCalendarOpen 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
+                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300 hover:border-slate-400'
             }`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
@@ -230,8 +228,8 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
         </div>
       </div>
 
-      {/* 4-5 Days Back Quick Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+      {/* 4 Days Back Quick Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3">
         {pastDays.map((item) => {
           const isSelected = item.date === selectedDate;
 
@@ -240,8 +238,8 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
               key={item.date}
               className={`relative rounded-xl p-2.5 transition-all flex flex-col justify-between border ${
                 isSelected
-                  ? 'bg-blue-50/80 border-blue-400 shadow-sm ring-2 ring-blue-500/20'
-                  : 'bg-slate-50/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                  ? 'bg-slate-100 border-slate-800 shadow-xs ring-1 ring-slate-400'
+                  : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 shadow-2xs'
               }`}
             >
               {/* Click area to select date */}
@@ -252,13 +250,13 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    isSelected ? 'bg-blue-600 text-white' : 'bg-slate-200/80 text-slate-700'
+                    isSelected ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
                   }`}>
                     {item.relativeLabel.split(' ')[0]}
                   </span>
                   
                   {item.hasData ? (
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/90 px-1 py-0.5 rounded flex items-center gap-0.5">
+                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 flex items-center gap-0.5">
                       <CheckCircle2 className="w-2.5 h-2.5" /> Ready
                     </span>
                   ) : (
@@ -270,7 +268,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
                   <div className="text-xs font-black text-slate-900 font-mono tracking-tight">
                     {item.date}
                   </div>
-                  <div className="text-[11px] font-bold text-blue-900 font-sinhala leading-tight">
+                  <div className="text-[11px] font-bold text-slate-900 font-sinhala leading-tight">
                     {item.daySi} <span className="text-[10px] text-slate-500 font-sans font-normal">({item.dayEn})</span>
                   </div>
                 </div>
@@ -285,12 +283,12 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
                 }}
                 className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs ${
                   isSelected
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white active:scale-95'
-                    : 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 hover:border-slate-300'
+                    ? 'bg-[#15803d] hover:bg-[#166534] text-white active:scale-95'
+                    : 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 hover:border-slate-400'
                 }`}
                 title={`1-Click direct print for ${item.date} (${item.daySi})`}
               >
-                <Printer className="w-3 h-3 text-emerald-600" />
+                <Printer className="w-3 h-3" />
                 <span>Quick Print</span>
               </button>
             </div>
@@ -354,11 +352,11 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
                     }}
                     className={`py-1.5 px-1 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition cursor-pointer relative ${
                       cell.isSelected
-                        ? 'bg-blue-600 text-white font-bold shadow-sm'
+                        ? 'bg-slate-900 text-white font-bold shadow-sm'
                         : cell.isCurrentMonth
-                          ? 'bg-white hover:bg-blue-50 text-slate-800 border border-slate-200/80 hover:border-blue-300'
+                          ? 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 hover:border-slate-400'
                           : 'bg-transparent text-slate-400 hover:text-slate-600'
-                    } ${cell.isToday && !cell.isSelected ? 'ring-1.5 ring-blue-500 font-bold' : ''}`}
+                    } ${cell.isToday && !cell.isSelected ? 'ring-1.5 ring-slate-800 font-bold' : ''}`}
                     title={`${cell.dateStr} ${cell.hasData ? '(Has Saved Results)' : ''}`}
                   >
                     <span>{cell.dayNum}</span>
@@ -366,7 +364,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
                     {/* Green dot indicator for days with saved sheets */}
                     {cell.hasData && (
                       <span className={`w-1 h-1 rounded-full mt-0.5 ${
-                        cell.isSelected ? 'bg-white' : 'bg-emerald-500'
+                        cell.isSelected ? 'bg-white' : 'bg-emerald-600'
                       }`} />
                     )}
                   </button>
@@ -377,7 +375,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
             {/* Quick Navigation Shortcuts */}
             <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-200/70 text-[11px]">
               <div className="flex items-center gap-1 text-slate-500">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" />
+                <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full inline-block" />
                 <span>Green dot = Results saved / Available</span>
               </div>
 
@@ -385,16 +383,9 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
                 <button
                   type="button"
                   onClick={jumpToYesterday}
-                  className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold cursor-pointer"
+                  className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold cursor-pointer shadow-2xs"
                 >
-                  Yesterday (ඊයේ)
-                </button>
-                <button
-                  type="button"
-                  onClick={jumpToToday}
-                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold cursor-pointer"
-                >
-                  Today (අද)
+                  Latest: Yesterday (ඊයේ)
                 </button>
               </div>
             </div>

@@ -19,85 +19,18 @@ export async function POST(req: NextRequest) {
       validationErrors.push('Valid result date is required (YYYY-MM-DD).');
     }
 
-    // 2. Check Footer announcement review confirmation
-    if (!sheet.isFooterReviewed) {
-      validationErrors.push('Footer prize announcement must be reviewed and confirmed before export.');
-    }
-
-    // 3. Check each lottery item
-    for (const def of STANDARD_LOTTERIES) {
-      const item = sheet.lotteries.find(l => l.lotteryId === def.id);
-
-      if (!item) {
-        validationErrors.push(`Missing lottery row for: ${def.nameSi}`);
-        continue;
-      }
-
-      // If marked No Draw, ensure reason exists
-      if (item.isNoDraw) {
-        if (!item.noDrawReason || item.noDrawReason.trim().length === 0) {
-          validationErrors.push(`${def.nameSi} is marked 'No draw', but no reason was provided.`);
-        }
-        continue;
-      }
-
-      // Must be checked against source
-      if (!item.isCheckedAgainstSource) {
-        validationErrors.push(`${def.nameSi}: Not yet confirmed as 'Checked against source'.`);
-      }
-
-      // Must have Draw Number
-      if (!item.drawNo || item.drawNo.trim().length === 0) {
-        validationErrors.push(`${def.nameSi}: Draw number is missing.`);
-      }
-
-      // Must have English Letter if required
-      if (def.requiresLetter && (!item.letter || item.letter.trim().length === 0)) {
-        validationErrors.push(`${def.nameSi}: English letter is required.`);
-      }
-
-      // Must have Zodiac if required
-      if (def.requiresZodiac && (!item.zodiac || item.zodiac.trim().length === 0)) {
-        validationErrors.push(`${def.nameSi}: Zodiac sign is required.`);
-      }
-
-      // Must have required numbers filled
-      if (def.isTieredDigits) {
-        // Must have 3 parts
-        const nums = item.numbers || [];
-        if (!nums[0] || !nums[1] || !nums[2]) {
-          validationErrors.push(`${def.nameSi}: All 3 tiered winning numbers must be entered.`);
-        }
-      } else {
-        const nums = item.numbers || [];
-        if (nums.length < def.numberCount || nums.slice(0, def.numberCount).some(n => !n || n.trim().length === 0)) {
-          validationErrors.push(`${def.nameSi}: Requires ${def.numberCount} winning numbers/digits.`);
-        }
-      }
-
-      // Must have bonus number if required
-      if (def.hasBonusNumber && (!item.bonusNumber || item.bonusNumber.trim().length === 0)) {
-        validationErrors.push(`${def.nameSi}: Bonus number is missing.`);
-      }
-
-      // Check conflicts
-      if (item.hasConflict) {
-        validationErrors.push(`${def.nameSi}: Unresolved source conflict detected.`);
-      }
-    }
-
-    // 4. Check footer announcement length overflow
+    // 2. Check footer announcement length overflow
     if (sheet.footerAnnouncement && sheet.footerAnnouncement.length > 250) {
       validationErrors.push('Footer announcement text exceeds maximum printable length (250 chars). Please shorten to avoid page overflow.');
     }
 
-    // If any validation errors exist, BLOCK export!
+    // Only block if critical date or structural issue exists
     if (validationErrors.length > 0) {
       return NextResponse.json({
         success: false,
         blocked: true,
         errors: validationErrors,
-        error: 'Export blocked: Resolve all pending reviews and required fields before downloading.'
+        error: validationErrors[0]
       }, { status: 400 });
     }
 

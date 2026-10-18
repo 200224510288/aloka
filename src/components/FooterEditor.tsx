@@ -200,16 +200,16 @@ export const FooterEditor: React.FC<FooterEditorProps> = ({ sheet, onChange }) =
 
       {/* Collapsible Singlish Cheat Sheet */}
       {showGuide && (
-        <div className="mb-3 p-3 bg-gradient-to-br from-blue-50/90 to-indigo-50/80 border border-blue-200 rounded-xl text-xs animate-in fade-in-50 duration-150">
-          <div className="flex items-center justify-between pb-2 border-b border-blue-200/60 mb-2">
-            <span className="font-extrabold text-blue-900 flex items-center gap-1.5">
-              <Keyboard className="w-3.5 h-3.5 text-blue-700" />
+        <div className="mb-3 p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs animate-in fade-in-50 duration-150">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-2">
+            <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+              <Keyboard className="w-3.5 h-3.5 text-slate-700" />
               Singlish (Sinhala Phonetic) Typing Cheat Sheet:
             </span>
             <button
               type="button"
               onClick={() => setShowGuide(false)}
-              className="text-blue-700 hover:text-blue-900 text-[11px] font-bold"
+              className="text-slate-600 hover:text-slate-900 text-[11px] font-bold"
             >
               Close
             </button>
@@ -217,14 +217,14 @@ export const FooterEditor: React.FC<FooterEditorProps> = ({ sheet, onChange }) =
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-[11px]">
             {SINGLISH_CHEAT_SHEET.map((item, idx) => (
-              <div key={idx} className="bg-white/80 p-1.5 rounded-lg border border-blue-100 shadow-2xs">
-                <div className="font-mono font-bold text-blue-700">{item.eng}</div>
+              <div key={idx} className="bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs">
+                <div className="font-mono font-bold text-slate-800">{item.eng}</div>
                 <div className="font-sinhala font-extrabold text-slate-900 text-sm">{item.sin}</div>
                 <div className="text-[10px] text-slate-500">{item.note}</div>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[10.5px] text-blue-800 italic">
+          <p className="mt-2 text-[10.5px] text-slate-600 italic">
             Tip: Press Space, Enter, or comma to immediately convert typed words. Unfinished words auto-convert on blur.
           </p>
         </div>
