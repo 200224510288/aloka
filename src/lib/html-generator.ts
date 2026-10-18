@@ -1,6 +1,7 @@
 import { DailySheet, PreviewStyleOptions } from '@/types/lottery';
 import { STANDARD_LOTTERIES, DEFAULT_STYLE_OPTIONS } from './constants';
 import { ZODIAC_IMAGE_MAP } from './zodiac-icons';
+import { calculateRowSpacing } from './row-spacing';
 
 /**
  * Escapes HTML characters safely for print injection
@@ -104,7 +105,10 @@ export function validateSheetForPrint(sheet: DailySheet): { isValid: boolean; er
 /**
  * Renders HTML for a single half-sheet (137.5mm x ~195mm)
  */
-export function renderSingleSheet(sheet: DailySheet, isHighDensity = false): string {
+export function renderSingleSheet(sheet: DailySheet, isHighDensity = false, options: PreviewStyleOptions = {}): string {
+  const showRowTick = options.showRowTick ?? DEFAULT_STYLE_OPTIONS.showRowTick;
+  const rowTickPosition = options.rowTickPosition ?? DEFAULT_STYLE_OPTIONS.rowTickPosition;
+
   const rowsHtml = STANDARD_LOTTERIES.map((def) => {
     const item = sheet.lotteries.find(l => l.lotteryId === def.id) || {
       lotteryId: def.id,
@@ -119,6 +123,8 @@ export function renderSingleSheet(sheet: DailySheet, isHighDensity = false): str
     if (item.isNoDraw) {
       resultCellHtml = `<span class="no-draw-tag">දිනුම් ඇදීමක් නොමැත ${item.noDrawReason ? `(${escapeHtml(item.noDrawReason)})` : ''}</span>`;
     } else {
+      const rowSpacing = calculateRowSpacing(def.id, item, def, options);
+      const rowGapMm = rowSpacing.gapMm;
       const parts: string[] = [];
 
       // Letter (e.g. D, O, Z, Y, etc.) - for tiered digits, letter is at the end
@@ -160,7 +166,22 @@ export function renderSingleSheet(sheet: DailySheet, isHighDensity = false): str
         parts.push(`<span class="bonus-number">(${escapeHtml(item.bonusNumber)})</span>`);
       }
 
-      resultCellHtml = `<div class="result-content">${parts.join('')}</div>`;
+      if (showRowTick && rowTickPosition === 'right') {
+        resultCellHtml = `
+          <div class="result-content">
+            <div class="result-numbers-wrapper" style="gap: ${rowGapMm}mm;">${parts.join('')}</div>
+            <span class="row-tick-mark">✓</span>
+          </div>
+        `;
+      } else if (showRowTick && rowTickPosition === 'after_numbers') {
+        resultCellHtml = `
+          <div class="result-content">
+            <div class="result-numbers-wrapper" style="gap: ${rowGapMm}mm;">${parts.join('')}<span class="row-tick-mark" style="margin-left: 2mm;">✓</span></div>
+          </div>
+        `;
+      } else {
+        resultCellHtml = `<div class="result-content"><div class="result-numbers-wrapper" style="gap: ${rowGapMm}mm;">${parts.join('')}</div></div>`;
+      }
     }
 
     return `
@@ -207,7 +228,7 @@ export function generatePrintHtml(
   options: PreviewStyleOptions = {},
   copies: number = 1
 ): string {
-  const merged: Required<Omit<PreviewStyleOptions, 'printDensity'>> & { printDensity: 'eco' | 'high' } = {
+  const merged: Required<Omit<PreviewStyleOptions, 'printDensity' | 'customRowGaps'>> & { printDensity: 'eco' | 'high'; customRowGaps?: Record<string, number> } = {
     ...DEFAULT_STYLE_OPTIONS,
     ...options,
     printDensity: options.printDensity || 'eco',
@@ -228,6 +249,10 @@ export function generatePrintHtml(
   const cellPaddingLeftMm = merged.cellPaddingLeftMm ?? DEFAULT_STYLE_OPTIONS.cellPaddingLeftMm;
   const announcementOffsetYMm = merged.announcementOffsetYMm ?? DEFAULT_STYLE_OPTIONS.announcementOffsetYMm;
   const topMarginMm = merged.topMarginMm ?? DEFAULT_STYLE_OPTIONS.topMarginMm;
+  const zodiacIconSizeMm = merged.zodiacIconSizeMm ?? DEFAULT_STYLE_OPTIONS.zodiacIconSizeMm;
+  const showRowTick = merged.showRowTick ?? DEFAULT_STYLE_OPTIONS.showRowTick;
+  const rowTickPosition = merged.rowTickPosition ?? DEFAULT_STYLE_OPTIONS.rowTickPosition;
+  const rowTickColor = merged.rowTickColor ?? DEFAULT_STYLE_OPTIONS.rowTickColor;
 
   // Font Types and Bold Weights
   const lotteryNameFontFamily = merged.lotteryNameFontFamily ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontFamily;
@@ -251,8 +276,8 @@ export function generatePrintHtml(
   const dealerFontFamily = merged.dealerFontFamily ?? DEFAULT_STYLE_OPTIONS.dealerFontFamily;
   const dealerFontWeight = merged.dealerFontWeight ?? DEFAULT_STYLE_OPTIONS.dealerFontWeight;
 
-  // Render single sheet content
-  const singleSheetHtml = renderSingleSheet(sheet, isHighDensity);
+  // Render single sheet content with merged options
+  const singleSheetHtml = renderSingleSheet(sheet, isHighDensity, merged);
 
   return `<!DOCTYPE html>
 <html lang="si">
@@ -511,10 +536,33 @@ export function generatePrintHtml(
     .result-content {
       display: flex;
       align-items: center;
+      height: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      width: 100%;
+      ${showRowTick && rowTickPosition === 'right' ? 'justify-content: space-between;' : ''}
+    }
+
+    .result-numbers-wrapper {
+      display: flex;
+      align-items: center;
       gap: ${contentGapMm}mm;
       height: 100%;
       overflow: hidden;
       white-space: nowrap;
+    }
+
+    .row-tick-mark {
+      font-size: ${Math.max(10, resultFontSizePt - 4)}pt;
+      font-weight: 900;
+      color: ${rowTickColor};
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding-right: 1.5mm;
+      flex-shrink: 0;
+      user-select: none;
     }
 
     .result-letter {
@@ -539,8 +587,8 @@ export function generatePrintHtml(
     }
 
     .zodiac-icon-img {
-      width: 5.4mm;
-      height: 5.4mm;
+      width: ${zodiacIconSizeMm}mm;
+      height: ${zodiacIconSizeMm}mm;
       object-fit: contain;
       vertical-align: middle;
       display: inline-block;

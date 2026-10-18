@@ -117,6 +117,16 @@ export interface PreviewStyleOptions {
   cellPaddingLeftMm?: number; // default: 2.0mm
   announcementOffsetYMm?: number; // default: 0.0mm (move announcement up/down)
   topMarginMm?: number; // default: 6.0mm (top free space above table)
+  zodiacIconSizeMm?: number; // default: 5.4mm (range: 3.0mm - 8.5mm)
+  showRowTick?: boolean; // default: false (option to put a verification tick mark ✓ on each row)
+  rowTickPosition?: 'right' | 'after_numbers'; // default: 'right' (aligned at right edge vs after numbers)
+  rowTickColor?: string; // default: '#000000' (black, green, etc.)
+
+  // Spacing Safety & Auto-Expansion Limits
+  enableSpacingSafetyLimit?: boolean; // default: true (prevents numbers from crossing or clipping the right border)
+  expandShortRows?: boolean; // default: false (option to expand short rows that have plenty of space)
+  shortRowsExtraGapMm?: number; // default: 2.0mm (extra spacing for short rows like Sasiri, Ayubo, Suba Dawasak)
+  customRowGaps?: Record<string, number>; // optional per-lottery custom spacing overrides
 
   // Font Types (Family)
   lotteryNameFontFamily?: string;

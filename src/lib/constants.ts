@@ -1,6 +1,6 @@
 import { LotteryDefinition, DailySheet, PreviewStyleOptions } from '@/types/lottery';
 
-export const DEFAULT_STYLE_OPTIONS: Required<Omit<PreviewStyleOptions, 'printDensity'>> & { printDensity: 'eco' | 'high' } = {
+export const DEFAULT_STYLE_OPTIONS: Required<Omit<PreviewStyleOptions, 'printDensity' | 'customRowGaps'>> & { printDensity: 'eco' | 'high'; customRowGaps?: Record<string, number> } = {
   printDensity: 'eco',
   rowHeightMm: 9.4,
   lotteryNameFontSizePt: 10.5,
@@ -17,6 +17,14 @@ export const DEFAULT_STYLE_OPTIONS: Required<Omit<PreviewStyleOptions, 'printDen
   cellPaddingLeftMm: 2.0,
   announcementOffsetYMm: 0.0,
   topMarginMm: 6.0,
+  zodiacIconSizeMm: 5.4,
+  showRowTick: false,
+  rowTickPosition: 'right',
+  rowTickColor: '#000000',
+  enableSpacingSafetyLimit: true,
+  expandShortRows: false,
+  shortRowsExtraGapMm: 2.0,
+  customRowGaps: {},
 
   // Default Font Families
   lotteryNameFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
@@ -92,6 +100,13 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 2.0,
       announcementOffsetYMm: 0.0,
       topMarginMm: 6.0,
+      zodiacIconSizeMm: 5.4,
+      showRowTick: false,
+      rowTickPosition: 'right',
+      rowTickColor: '#000000',
+      enableSpacingSafetyLimit: true,
+      expandShortRows: false,
+      shortRowsExtraGapMm: 2.0,
       lotteryNameFontFamily: "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif",
       drawNoFontFamily: "'Consolas', 'Courier New', monospace",
       resultFontFamily: "Arial, sans-serif",
@@ -127,6 +142,13 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 1.5,
       announcementOffsetYMm: 0.0,
       topMarginMm: 5.0,
+      zodiacIconSizeMm: 4.8,
+      showRowTick: false,
+      rowTickPosition: 'right',
+      rowTickColor: '#000000',
+      enableSpacingSafetyLimit: true,
+      expandShortRows: false,
+      shortRowsExtraGapMm: 1.5,
       lotteryNameFontWeight: 700,
       drawNoFontWeight: 600,
       resultFontWeight: 600,
@@ -155,6 +177,13 @@ export const STYLE_PRESETS: Record<string, { label: string; description: string;
       cellPaddingLeftMm: 2.2,
       announcementOffsetYMm: 0.0,
       topMarginMm: 5.0,
+      zodiacIconSizeMm: 6.0,
+      showRowTick: false,
+      rowTickPosition: 'right',
+      rowTickColor: '#000000',
+      enableSpacingSafetyLimit: true,
+      expandShortRows: false,
+      shortRowsExtraGapMm: 2.0,
       lotteryNameFontWeight: 900,
       drawNoFontWeight: 800,
       resultFontWeight: 800,
@@ -734,7 +763,7 @@ export function createEmptySheet(dateStr: string): DailySheet {
       lotteryId: def.id,
       drawNo: '',
       letter: '',
-      zodiac: def.requiresZodiac ? 'කන්‍යා' : undefined,
+      zodiac: undefined,
       numbers: def.isTieredDigits 
         ? ['', '', ''] 
         : Array(def.numberCount).fill(''),

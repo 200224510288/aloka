@@ -11,6 +11,7 @@ import { FooterEditor } from '@/components/FooterEditor';
 import { SheetPreview } from '@/components/SheetPreview';
 import { RevisionsModal } from '@/components/RevisionsModal';
 import PrintModal from '@/components/PrintModal';
+import { DateHistoryBar } from '@/components/DateHistoryBar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 import { 
   CheckCircle2, 
@@ -63,6 +64,7 @@ export default function Home() {
   const [printDensity, setPrintDensity] = useState<'eco' | 'high'>('eco');
   const [previewStyles, setPreviewStyles] = useState<PreviewStyleOptions | undefined>(undefined);
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -476,10 +478,9 @@ export default function Home() {
 
   // Stats calculation
   const totalLotteries = sheet.lotteries.length;
-  const checkedCount = sheet.lotteries.filter(l => l.isCheckedAgainstSource && !l.isNoDraw).length;
   const noDrawCount = sheet.lotteries.filter(l => l.isNoDraw).length;
-  const pendingCount = totalLotteries - checkedCount - noDrawCount;
-  const canExport = pendingCount === 0 && sheet.isFooterReviewed && exportBlockedErrors.length === 0;
+  const pendingCount = 0;
+  const canExport = exportBlockedErrors.length === 0;
 
   // Filtered rows for Step 2
   const filteredLotteries = useMemo(() => {
@@ -489,22 +490,16 @@ export default function Home() {
         drawNo: '',
         numbers: [],
         isNoDraw: false,
-        isCheckedAgainstSource: false,
+        isCheckedAgainstSource: true,
       };
       return { def, item, originalIndex: idx };
-    }).filter(({ def, item }) => {
-      if (filterMode === 'needs_attention') {
-        return !item.isNoDraw && (!item.isCheckedAgainstSource || !isRowComplete(item, def));
-      }
-      if (filterMode === 'confirmed') {
-        return item.isCheckedAgainstSource && !item.isNoDraw;
-      }
+    }).filter(({ item }) => {
       if (filterMode === 'no_draw') {
         return item.isNoDraw;
       }
       return true; // 'all'
     });
-  }, [sheet.lotteries, filterMode, isRowComplete]);
+  }, [sheet.lotteries, filterMode]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans text-slate-900">
@@ -749,105 +744,47 @@ export default function Home() {
           <div className="flex flex-col gap-4 flex-1 animate-in fade-in-50 duration-200">
             
             {/* Command & Verification Toolbar */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Toolbar */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               
-              {/* Left: Progress bar & status */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-extrabold text-slate-900">
-                      Verification Progress
-                    </span>
-                    <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                      pendingCount === 0 && sheet.isFooterReviewed
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {checkedCount + noDrawCount}/{totalLotteries} Ready
-                    </span>
-                  </div>
-
-                  {/* Visual progress bar */}
-                  <div className="w-48 sm:w-64 h-2 bg-slate-100 rounded-full overflow-hidden mt-1.5 border border-slate-200">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.round(((checkedCount + noDrawCount) / totalLotteries) * 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* 1-Click Verify All Button (Massive Cognitive Relief!) */}
-                <button
-                  type="button"
-                  onClick={handleVerifyAllValid}
-                  className="ml-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
-                  title="Verify all 17 valid lottery rows in 1 click"
-                >
-                  <CheckCheck className="w-4 h-4 stroke-[2.5]" />
-                  <span>Verify All Valid</span>
-                </button>
+              {/* Left: Summary */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm font-extrabold text-slate-900">
+                  {totalLotteries} Daily Lotteries
+                </span>
+                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  Direct Edit Mode
+                </span>
               </div>
 
-              {/* Center / Right: Filter Chips & View Mode Toggle */}
+              {/* Right: Filter Chips & View Mode Toggle */}
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                
-                {/* Filter Tabs */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('all')}
-                    className={`px-2.5 py-1 rounded-lg transition ${
-                      filterMode === 'all'
-                        ? 'bg-white text-blue-700 shadow-2xs'
-                        : 'hover:text-slate-900'
-                    }`}
-                  >
-                    All ({totalLotteries})
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('needs_attention')}
-                    className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
-                      filterMode === 'needs_attention'
-                        ? 'bg-white text-amber-700 shadow-2xs'
-                        : pendingCount > 0 ? 'text-amber-800 hover:text-amber-900 font-black' : 'hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Needs Attention</span>
-                    {pendingCount > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('confirmed')}
-                    className={`px-2.5 py-1 rounded-lg transition ${
-                      filterMode === 'confirmed'
-                        ? 'bg-white text-emerald-700 shadow-2xs'
-                        : 'hover:text-slate-900'
-                    }`}
-                  >
-                    Confirmed ({checkedCount})
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterMode('no_draw')}
-                    className={`px-2.5 py-1 rounded-lg transition ${
-                      filterMode === 'no_draw'
-                        ? 'bg-white text-slate-800 shadow-2xs'
-                        : 'hover:text-slate-900'
-                    }`}
-                  >
-                    No Draw ({noDrawCount})
-                  </button>
-                </div>
+                {noDrawCount > 0 && (
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('all')}
+                      className={`px-2.5 py-1 rounded-lg transition ${
+                        filterMode === 'all'
+                          ? 'bg-white text-blue-700 shadow-2xs'
+                          : 'hover:text-slate-900'
+                      }`}
+                    >
+                      All ({totalLotteries})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('no_draw')}
+                      className={`px-2.5 py-1 rounded-lg transition ${
+                        filterMode === 'no_draw'
+                          ? 'bg-white text-slate-800 shadow-2xs'
+                          : 'hover:text-slate-900'
+                      }`}
+                    >
+                      No Draw ({noDrawCount})
+                    </button>
+                  </div>
+                )}
 
                 {/* Split-View Toggle (Source Document on Left) */}
                 <button
@@ -914,18 +851,6 @@ export default function Home() {
                         <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
                           Showing: {filteredLotteries.length} of {totalLotteries}
                         </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs">
-                      {pendingCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setFilterMode('needs_attention')}
-                          className="text-amber-700 hover:text-amber-900 font-bold underline text-[11px]"
-                        >
-                          Show {pendingCount} Pending Row{pendingCount !== 1 ? 's' : ''}
-                        </button>
                       )}
                     </div>
                   </div>

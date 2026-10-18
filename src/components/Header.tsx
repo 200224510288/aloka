@@ -42,12 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isEditingDealer, setIsEditingDealer] = useState(false);
   const [dealerInput, setDealerInput] = useState(sheet.headerDealerName);
 
-  const totalLotteries = sheet.lotteries.length;
-  const checkedCount = sheet.lotteries.filter(l => l.isCheckedAgainstSource && !l.isNoDraw).length;
-  const noDrawCount = sheet.lotteries.filter(l => l.isNoDraw).length;
-  const pendingCount = totalLotteries - checkedCount - noDrawCount;
-
-  const isReadyToExport = pendingCount === 0 && sheet.isFooterReviewed && exportBlockedErrors.length === 0;
+  const isReadyToExport = exportBlockedErrors.length === 0;
 
   const handleSaveDealer = () => {
     const trimmed = dealerInput.trim();
@@ -149,22 +144,6 @@ export const Header: React.FC<HeaderProps> = ({
                   {sheet.headerDealerName}
                 </button>
               )}
-            </div>
-
-            {/* Verification Stats Badge */}
-            <div className="hidden md:flex items-center">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
-                pendingCount === 0 
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                  : 'bg-amber-50 text-amber-800 border-amber-200'
-              }`}>
-                {pendingCount === 0 ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                ) : (
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                )}
-                <span>{checkedCount}/{totalLotteries} Checked</span>
-              </span>
             </div>
 
             {/* Cloud Auto-Sync Status */}
@@ -282,12 +261,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <AlertTriangle className="w-3.5 h-3.5" /> Export Blocked:
                     </p>
                     <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-slate-300">
-                      {pendingCount > 0 && (
-                        <li>{pendingCount} lottery row(s) require verification.</li>
-                      )}
-                      {!sheet.isFooterReviewed && (
-                        <li>Footer prize announcement must be confirmed.</li>
-                      )}
                       {exportBlockedErrors.map((err, idx) => (
                         <li key={idx}>{err}</li>
                       ))}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, CheckCircle2, AlertCircle, Ban, Undo, Sparkles } from 'lucide-react';
+import { AlertCircle, Ban, Undo, Sparkles } from 'lucide-react';
 import { LotteryDefinition, LotteryResultItem } from '@/types/lottery';
 import { ZODIAC_SIGNS } from '@/lib/constants';
 import { ZODIAC_PATH_MAP } from '@/lib/zodiac-icons';
@@ -22,21 +22,10 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
   const [showNoDrawModal, setShowNoDrawModal] = useState(false);
   const [noDrawReasonInput, setNoDrawReasonInput] = useState(item.noDrawReason || '');
 
-  // CRITICAL RULE: updating any field must automatically RESET confirmation!
   const updateField = (fieldUpdates: Partial<LotteryResultItem>) => {
     onChange({
       ...item,
       ...fieldUpdates,
-      isCheckedAgainstSource: false, // RESET CONFIRMATION UPON EDIT!
-      checkedAt: undefined,
-    });
-  };
-
-  const handleToggleChecked = () => {
-    onChange({
-      ...item,
-      isCheckedAgainstSource: !item.isCheckedAgainstSource,
-      checkedAt: !item.isCheckedAgainstSource ? new Date().toISOString() : undefined,
     });
   };
 
@@ -74,7 +63,6 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
     updateField({ boxedIndex: newBoxed });
   };
 
-  const isConfirmed = item.isCheckedAgainstSource;
   const isNoDraw = item.isNoDraw;
 
   return (
@@ -82,8 +70,6 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
       className={`rounded-xl border transition-all duration-200 ${
         isNoDraw
           ? 'bg-slate-50 border-slate-200 opacity-75'
-          : isConfirmed
-          ? 'bg-white border-emerald-300 shadow-2xs hover:border-emerald-400 ring-1 ring-emerald-500/10'
           : 'bg-white border-slate-200 shadow-2xs hover:border-blue-300'
       }`}
     >
@@ -92,11 +78,7 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
         {/* Header Row: Index, Name, Board, Status & Actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-            <span className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 ${
-              isConfirmed 
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-slate-100 text-slate-700'
-            }`}>
+            <span className="w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
               {index + 1}
             </span>
 
@@ -139,31 +121,6 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
               >
                 <Undo className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Restore</span>
-              </button>
-            )}
-
-            {/* Checked Confirmation Button */}
-            {!isNoDraw && (
-              <button
-                type="button"
-                onClick={handleToggleChecked}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 transition shadow-2xs cursor-pointer ${
-                  isConfirmed
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
-                }`}
-              >
-                {isConfirmed ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                    <span>Confirmed</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-amber-700 stroke-[3]" />
-                    <span>Confirm Check</span>
-                  </>
-                )}
               </button>
             )}
           </div>
@@ -219,19 +176,24 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">
                       Zodiac:
                     </label>
-                    {ZODIAC_PATH_MAP[item.zodiac || 'කන්‍යා'] && (
+                    {item.zodiac && ZODIAC_PATH_MAP[item.zodiac] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={ZODIAC_PATH_MAP[item.zodiac || 'කන්‍යා']}
-                        alt={item.zodiac || 'කන්‍යා'}
+                        src={ZODIAC_PATH_MAP[item.zodiac]}
+                        alt={item.zodiac}
                         className="w-7 h-7 object-contain inline-block bg-white border border-slate-300 rounded-md p-0.5 shadow-2xs shrink-0"
                       />
+                    ) : (
+                      <span className="w-7 h-7 inline-flex items-center justify-center bg-amber-50 border border-amber-300 rounded-md text-amber-700 font-bold text-xs shrink-0" title="Zodiac not selected">
+                        ?
+                      </span>
                     )}
                     <select
-                      value={item.zodiac || 'කන්‍යා'}
-                      onChange={(e) => updateField({ zodiac: e.target.value })}
-                      className="h-9 px-2 text-xs font-bold font-sinhala border-2 border-slate-300 rounded-lg bg-white focus:border-blue-600 outline-none shadow-2xs transition cursor-pointer"
+                      value={item.zodiac || ''}
+                      onChange={(e) => updateField({ zodiac: e.target.value || undefined })}
+                      className={`h-9 px-2 text-xs font-bold font-sinhala border-2 rounded-lg bg-white focus:border-blue-600 outline-none shadow-2xs transition cursor-pointer ${!item.zodiac ? 'border-amber-400 bg-amber-50/50 text-amber-900' : 'border-slate-300'}`}
                     >
+                      <option value="">-- තෝරන්න (Select) --</option>
                       {ZODIAC_SIGNS.map((z) => (
                         <option key={z.si} value={z.si}>
                           {z.si} ({z.en})

@@ -190,28 +190,19 @@ export default function PrintModal({
         <div className="p-5 overflow-y-auto space-y-4 text-sm text-slate-700">
 
           {/* Validation Banner if blocked */}
-          {!isReadyToExport && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-              <div className="flex items-start gap-2 text-amber-800 font-bold text-xs">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          {exportBlockedErrors.length > 0 && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+              <div className="flex items-start gap-2 text-red-800 font-bold text-xs">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                 <div>
-                  <div>Verification required before printing:</div>
-                  <div className="font-normal text-[11px] text-amber-700 mt-0.5">
-                    {pendingCount > 0 && `${pendingCount} lottery row(s) pending verification. `}
-                    {!sheet.isFooterReviewed && 'Footer prize announcement must be confirmed.'}
-                  </div>
+                  <div>Required fields missing before printing:</div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-red-700 mt-1">
+                    {exportBlockedErrors.map((err, idx) => (
+                      <li key={idx}>{err}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
-              {onVerifyAll && (
-                <button
-                  type="button"
-                  onClick={onVerifyAll}
-                  className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>1-Click Confirm All & Enable Printing (සියල්ල තහවුරු කරන්න)</span>
-                </button>
-              )}
             </div>
           )}
 

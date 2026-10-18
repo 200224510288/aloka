@@ -155,6 +155,15 @@ export function listAvailableDates(): string[] {
         }
       }
     }
+    const pubUploads = path.join(process.cwd(), 'public', 'uploads');
+    if (fs.existsSync(pubUploads)) {
+      const dirs = fs.readdirSync(pubUploads);
+      for (const d of dirs) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+          dates.add(d);
+        }
+      }
+    }
   } catch (err) {
     console.warn('Could not list local dates from disk:', err);
   }

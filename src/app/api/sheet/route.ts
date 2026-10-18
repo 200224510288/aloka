@@ -13,13 +13,19 @@ export async function GET(req: NextRequest) {
     let fromCloud = false;
 
     // 1. First priority: Check Cloud Firestore (cloud store across deployments)
+    const localSheet = getSheetByDate(date);
+
     try {
       const cloudSheet = await loadSheetFromCloud(date);
       if (cloudSheet) {
         sheet = cloudSheet;
         fromCloud = true;
+        // If cloud sheet lacks sources but local sheet had them, preserve local sources
+        if ((!sheet.sources || sheet.sources.length === 0) && localSheet?.sources && localSheet.sources.length > 0) {
+          sheet.sources = localSheet.sources;
+        }
         // Cache locally for fast subsequent reads
-        saveSheet(cloudSheet, 'Synced from cloud Firestore');
+        saveSheet(sheet, 'Synced from cloud Firestore');
       }
     } catch (cloudErr) {
       console.warn('Cloud fetch check failed:', cloudErr);
@@ -27,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Second priority: Check local storage
     if (!sheet) {
-      sheet = getSheetByDate(date);
+      sheet = localSheet;
     }
 
     // 3. Fallback: If no sheet exists, generate default template
@@ -37,6 +43,39 @@ export async function GET(req: NextRequest) {
       } else {
         sheet = createEmptySheet(date);
       }
+    }
+
+    // 4. Auto-reconcile physical uploaded files from public/uploads/${date}
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', date);
+      if (fs.existsSync(uploadDir)) {
+        const diskFiles = fs.readdirSync(uploadDir).filter(f => !f.startsWith('.') && !f.endsWith('.tmp'));
+        if (diskFiles.length > 0) {
+          const hasValidSources = sheet.sources && sheet.sources.length > 0 && sheet.sources.some(s => s.filePath && !s.filePath.includes('Browser Session'));
+          if (!hasValidSources) {
+            sheet.sources = diskFiles.map((fname, idx) => {
+              const fullFp = path.join(uploadDir, fname);
+              const stats = fs.statSync(fullFp);
+              const ext = path.extname(fname).toLowerCase();
+              return {
+                id: `doc_disk_${idx}_${fname}`,
+                fileName: fname.replace(/^doc_\d+_[a-zA-Z0-9]+_/, ''),
+                fileType: ext === '.pdf' ? 'pdf' : (ext === '.png' ? 'png' : 'jpg'),
+                filePath: `/uploads/${date}/${fname}`,
+                fileSize: stats.size,
+                uploadedAt: stats.mtime.toISOString(),
+                pageCount: 1,
+                status: 'extracted',
+              };
+            });
+            saveSheet(sheet, 'Auto-reconciled uploaded sources from disk');
+          }
+        }
+      }
+    } catch (recErr) {
+      console.warn('Sources disk reconciliation error:', recErr);
     }
 
     const revisions = getRevisionsByDate(date);

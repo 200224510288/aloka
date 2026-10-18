@@ -67,6 +67,8 @@ export interface ExtractionResult {
 export function cleanSinhalaText(str: string): string {
   if (!str) return '';
   return str
+    // Strip null characters, zero-width characters, and replacement chars from PDF OCR streams
+    .replace(/[\u0000\uFFFD\uFEFF\u200B-\u200D]/g, '')
     // Fix broken anusvara / vowel signs separated by space from their base letter
     .replace(/([\u0D80-\u0DFF])\s+([ංඃ්ා-ෞ])/g, '$1$2')
     .replace(/([ෙ-ෛ])\s+([\u0D80-\u0DFF])/g, '$1$2')
@@ -79,7 +81,94 @@ export function cleanSinhalaText(str: string): string {
     .replace(/සු\s+බ/g, 'සුබ')
     .replace(/සු\s+පර්/g, 'සුපර්')
     .replace(/සු\s+පිරි/g, 'සුපිරි')
-    .replace(/ධන\s+ස\./g, 'ධන ස.');
+    .replace(/ධන\s+ස\./g, 'ධන ස.')
+    // Zodiac OCR and broken ligature fixes
+    .replace(/වෘ\s*(?:[ශෂස]්?)?\s*චි[ක]?/g, 'වෘශ්චික')
+    .replace(/වෘ\s*චික/g, 'වෘශ්චික')
+    .replace(/තු\s+ලා/g, 'තුලා')
+    .replace(/වෘ\s+ෂභ/g, 'වෘෂභ')
+    .replace(/මි\s+ථුන/g, 'මිථුන')
+    .replace(/කන්\s+යා/g, 'කන්‍යා')
+    .replace(/ක\s+ටක/g, 'කටක')
+    .replace(/ම\s+කර/g, 'මකර')
+    .replace(/කුම්\s+භ/g, 'කුම්භ')
+    .replace(/මී\s+න/g, 'මීන')
+    .replace(/ධ\s+නු/g, 'ධනු');
+}
+
+/**
+ * Robustly detects any of the 12 Sinhala zodiac signs even with broken ligatures,
+ * missing glyphs, null bytes, spaced letters, or legacy font representations.
+ */
+export function detectZodiacInText(text: string): string | undefined {
+  if (!text) return undefined;
+
+  // Clean null bytes, replacement characters, zero-width characters
+  const clean = text
+    .replace(/[\u0000\uFFFD\uFEFF\u200B-\u200D]/g, '')
+    .trim();
+
+  // 1. Scorpio (වෘශ්චික): Matches 'වෘශ්චික', 'වෘ චික', 'වෘචික', 'වෘ ශ්චික', 'වෘෂ්චික', 'වෘස්චික', 'jDoaÑl', 'scorpio'
+  if (/(?:වෘ\s*(?:[ශෂස]්?)?\s*චි[ක]?|jDoaÑl|scorpio)/i.test(clean)) {
+    return 'වෘශ්චික';
+  }
+
+  // 2. Libra (තුලා): Matches 'තුලා', 'තු ලා', 'තුල', 'තු ල', ';=,d', 'libra'
+  if (/(?:තු\s*ල[ා]?|;=,d|libra)/i.test(clean)) {
+    return 'තුලා';
+  }
+
+  // 3. Taurus (වෘෂභ): Matches 'වෘෂභ', 'වෘ ෂභ', 'වෘශභ', 'වෘෂබ', 'jDoN', 'taurus' - MUST require [භබ]
+  if (/(?:වෘ\s*[ෂශ]\s*[භබ]|jDoN|taurus)/i.test(clean)) {
+    return 'වෘෂභ';
+  }
+
+  // 4. Virgo (කන්‍යා): Matches 'කන්‍යා', 'කන්යා', 'ක න්‍යා', 'කන් යා', 'lkHd', 'virgo'
+  if (/(?:ක\s*(?:න\s*්|න්)\s*[\u200D]?\s*ය[ා]?|lkHd|virgo)/i.test(clean)) {
+    return 'කන්‍යා';
+  }
+
+  // 5. Cancer (කටක): Matches 'කටක', 'ක ටක', 'කට ක', 'lgl', 'cancer'
+  if (/(?:ක\s*ට\s*ක|lgl|cancer)/i.test(clean)) {
+    return 'කටක';
+  }
+
+  // 6. Leo (සිංහ): Matches 'සිංහ', 'සි ංහ', 'සිහ', 'isxy', 'leo'
+  if (/(?:සි\s*ං?\s*හ|isxy|leo)/i.test(clean)) {
+    return 'සිංහ';
+  }
+
+  // 7. Aries (මේෂ): Matches 'මේෂ', 'ෙම්ෂ', 'ෙමෂ', 'මෙෂ', 'මේෂ', 'fïI', 'fම්I', 'aries'
+  if (/(?:(?:ෙ\s*ම|ම\s*[ේ්ෙ]|f\s*ï)\s*[්]?\s*ෂ|fïI|fම්I|aries)/i.test(clean)) {
+    return 'මේෂ';
+  }
+
+  // 8. Gemini (මිථුන): Matches 'මිථුන', 'මි ථුන', 'මිතුන', 'මිථු', 'ñhqk', 'gemini'
+  if (/(?:මි\s*[ථත]\s*[ුූ]?\s*න?|ñhqk|gemini)/i.test(clean)) {
+    return 'මිථුන';
+  }
+
+  // 9. Sagittarius (ධනු): Matches 'ධනු', 'ධ නු', 'දනු', 'Okq', 'sagittarius' - MUST require [ුූ] to avoid 'ධන'
+  if (/(?:[ධද]\s*න[ුූ]|Okq|sagittarius)/i.test(clean)) {
+    return 'ධනු';
+  }
+
+  // 10. Capricorn (මකර): Matches 'මකර', 'ම කර', 'mlr', 'capricorn'
+  if (/(?:ම\s*ක\s*ර|mlr|capricorn)/i.test(clean)) {
+    return 'මකර';
+  }
+
+  // 11. Aquarius (කුම්භ): Matches 'කුම්භ', 'කු ම්භ', 'කුම්බ', 'l=ïN', 'aquarius'
+  if (/(?:කු\s*(?:ම\s*්\s*)?[භබ]|l=ïN|aquarius)/i.test(clean)) {
+    return 'කුම්භ';
+  }
+
+  // 12. Pisces (මීන): Matches 'මීන', 'මී න', 'මින', 'mSk', 'pisces'
+  if (/(?:[මීමි]\s*න|mSk|pisces)/i.test(clean)) {
+    return 'මීන';
+  }
+
+  return undefined;
 }
 
 /**
@@ -248,7 +337,7 @@ export function extractLotteryDataFromText(
           if (currentDigits.length >= 2) {
             // For zodiac lotteries, ensure zodiac sign was also captured
             if (def?.requiresZodiac) {
-              const hasZodiac = ZODIAC_SIGNS.some(z => combinedLine.includes(z.si));
+              const hasZodiac = !!detectZodiacInText(combinedLine);
               if (!hasZodiac && nextIdx < lines.length && !findLotteryIdInText(lines[nextIdx])) {
                 combinedLine += ' ' + lines[nextIdx];
                 nextIdx++;
@@ -357,35 +446,7 @@ export function parseLotteryLine(
   // 2. Extract Zodiac sign if lottery requires zodiac
   let zodiac: string | undefined;
   if (def.requiresZodiac) {
-    const normSpaceless = normalized.replace(/\s+/g, '');
-    for (const z of ZODIAC_SIGNS) {
-      if (normSpaceless.includes(z.si) || normSpaceless.includes(z.en.toLowerCase())) {
-        zodiac = z.si;
-        break;
-      }
-    }
-    if (!zodiac) {
-      if (normSpaceless.includes('ෙම්ෂ') || normSpaceless.includes('මේෂ')) zodiac = 'මේෂ';
-      else if (normSpaceless.includes('සිංහ')) zodiac = 'සිංහ';
-      else if (normSpaceless.includes('කටක')) zodiac = 'කටක';
-      else if (normSpaceless.includes('කන්‍යා') || normSpaceless.includes('කන්‍ය')) zodiac = 'කන්‍යා';
-      else if (normSpaceless.includes('වෘෂභ')) zodiac = 'වෘෂභ';
-      else if (normSpaceless.includes('මිථුන')) zodiac = 'මිථුන';
-      else if (normSpaceless.includes('තුලා')) zodiac = 'තුලා';
-      else if (normSpaceless.includes('වෘශ්චික')) zodiac = 'වෘශ්චික';
-      else if (normSpaceless.includes('ධනු')) zodiac = 'ධනු';
-      else if (normSpaceless.includes('මකර')) zodiac = 'මකර';
-      else if (normSpaceless.includes('කුම්භ')) zodiac = 'කුම්භ';
-      else if (normSpaceless.includes('මීන')) zodiac = 'මීන';
-    }
-    if (!zodiac) {
-      for (const [legZ, siZ] of Object.entries(LEGACY_ZODIAC_MAP)) {
-        if (normalized.includes(legZ)) {
-          zodiac = siZ;
-          break;
-        }
-      }
-    }
+    zodiac = detectZodiacInText(normalized) || detectZodiacInText(line);
   }
 
   // 3. Extract bonus number in parentheses e.g. (86597)

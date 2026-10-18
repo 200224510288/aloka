@@ -43,13 +43,11 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
     {
       id: 'verify',
       number: 2,
-      title: 'Review & Verify',
-      titleSi: 'පරීක්ෂාව',
-      subtitle: pendingCount === 0 && isFooterReviewed 
-        ? `All ${totalLotteries} lotteries verified` 
-        : `${totalLotteries - pendingCount}/${totalLotteries} verified`,
+      title: 'Edit & Review',
+      titleSi: 'සංස්කරණය',
+      subtitle: `${totalLotteries} daily lotteries`,
       icon: CheckSquare,
-      isComplete: pendingCount === 0 && isFooterReviewed,
+      isComplete: true,
     },
     {
       id: 'preview',
