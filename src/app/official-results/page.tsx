@@ -21,7 +21,9 @@ import {
   FileCheck,
   Zap,
   Sliders,
-  DownloadCloud
+  DownloadCloud,
+  Building,
+  CheckCheck
 } from 'lucide-react';
 import { OfficialFetchResponse, OfficialFetchedLottery } from '@/lib/official-lottery-fetcher';
 
@@ -30,17 +32,18 @@ export default function OfficialResultsExperimentPage() {
   const [data, setData] = useState<OfficialFetchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedBoard, setSelectedBoard] = useState<'all' | 'dlb' | 'nlb'>('all');
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'cards' | 'comparison' | 'inspector'>('cards');
   const [copiedJson, setCopiedJson] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch results
-  const fetchResults = async () => {
+  const fetchResults = async (board = selectedBoard) => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/official-results');
+      const res = await fetch(`/api/official-results?board=${board}`);
       if (!res.ok) {
         throw new Error(`Server returned HTTP ${res.status}`);
       }
@@ -51,15 +54,20 @@ export default function OfficialResultsExperimentPage() {
       setData(json);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred while fetching from NLB website.');
+      setError(err.message || 'An error occurred while fetching from official lottery websites.');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchResults();
+    fetchResults('all');
   }, []);
+
+  const handleBoardChange = (board: 'all' | 'dlb' | 'nlb') => {
+    setSelectedBoard(board);
+    fetchResults(board);
+  };
 
   const handleCopyJson = () => {
     if (!data) return;
@@ -68,9 +76,24 @@ export default function OfficialResultsExperimentPage() {
     setTimeout(() => setCopiedJson(false), 2000);
   };
 
-  // Convert draw date like "Sunday October 18, 2026" to YYYY-MM-DD reliably without timezone shifts
+  // Convert draw date like "Sunday October 18, 2026" or "2026-Oct-18 Sunday" to YYYY-MM-DD
   const getIsoDate = (dateStr?: string | null): string => {
     if (!dateStr) return '2026-10-18';
+    
+    // Check if format is "2026-Oct-18" or "2026-10-18"
+    const isoLike = dateStr.match(/(\d{4})-([A-Za-z]+|\d{2})-(\d{1,2})/);
+    if (isoLike) {
+      const y = isoLike[1];
+      const mStr = isoLike[2].toLowerCase();
+      const d = isoLike[3].padStart(2, '0');
+      const monthMap: Record<string, string> = {
+        jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+        jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+      };
+      const m = monthMap[mStr.slice(0, 3)] || mStr.padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
     const monthMap: Record<string, string> = {
       january: '01', february: '02', march: '03', april: '04',
       may: '05', june: '06', july: '07', august: '08',
@@ -106,12 +129,14 @@ export default function OfficialResultsExperimentPage() {
       }
 
       // 2. Merge official lotteries into sheet
+      let importCount = 0;
       const updatedLotteries = currentSheet.lotteries.map((existing: any) => {
         const officialMatch = data.lotteries.find(
           l => l.matchedLotteryId === existing.lotteryId
         );
         if (!officialMatch) return existing;
 
+        importCount++;
         return {
           ...existing,
           drawNo: officialMatch.drawNo,
@@ -120,7 +145,7 @@ export default function OfficialResultsExperimentPage() {
           numbers: officialMatch.numbers.length > 0 ? officialMatch.numbers : existing.numbers,
           bonusNumber: officialMatch.superNumber || existing.bonusNumber,
           isVerified: true,
-          verificationNotes: `Verified from Official NLB website on ${new Date().toLocaleTimeString()}`,
+          verificationNotes: `Verified from Official ${officialMatch.board} website on ${new Date().toLocaleTimeString()}`,
           isNoDraw: false,
         };
       });
@@ -137,7 +162,7 @@ export default function OfficialResultsExperimentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheet: updatedSheet,
-          summary: `Imported ${data.matchedCount} official lotteries directly from nlb.lk`,
+          summary: `Imported ${importCount} official lotteries directly from ${data.boards?.join(' & ') || 'official sites'}`,
         }),
       });
 
@@ -161,7 +186,8 @@ export default function OfficialResultsExperimentPage() {
       item.officialName.toLowerCase().includes(q) ||
       item.lotteryNameSi?.toLowerCase().includes(q) ||
       item.lotteryNameEn?.toLowerCase().includes(q) ||
-      item.drawNo.includes(q)
+      item.drawNo.includes(q) ||
+      item.board.toLowerCase().includes(q)
     );
   }) || [];
 
@@ -178,7 +204,7 @@ export default function OfficialResultsExperimentPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-extrabold shadow-md shadow-blue-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-extrabold shadow-md shadow-blue-500/20">
               <Globe className="w-5 h-5" />
             </div>
             <div>
@@ -187,16 +213,26 @@ export default function OfficialResultsExperimentPage() {
                   Official Lottery Fetcher Lab
                 </h1>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Live Scraper
+                  NLB + DLB Scraper
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Direct automated 2-step bypass fetch from{' '}
+              <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
+                <span>Official sources:</span>
+                <a 
+                  href="https://www.dlb.lk/result/2/" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="text-sky-400 hover:underline inline-flex items-center gap-0.5 font-semibold"
+                >
+                  dlb.lk/result/2/
+                  <ExternalLink className="w-3 h-3 inline" />
+                </a>
+                <span className="text-slate-600">•</span>
                 <a 
                   href="https://www.nlb.lk/results" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className="text-blue-400 hover:underline inline-flex items-center gap-0.5 font-semibold"
+                  className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 font-semibold"
                 >
                   nlb.lk/results
                   <ExternalLink className="w-3 h-3 inline" />
@@ -209,7 +245,7 @@ export default function OfficialResultsExperimentPage() {
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
-              onClick={fetchResults}
+              onClick={() => fetchResults(selectedBoard)}
               disabled={isLoading}
               className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white flex items-center gap-2 shadow-sm transition disabled:opacity-50"
             >
@@ -225,17 +261,57 @@ export default function OfficialResultsExperimentPage() {
               title={`Import ${data?.matchedCount || 0} official lotteries directly into sheet for ${targetDateIso}`}
             >
               <DownloadCloud className={`w-3.5 h-3.5 ${isImporting ? 'animate-bounce' : ''}`} />
-              <span>{isImporting ? 'Importing...' : `Import into Editor (${targetDateIso})`}</span>
+              <span>{isImporting ? 'Importing...' : `Import All ${data?.matchedCount || 0} into Editor (${targetDateIso})`}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Hero / Status Bar */}
+      {/* Hero / Filter / Status Bar */}
       <div className="bg-slate-900 border-b border-slate-800/80 px-4 sm:px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Board Selector Filter */}
+            <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => handleBoardChange('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  selectedBoard === 'all'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>All Boards (18 Lotteries)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBoardChange('dlb')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  selectedBoard === 'dlb'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5 text-sky-400" />
+                <span>DLB Official (9)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBoardChange('nlb')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  selectedBoard === 'nlb'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5 text-indigo-400" />
+                <span>NLB Official (9)</span>
+              </button>
+            </div>
+
             <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
               <Calendar className="w-4 h-4 text-blue-400" />
               <span>Draw Date:</span>
@@ -244,8 +320,8 @@ export default function OfficialResultsExperimentPage() {
 
             <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Extracted Lotteries:</span>
-              <strong className="text-emerald-400 font-bold">{data?.totalLotteries || 0} Lotteries</strong>
+              <span>Matched Lotteries:</span>
+              <strong className="text-emerald-400 font-bold">{data?.matchedCount || 0} / {data?.totalLotteries || 0}</strong>
             </div>
 
             {data?.handshakeDetails && (
@@ -261,7 +337,7 @@ export default function OfficialResultsExperimentPage() {
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Search lottery name or draw..."
+              placeholder="Search lottery name, draw, or board..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-slate-800/90 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500 w-full md:w-64"
@@ -294,7 +370,7 @@ export default function OfficialResultsExperimentPage() {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>System Mapping (18 Sheet Rows)</span>
+              <span>Sheet Mapping (18 Standard Rows)</span>
             </button>
             <button
               onClick={() => setActiveTab('inspector')}
@@ -305,7 +381,7 @@ export default function OfficialResultsExperimentPage() {
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
-              <span>Handshake & JSON Inspector</span>
+              <span>Mechanism & JSON Inspector</span>
             </button>
           </div>
 
@@ -326,10 +402,10 @@ export default function OfficialResultsExperimentPage() {
           <div className="p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-200 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <div className="font-bold text-sm">Failed to connect to official source</div>
+              <div className="font-bold text-sm">Failed to connect to official sources</div>
               <p className="text-xs text-red-300/90 mt-0.5">{error}</p>
               <button
-                onClick={fetchResults}
+                onClick={() => fetchResults(selectedBoard)}
                 className="mt-2 text-xs font-bold px-3 py-1 bg-red-800 hover:bg-red-700 text-white rounded-md transition"
               >
                 Retry Fetch
@@ -342,7 +418,7 @@ export default function OfficialResultsExperimentPage() {
         {activeTab === 'cards' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {isLoading && !data ? (
-              Array.from({ length: 6 }).map((_, i) => (
+              Array.from({ length: 9 }).map((_, i) => (
                 <div key={i} className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 animate-pulse space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="w-28 h-5 bg-slate-800 rounded"></div>
@@ -392,8 +468,12 @@ export default function OfficialResultsExperimentPage() {
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800 text-blue-300 shrink-0">
-                        {item.board}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                        item.board === 'DLB'
+                          ? 'bg-sky-950/80 border-sky-800 text-sky-300'
+                          : 'bg-indigo-950/80 border-indigo-800 text-indigo-300'
+                      }`}>
+                        {item.board} Official
                       </span>
                     </div>
 
@@ -410,7 +490,7 @@ export default function OfficialResultsExperimentPage() {
                       )}
 
                       {/* Zodiac Sign Badge */}
-                      {item.zodiacEn && (
+                      {(item.zodiacEn || item.zodiacSi) && (
                         <div 
                           className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-700 text-indigo-200 font-bold text-xs flex items-center gap-1.5 shadow-sm shrink-0"
                           title={`Zodiac: ${item.zodiacEn} (${item.zodiacSi || ''})`}
@@ -418,16 +498,6 @@ export default function OfficialResultsExperimentPage() {
                           <span className="text-amber-300 text-sm">{item.zodiacSymbol || '♈'}</span>
                           <span>{item.zodiacSi || item.zodiacEn}</span>
                           <span className="text-[10px] text-indigo-300/80">({item.zodiacEn})</span>
-                        </div>
-                      )}
-
-                      {/* Super Number (Red Ball) */}
-                      {item.superNumber && (
-                        <div 
-                          className="w-9 h-9 rounded-full bg-gradient-to-b from-rose-500 to-red-700 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30 ring-2 ring-rose-400/50 shrink-0"
-                          title={`Super Ball / Bonus Number: ${item.superNumber}`}
-                        >
-                          {item.superNumber}
                         </div>
                       )}
 
@@ -440,6 +510,16 @@ export default function OfficialResultsExperimentPage() {
                           {num}
                         </div>
                       ))}
+
+                      {/* Super / Special Number (Red / Boxed Ball) */}
+                      {item.superNumber && (
+                        <div 
+                          className="w-9 h-9 rounded-full bg-gradient-to-b from-rose-500 to-red-700 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30 ring-2 ring-rose-400/50 shrink-0"
+                          title={`Special / Boxed Number: [${item.superNumber}]`}
+                        >
+                          [{item.superNumber}]
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -466,20 +546,22 @@ export default function OfficialResultsExperimentPage() {
         {/* Tab 2: System Mapping & Comparison */}
         {activeTab === 'comparison' && (
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/80">
               <div>
                 <h3 className="font-bold text-sm text-white">Daily Sheet Mapping Overview</h3>
                 <p className="text-xs text-slate-400">
-                  Showing how the fetched official results connect to the 18 standard daily lotteries.
+                  Showing how official NLB and DLB results connect to the 18 standard rows on the A4 landscape sheet.
                 </p>
               </div>
-              <Link
-                href={`/editor?date=${targetDateIso}`}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition"
+              <button
+                type="button"
+                onClick={handleImportToEditor}
+                disabled={isImporting || !data || data.lotteries.length === 0}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition disabled:opacity-50"
               >
-                <span>Edit Sheet for {targetDateIso}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+                <DownloadCloud className="w-3.5 h-3.5" />
+                <span>Import All {data?.matchedCount || 0} into Editor Sheet</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto">
@@ -487,6 +569,7 @@ export default function OfficialResultsExperimentPage() {
                 <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Board</th>
                     <th className="py-3 px-4">Official Lottery</th>
                     <th className="py-3 px-4">System ID</th>
                     <th className="py-3 px-4">Draw No</th>
@@ -499,6 +582,15 @@ export default function OfficialResultsExperimentPage() {
                   {filteredLotteries.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-850/50 transition">
                       <td className="py-3 px-4 text-slate-500 font-bold">{idx + 1}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.board === 'DLB'
+                            ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                            : 'bg-indigo-950 text-indigo-400 border border-indigo-800'
+                        }`}>
+                          {item.board}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 font-sans font-bold text-white">
                         {item.lotteryNameSi || item.officialName}
                         <span className="block text-[11px] text-slate-400 font-normal font-sans">
@@ -526,21 +618,22 @@ export default function OfficialResultsExperimentPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {item.superNumber && (
-                            <span className="px-1.5 py-0.5 rounded bg-red-900/80 border border-red-700 text-red-200 font-bold">
-                              [{item.superNumber}]
-                            </span>
-                          )}
                           {item.numbers.map((n, i) => (
                             <span key={i} className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold">
                               {n}
                             </span>
                           ))}
+                          {item.superNumber && (
+                            <span className="px-1.5 py-0.5 rounded bg-red-900/80 border border-red-700 text-red-200 font-bold">
+                              [{item.superNumber}]
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-4 font-sans">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400">
-                          Ready to Import
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 flex items-center gap-1 w-fit">
+                          <CheckCheck className="w-3 h-3" />
+                          Ready
                         </span>
                       </td>
                     </tr>
@@ -551,39 +644,38 @@ export default function OfficialResultsExperimentPage() {
           </div>
         )}
 
-        {/* Tab 3: Handshake & JSON Inspector */}
+        {/* Tab 3: Mechanism & JSON Inspector */}
         {activeTab === 'inspector' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Handshake Details */}
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-blue-400" />
-                <h3 className="font-extrabold text-sm text-white">How the Automated Mechanism Works</h3>
+                <h3 className="font-extrabold text-sm text-white">Official Scraper Mechanisms</h3>
               </div>
 
               <div className="space-y-3 text-xs text-slate-300 leading-relaxed font-sans">
-                <p>
-                  Official Sri Lankan government lottery sites (NLB) protect their pages using a JavaScript challenge script:
-                </p>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1.5 font-mono text-[11px]">
+                  <div className="text-sky-400 font-bold">// DLB Endpoint (Development Lotteries Board)</div>
+                  <div className="text-slate-300">GET https://www.dlb.lk/result/2/</div>
+                  <div className="text-slate-400">Direct HTTP extraction (no cookies required, 9 lotteries)</div>
+                </div>
 
-                <div className="p-3 bg-slate-950 rounded-lg font-mono text-[11px] text-slate-400 border border-slate-800 space-y-1">
-                  <div className="text-slate-500">// Step 1: Initial Handshake</div>
-                  <div>GET https://www.nlb.lk/results</div>
-                  <div className="text-amber-400">&lt;script&gt;setCookie(&apos;human&apos;, &apos;{data?.handshakeDetails?.humanToken?.slice(0, 16)}...&apos;, 1);&lt;/script&gt;</div>
-                  <div className="text-slate-500 pt-1">// Step 2: Authenticated Extraction</div>
-                  <div>GET https://www.nlb.lk/results [Cookie: human={data?.handshakeDetails?.humanToken?.slice(0, 10)}...]</div>
-                  <div className="text-emerald-400">HTTP 200 OK ({data?.handshakeDetails?.htmlLength?.toLocaleString()} bytes HTML received)</div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1.5 font-mono text-[11px]">
+                  <div className="text-indigo-400 font-bold">// NLB Endpoint (National Lotteries Board)</div>
+                  <div className="text-slate-300">GET https://www.nlb.lk/results</div>
+                  <div className="text-slate-400">2-step cookie handshake bypass (9 lotteries)</div>
                 </div>
 
                 <p>
-                  Our serverless backend in <code className="text-blue-300 bg-slate-800 px-1 py-0.5 rounded">src/lib/official-lottery-fetcher.ts</code> executes this 2-step handshake programmatically in <strong>{data?.handshakeDetails?.responseTimeMs || 0}ms</strong> without requiring headless Chrome or manual copy-pasting.
+                  Together, the combined scraper extracts all <strong>18 standard Sri Lankan lotteries</strong> concurrently in approximately <strong>{data?.handshakeDetails?.responseTimeMs || 0}ms</strong> directly from the respective government board servers.
                 </p>
 
-                <div className="pt-2">
-                  <span className="text-slate-400 font-semibold">Active Session Token:</span>
-                  <div className="font-mono text-[11px] text-blue-300 bg-slate-950 p-2 rounded border border-slate-800 break-all select-all mt-1">
-                    {data?.handshakeDetails?.humanToken || 'N/A'}
-                  </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-slate-400">
+                  <span className="font-bold text-white block mb-1">Extraction Summary:</span>
+                  <div>• Total Lotteries Found: <strong>{data?.totalLotteries || 0}</strong></div>
+                  <div>• Successfully Matched to 18 Standard Rows: <strong>{data?.matchedCount || 0}</strong></div>
+                  <div>• Active Boards: <strong>{data?.boards?.join(' + ') || 'NLB + DLB'}</strong></div>
                 </div>
               </div>
             </div>
@@ -616,7 +708,7 @@ export default function OfficialResultsExperimentPage() {
 
       {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-950/80 px-4 py-4 text-center text-xs text-slate-500">
-        Sinhala Daily Lottery Result Sheet Generator • Official Data Fetcher Laboratory
+        Sinhala Daily Lottery Result Sheet Generator • Official Data Fetcher Laboratory (NLB & DLB)
       </footer>
     </div>
   );

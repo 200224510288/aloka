@@ -492,7 +492,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     aliases: [
       'ධන සම්පත', 'ධනසම්පත', 'සුපිරි ධන ස.', 'සුපිරි ධන ස', 'සුපිරි ධන', 'සුපිරි ධන සම්පත', 'සුපිරි ධනසම්පත', 'ධන ස.', 'ධන ස',
       'Ok iïm;', 'Ok iï', 
-      'dhana sampatha', 'dhanasampatha', 'supiri dhana'
+      'dhana sampatha', 'dhanasampatha', 'supiri dhana', 'supiri dhana sampatha'
     ]
   },
   {
@@ -508,7 +508,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     hasBoxedNumber: true,
     aliases: [
       'වාසි', 'වාසී', 'jdis', 'වාසි වාසනා', 
-      'vasi', 'vaasi', 'vasi wasana'
+      'vasi', 'vaasi', 'vasi wasana', 'waasi', 'wasi'
     ]
   }
 ];

@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchNlbOfficialResults, convertOfficialToSheetRows } from '@/lib/official-lottery-fetcher';
+import { 
+  fetchNlbOfficialResults, 
+  fetchDlbOfficialResults, 
+  fetchAllOfficialResults, 
+  convertOfficialToSheetRows 
+} from '@/lib/official-lottery-fetcher';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
+async function getOfficialResultsByBoard(board?: string | null) {
+  if (board === 'dlb') {
+    return await fetchDlbOfficialResults();
+  } else if (board === 'nlb') {
+    return await fetchNlbOfficialResults();
+  }
+  // default: all (NLB + DLB combined 18 lotteries)
+  return await fetchAllOfficialResults();
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const data = await fetchNlbOfficialResults();
+    const { searchParams } = new URL(req.url);
+    const board = searchParams.get('board')?.toLowerCase();
+
+    const data = await getOfficialResultsByBoard(board);
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
@@ -19,7 +37,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const data = await fetchNlbOfficialResults();
+    const { searchParams } = new URL(req.url);
+    const board = body.board || searchParams.get('board')?.toLowerCase();
+
+    const data = await getOfficialResultsByBoard(board);
 
     if (!data.success) {
       return NextResponse.json(data, { status: 502 });
