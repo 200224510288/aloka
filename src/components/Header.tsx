@@ -178,9 +178,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
               <span>
                 {cloudStatus === 'syncing'
-                  ? 'Syncing...'
+                  ? 'Saving edits...'
                   : cloudStatus === 'synced'
-                  ? 'Cloud Synced'
+                  ? 'Auto-Saved'
                   : cloudStatus === 'permission_denied'
                   ? 'Cloud: Rule Blocked'
                   : 'Local Cache'}

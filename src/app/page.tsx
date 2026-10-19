@@ -138,6 +138,66 @@ export default function Home() {
     loadSheet(selectedDate);
   }, [selectedDate, loadSheet]);
 
+  // Real-time synchronization for staff: immediately reflects edits done in the editor
+  useEffect(() => {
+    // 1. Listen to real-time Firestore updates
+    let unsubscribeCloud: (() => void) | undefined;
+    import('@/lib/cloud-service').then(({ subscribeToCloudSheet }) => {
+      unsubscribeCloud = subscribeToCloudSheet(selectedDate, (cloudSheet) => {
+        if (cloudSheet && cloudSheet.lotteries && cloudSheet.lotteries.length > 0) {
+          setSheet((prev) => {
+            const prevStr = JSON.stringify(prev);
+            const nextStr = JSON.stringify(cloudSheet);
+            if (prevStr !== nextStr) {
+              setCloudStatus('synced');
+              return cloudSheet;
+            }
+            return prev;
+          });
+        }
+      });
+    });
+
+    // 2. Cross-tab instant local storage event (same-browser tabs)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === `sinhala_lottery_sheet_${selectedDate}` && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          setSheet(updated);
+        } catch {}
+      }
+    };
+
+    const handleCustomUpdate = (e: any) => {
+      if (e.detail?.date === selectedDate) {
+        try {
+          const cached = localStorage.getItem(`sinhala_lottery_sheet_${selectedDate}`);
+          if (cached) setSheet(JSON.parse(cached));
+        } catch {}
+      }
+    };
+
+    // 3. Tab visibility / focus catch-up
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadSheet(selectedDate);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('lottery_sheet_updated', handleCustomUpdate);
+    window.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    return () => {
+      if (unsubscribeCloud) unsubscribeCloud();
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('lottery_sheet_updated', handleCustomUpdate);
+      window.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [selectedDate, loadSheet]);
+
   // Load Cloud default design on mount so staff preview & print match user's custom design
   useEffect(() => {
     async function loadCloudDesign() {

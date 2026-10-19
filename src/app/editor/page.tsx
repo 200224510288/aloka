@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
@@ -43,6 +43,30 @@ function getYesterdayDateStr(): string {
   return `${year}-${month}-${day}`;
 }
 
+function getSheetContentHash(s: DailySheet): string {
+  if (!s || !s.date) return '';
+  return JSON.stringify({
+    date: s.date,
+    headerDealerName: s.headerDealerName || '',
+    footerAnnouncement: s.footerAnnouncement || '',
+    isFooterReviewed: !!s.isFooterReviewed,
+    lotteries: (s.lotteries || []).map(l => ({
+      id: l.lotteryId,
+      draw: l.drawNo || '',
+      let: l.letter || '',
+      zod: l.zodiac || '',
+      nums: l.numbers || [],
+      bonus: l.bonusNumber || '',
+      noDraw: !!l.isNoDraw,
+      noDrawReason: l.noDrawReason || '',
+      boxed: l.boxedIndex ?? null,
+      isCheckedAgainstSource: !!l.isCheckedAgainstSource,
+      aiVerified: !!l.aiVerified,
+      officialVerified: !!l.officialVerified,
+    })),
+  });
+}
+
 type FilterType = 'all' | 'needs_attention' | 'confirmed' | 'no_draw';
 
 export default function Home() {
@@ -66,6 +90,11 @@ export default function Home() {
   const [previewStyles, setPreviewStyles] = useState<PreviewStyleOptions | undefined>(undefined);
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+
+  // Auto-save tracking refs
+  const lastSavedHashRef = useRef<string>('');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadedRef = useRef<boolean>(false);
 
   // AI Verification states
   const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState<boolean>(false);
@@ -122,6 +151,7 @@ export default function Home() {
 
   // Fetch sheet by date with triple redundancy (Cloud -> Local Server -> Browser LocalStorage)
   const loadSheet = useCallback(async (date: string) => {
+    isInitialLoadedRef.current = false;
     try {
       const res = await fetch(`/api/sheet?date=${date}`);
       const data = await res.json();
@@ -150,6 +180,8 @@ export default function Home() {
 
         setSheet(data.sheet);
         setRevisions(data.revisions || []);
+        lastSavedHashRef.current = getSheetContentHash(data.sheet);
+        isInitialLoadedRef.current = true;
         if (data.fromCloud) {
           setCloudStatus('synced');
         }
@@ -168,22 +200,34 @@ export default function Home() {
         try {
           const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
           if (cached) {
-            setSheet(JSON.parse(cached));
+            const parsed = JSON.parse(cached);
+            setSheet(parsed);
+            lastSavedHashRef.current = getSheetContentHash(parsed);
+            isInitialLoadedRef.current = true;
             return;
           }
         } catch {}
-        setSheet(createEmptySheet(date));
+        const empty = createEmptySheet(date);
+        setSheet(empty);
+        lastSavedHashRef.current = getSheetContentHash(empty);
+        isInitialLoadedRef.current = true;
       }
     } catch (e) {
       console.error('Error loading sheet:', e);
       try {
         const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
         if (cached) {
-          setSheet(JSON.parse(cached));
+          const parsed = JSON.parse(cached);
+          setSheet(parsed);
+          lastSavedHashRef.current = getSheetContentHash(parsed);
+          isInitialLoadedRef.current = true;
           return;
         }
       } catch {}
-      setSheet(createEmptySheet(date));
+      const empty = createEmptySheet(date);
+      setSheet(empty);
+      lastSavedHashRef.current = getSheetContentHash(empty);
+      isInitialLoadedRef.current = true;
     }
   }, []);
 
@@ -208,6 +252,86 @@ export default function Home() {
   useEffect(() => {
     loadSheet(selectedDate);
   }, [selectedDate, loadSheet]);
+
+  // Debounced auto-save effect: automatically persists edits so staff sees them immediately
+  useEffect(() => {
+    if (!isInitialLoadedRef.current || !sheet?.date) return;
+
+    const currentHash = getSheetContentHash(sheet);
+    if (!currentHash || currentHash === lastSavedHashRef.current) {
+      return;
+    }
+
+    // Indicate syncing status
+    setCloudStatus('syncing');
+
+    // Immediately cache in localStorage & dispatch custom event for instant cross-tab / staff access
+    try {
+      localStorage.setItem(`sinhala_lottery_sheet_${sheet.date}`, JSON.stringify(sheet));
+      window.dispatchEvent(new CustomEvent('lottery_sheet_updated', { detail: { date: sheet.date } }));
+    } catch {}
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    // Debounce save by 800ms to group consecutive keystrokes smoothly
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setIsSaving(true);
+        const targetSheet: DailySheet = {
+          ...sheet,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // 1. Save to local server & cloud via /api/sheet
+        const res = await fetch('/api/sheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sheet: targetSheet, summary: 'Auto-saved edit' }),
+        });
+        const data = await res.json();
+
+        // 2. Also execute direct client Firestore sync for instant real-time delivery
+        try {
+          const { saveSheetToCloud } = await import('@/lib/cloud-service');
+          await saveSheetToCloud(targetSheet);
+        } catch {}
+
+        lastSavedHashRef.current = getSheetContentHash(targetSheet);
+        setCloudStatus('synced');
+      } catch (err) {
+        console.warn('Auto-save error:', err);
+        setCloudStatus('offline');
+      } finally {
+        setIsSaving(false);
+      }
+    }, 800);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [sheet]);
+
+  // Flush pending auto-save on page exit
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!isInitialLoadedRef.current || !sheet?.date) return;
+      const currentHash = getSheetContentHash(sheet);
+      if (currentHash && currentHash !== lastSavedHashRef.current) {
+        try {
+          localStorage.setItem(`sinhala_lottery_sheet_${sheet.date}`, JSON.stringify(sheet));
+          const blob = new Blob([JSON.stringify({ sheet, summary: 'Auto-saved on exit' })], { type: 'application/json' });
+          navigator.sendBeacon('/api/sheet', blob);
+        } catch {}
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sheet]);
 
   // Handle date change
   const handleDateChange = (newDate: string) => {

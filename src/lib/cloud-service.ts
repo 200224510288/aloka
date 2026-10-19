@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION, CLOUD_SETTINGS_COLLECTION } from './firebase';
 import { DailySheet, SourceDocument, SavedCustomDesign } from '@/types/lottery';
 
@@ -81,6 +81,28 @@ export async function loadSheetFromCloud(date: string): Promise<DailySheet | nul
       console.warn('Could not load sheet from cloud:', err);
     }
     return null;
+  }
+}
+
+/**
+ * Subscribes to real-time changes for a specific DailySheet in Firestore.
+ * Allows staff pages to immediately reflect edits with zero page refresh.
+ */
+export function subscribeToCloudSheet(date: string, onUpdate: (sheet: DailySheet) => void): () => void {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, date);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const cloudData = snap.data() as DailySheet;
+        onUpdate(cloudData);
+      }
+    }, (err) => {
+      console.warn('Real-time cloud sheet subscription error:', err?.message || err);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Could not set up real-time subscription for date', date, err);
+    return () => {};
   }
 }
 
