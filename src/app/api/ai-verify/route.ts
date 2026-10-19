@@ -232,8 +232,17 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
       );
     }
 
+    const rateLimitRemainingTokens = openaiRes.headers.get('x-ratelimit-remaining-tokens');
+    const rateLimitLimitTokens = openaiRes.headers.get('x-ratelimit-limit-tokens');
+
     const aiData = await openaiRes.json();
     const rawContent = aiData.choices?.[0]?.message?.content;
+
+    const promptTokens = aiData.usage?.prompt_tokens || 0;
+    const completionTokens = aiData.usage?.completion_tokens || 0;
+    const totalTokens = aiData.usage?.total_tokens || 0;
+    // gpt-4o-mini pricing: $0.15/1M input, $0.60/1M output
+    const estimatedCostUsd = Number(((promptTokens * 0.00000015) + (completionTokens * 0.0000006)).toFixed(6));
 
     if (!rawContent) {
       return NextResponse.json(
@@ -313,6 +322,14 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
           ? parsedReport.summary || 'Discrepancies detected during AI audit.'
           : 'All 18 lotteries verified matching raw source document perfectly (100% Match).',
       results: enrichedResults,
+      tokenUsage: {
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCostUsd,
+        remainingTokensPerMinute: rateLimitRemainingTokens,
+        limitTokensPerMinute: rateLimitLimitTokens,
+      },
     };
 
     return NextResponse.json({

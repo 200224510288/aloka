@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   RotateCcw,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 import { AiVerificationReport, AiLotteryAuditResult, LotteryResultItem } from '@/types/lottery';
 
@@ -171,6 +172,46 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
                       <AlertTriangle className="w-3.5 h-3.5" /> Date Mismatch
                     </span>
                   )}
+                </div>
+              )}
+
+              {/* Token Usage & Quota Info */}
+              {report.tokenUsage && (
+                <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-slate-100/80 border border-slate-200/90 rounded-lg text-xs text-slate-800">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 font-bold text-indigo-700">
+                      <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      AI Tokens:
+                    </span>
+                    <span>
+                      <strong>{report.tokenUsage.totalTokens.toLocaleString()}</strong> tokens used
+                      <span className="text-slate-500 text-[11px] ml-1">
+                        ({report.tokenUsage.promptTokens.toLocaleString()} in / {report.tokenUsage.completionTokens.toLocaleString()} out)
+                      </span>
+                    </span>
+                    <span className="text-slate-300 hidden sm:inline">•</span>
+                    <span className="font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px]">
+                      Cost: ~${report.tokenUsage.estimatedCostUsd.toFixed(4)} USD
+                    </span>
+                    {report.tokenUsage.remainingTokensPerMinute && (
+                      <>
+                        <span className="text-slate-300 hidden sm:inline">•</span>
+                        <span className="text-slate-600 text-[11px]">
+                          Minute quota left: <strong>{Number(report.tokenUsage.remainingTokensPerMinute).toLocaleString()}</strong> TPM
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <a
+                    href="https://platform.openai.com/settings/organization/billing/overview"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 underline text-[11px] shrink-0"
+                    title="View your OpenAI account balance and add funds"
+                  >
+                    <span>Check OpenAI Account Balance</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               )}
 

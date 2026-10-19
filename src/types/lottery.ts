@@ -213,6 +213,14 @@ export interface AiVerificationReport {
   overallStatus: 'perfect_match' | 'discrepancies_found' | 'inconclusive';
   summary: string;
   results: AiLotteryAuditResult[];
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number;
+    remainingTokensPerMinute?: string | null;
+    limitTokensPerMinute?: string | null;
+  };
 }
 
 
