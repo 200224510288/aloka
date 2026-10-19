@@ -1,9 +1,4 @@
 {
-  "headerGreeting": "ඔබට සුබ දවසක් !",
-  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
-  "date": "2026-10-18",
-  "dayOfWeekSi": "ඉරිදා",
-  "footerAnnouncement": "ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්",
   "sources": [
     {
       "id": "doc_1792425139664_7ph94",
@@ -19,11 +14,7 @@
       "extractedText": "ෙලා\tතරැයි ප්‍රති ඵල\r\nඅද\t ෙකා්\tටිපති\r\n3144\t \r\nS\t 20\t 34\t 44\t 54\r\nඅද සම්පත\r\n919\t \r\n55\t /\t 855\t /\t 4855\t /\t M\r\nආයු\tෙබා්\r\n7\t \r\nV\t 8\t 5\t 7\t 7\r\nධන නි\t ධා\tනය\r\n2374\t \r\nS\t 34\t 40\t 45\t 80\r\nෙගා\tවි\tෙස\tත\r\n4586\t \r\nE\t 02\t 12\t 42\t 60\r\nහඳහන\r\n1653\r\n මී\r\n \r\nන\t 02\t 08\t 31\t 42\r\nජය සම්පත\r\n526\t \r\n13\t /\t 513\t /\t 0513\t /\t R\r\nකප්රුක\r\n2494\t \r\nB\t 17\t 11\t 61\t 65\t 67\r\nලග්න\t වා\tස\tනා\tව\r\n5030\r\n මිථු\r\n \r\nන\t 02\t 07\t 38\t 54\t 7 1 3 3 8\r\nමහජන සම්පත\r\n6344\t \r\nM\t 0\t 0\t 4\t 8\t 5\t 5\r\nෙම\tගා\t පවර්\r\n2692\t \r\nU\t 03\t 05\t 45\t 53\t 69\r\nNLB ජය\r\n612\t \r\nA\t 7\t 6\t 7\t 9\r\nසසිරි\r\n1148\t \r\n03\t 09\t 30\r\nශනි\tදා\t වා\tස\tනා\tව\r\n5479\t \r\nP\t 13\t 48\t 73\t 77\t 2 8 9 7 4\r\nසු\tබ දවසක්\r\n460\t \r\nක\tන\u0000ා\t 11\t 59\t 67\r\nසු\tපර්\t ෙබා්\tල්\r\n3318\t \r\nD\t 03\t 17\t 49\t 64\t 8 1 9 0 8\r\nසුපිරි\tධන ස.\r\n1052\t \r\nR\t 6\t 5\t 0\t 5\t 1\t 3\t 3 4 7\t /\t 1 3 9\r\nවා\tසි\r\n18\t \r\nI\t 10\t 74\t 02\r\n2026-10-18\t ඉරි\tදා\r\n©lklottery.com. අප ශ්‍රී\t ලං\tකා\tෙ\u0000\t ෙලා\tතරැයි මණ්ඩල\t හා\t අනුබද්ධ ආයතනයක්\t ෙනා\tවන අතර,\t ෙම\tය නි ල ප්‍රති ඵල සමග නි රව\tද\u0000\tතා\tවය තහවුරු කර\tගැ\tනී\tෙම\tන්\t පසුව පළ කිරී මට වගබ\tලා\tගන්න."
     }
   ],
-  "isFooterReviewed": true,
-  "syncedAt": "2026-10-19T15:52:19.876Z",
   "branch": "result-generator",
-  "lastCloudUpdate": "2026-10-19T15:52:19.876Z",
-  "updatedAt": "2026-10-19T15:54:18.675Z",
   "lotteries": [
     {
       "extractionConfidence": 95,
@@ -363,5 +354,14 @@
       "sourcePage": 1,
       "extractionConfidence": 95
     }
-  ]
+  ],
+  "lastCloudUpdate": "2026-10-19T15:57:36.945Z",
+  "updatedAt": "2026-10-19T16:01:57.462Z",
+  "syncedAt": "2026-10-19T15:57:36.945Z",
+  "isFooterReviewed": true,
+  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+  "headerGreeting": "ඔබට සුබ දවසක් !",
+  "dayOfWeekSi": "ඉරිදා",
+  "date": "2026-10-18",
+  "footerAnnouncement": "ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්"
 }

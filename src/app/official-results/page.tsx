@@ -1,43 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   Globe, 
   RefreshCw, 
   CheckCircle2, 
-  ArrowRight, 
-  ExternalLink, 
-  ShieldCheck, 
-  Sparkles, 
+  ArrowLeft, 
   Copy, 
   Check, 
   Terminal, 
   Layers, 
-  ArrowLeft, 
   Calendar, 
-  AlertCircle,
-  FileCheck,
-  Zap,
-  Sliders,
-  DownloadCloud,
+  Search,
   Building,
-  CheckCheck
+  CheckCheck,
+  ShieldCheck,
+  ExternalLink,
+  Sparkles,
+  Info,
+  SlidersHorizontal,
+  ChevronRight
 } from 'lucide-react';
 import { OfficialFetchResponse, OfficialFetchedLottery } from '@/lib/official-lottery-fetcher';
 
-export default function OfficialResultsExperimentPage() {
+export default function OfficialResultsPage() {
   const router = useRouter();
   const [data, setData] = useState<OfficialFetchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState<'all' | 'dlb' | 'nlb'>('all');
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'cards' | 'comparison' | 'inspector'>('cards');
+  const [activeTab, setActiveTab] = useState<'cards' | 'table' | 'inspector'>('cards');
   const [copiedJson, setCopiedJson] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch results
+  // Fetch results from the API
   const fetchResults = async (board = selectedBoard) => {
     setIsLoading(true);
     setError(null);
@@ -78,8 +76,6 @@ export default function OfficialResultsExperimentPage() {
   // Convert draw date like "Sunday October 18, 2026" or "2026-Oct-18 Sunday" to YYYY-MM-DD
   const getIsoDate = (dateStr?: string | null): string => {
     if (!dateStr) return '2026-10-18';
-    
-    // Check if format is "2026-Oct-18" or "2026-10-18"
     const isoLike = dateStr.match(/(\d{4})-([A-Za-z]+|\d{2})-(\d{1,2})/);
     if (isoLike) {
       const y = isoLike[1];
@@ -98,397 +94,458 @@ export default function OfficialResultsExperimentPage() {
       may: '05', june: '06', july: '07', august: '08',
       september: '09', october: '10', november: '11', december: '12'
     };
-    const match = dateStr.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),?\s+(\d{4})/i);
-    if (match) {
-      const month = monthMap[match[1].toLowerCase()] || '10';
-      const day = match[2].padStart(2, '0');
-      const year = match[3];
-      return `${year}-${month}-${day}`;
+    const parts = dateStr.split(/[\s,]+/);
+    let foundMonth = '10';
+    let foundDay = '18';
+    let foundYear = '2026';
+    for (const p of parts) {
+      const low = p.toLowerCase();
+      if (monthMap[low]) foundMonth = monthMap[low];
+      else if (/^\d{1,2}$/.test(p) && parseInt(p) <= 31) foundDay = p.padStart(2, '0');
+      else if (/^\d{4}$/.test(p)) foundYear = p;
     }
-    return '2026-10-18';
+    return `${foundYear}-${foundMonth}-${foundDay}`;
   };
 
   const targetDateIso = getIsoDate(data?.drawDate);
 
-  const filteredLotteries = data?.lotteries.filter(item => {
-    if (!searchTerm.trim()) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      item.officialName.toLowerCase().includes(q) ||
-      item.lotteryNameSi?.toLowerCase().includes(q) ||
-      item.lotteryNameEn?.toLowerCase().includes(q) ||
-      item.drawNo.includes(q) ||
-      item.board.toLowerCase().includes(q)
-    );
-  }) || [];
+  // Filter lotteries by board and search query
+  const filteredLotteries = useMemo(() => {
+    if (!data?.lotteries) return [];
+    return data.lotteries.filter(item => {
+      const matchesSearch = !searchTerm.trim() || 
+        item.officialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.lotteryNameSi && item.lotteryNameSi.includes(searchTerm)) ||
+        (item.lotteryNameEn && item.lotteryNameEn.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.matchedLotteryId && item.matchedLotteryId.includes(searchTerm.toLowerCase())) ||
+        item.drawNo.includes(searchTerm);
+
+      return matchesSearch;
+    });
+  }, [data, searchTerm]);
+
+  const nlbCount = data?.lotteries.filter(l => l.board === 'NLB').length || 0;
+  const dlbCount = data?.lotteries.filter(l => l.board === 'DLB').length || 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col">
+      {/* Top Header Bar */}
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <Link
               href={`/editor?date=${targetDateIso}`}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition border border-slate-200/80"
               title="Return to Sheet Editor"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-extrabold shadow-md shadow-blue-500/20">
-              <Globe className="w-5 h-5" />
+            
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 shrink-0">
+              <ShieldCheck className="w-5 h-5 text-blue-100" />
             </div>
+
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                  Official Lottery Fetcher Lab
+                <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  Official Government Lottery Results
                 </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  NLB + DLB Scraper
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Sync
                 </span>
               </div>
-              <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
-                <span>Official sources:</span>
-                <a 
-                  href="https://www.dlb.lk/result/2/" 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="text-sky-400 hover:underline inline-flex items-center gap-0.5 font-semibold"
-                >
-                  dlb.lk/result/2/
-                  <ExternalLink className="w-3 h-3 inline" />
-                </a>
-                <span className="text-slate-600">•</span>
-                <a 
-                  href="https://www.nlb.lk/results" 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 font-semibold"
-                >
-                  nlb.lk/results
-                  <ExternalLink className="w-3 h-3 inline" />
-                </a>
+              <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                <span>National Lotteries Board (nlb.lk) &amp; Development Lotteries Board (dlb.lk)</span>
               </p>
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => fetchResults(selectedBoard)}
               disabled={isLoading}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white flex items-center gap-2 shadow-sm transition disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 text-slate-700 hover:text-slate-900 flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{isLoading ? 'Fetching Official...' : 'Fetch Live Results'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Fetching...' : 'Refresh Live'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyJson}
+              disabled={!data}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
+              title="Copy JSON Payload"
+            >
+              {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+              <span>{copiedJson ? 'Copied' : 'JSON'}</span>
             </button>
 
             <Link
               href={`/editor?date=${targetDateIso}`}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white flex items-center gap-2 shadow-sm transition border border-slate-700"
+              className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center gap-1.5 shadow-sm transition"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Editor</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero / Filter / Status Bar */}
-      <div className="bg-slate-900 border-b border-slate-800/80 px-4 sm:px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Board Selector Filter */}
-            <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+      {/* Hero Stats & Info Banner */}
+      <section className="bg-gradient-to-b from-white to-slate-50/70 border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-5">
+        <div className="max-w-7xl mx-auto space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {/* Metric 1 */}
+            <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Fetched</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 font-mono">{data?.totalLotteries || 0}</span>
+                <span className="text-xs font-bold text-slate-400">/ 18 standard</span>
+              </div>
+            </div>
+
+            {/* Metric 2: NLB */}
+            <div className="bg-white rounded-xl p-3.5 border border-indigo-100 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">NLB Official</span>
+                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-indigo-950 font-mono">{nlbCount}</span>
+                <span className="text-xs font-medium text-indigo-600">nlb.lk results</span>
+              </div>
+            </div>
+
+            {/* Metric 3: DLB */}
+            <div className="bg-white rounded-xl p-3.5 border border-sky-100 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-sky-700 uppercase tracking-wider">DLB Official</span>
+                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-sky-950 font-mono">{dlbCount}</span>
+                <span className="text-xs font-medium text-sky-600">dlb.lk/result/2</span>
+              </div>
+            </div>
+
+            {/* Metric 4: Date */}
+            <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Official Draw Date</span>
+              <div className="mt-1 flex items-center gap-1.5 text-slate-800 font-bold text-sm truncate">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="truncate">{data?.drawDate || 'Loading...'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Controls Bar: Filter + Search + View Tabs */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+            {/* Board Selector Tabs */}
+            <div className="inline-flex rounded-xl bg-slate-200/80 p-1 border border-slate-200 self-start sm:self-auto">
               <button
                 type="button"
                 onClick={() => handleBoardChange('all')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                   selectedBoard === 'all'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Globe className="w-3.5 h-3.5" />
-                <span>All Boards (18 Lotteries)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBoardChange('dlb')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                  selectedBoard === 'dlb'
-                    ? 'bg-sky-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Building className="w-3.5 h-3.5 text-sky-400" />
-                <span>DLB Official (9)</span>
+                <Globe className="w-3.5 h-3.5 text-blue-600" />
+                <span>All Boards ({data?.totalLotteries || 18})</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleBoardChange('nlb')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                   selectedBoard === 'nlb'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white text-indigo-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Building className="w-3.5 h-3.5 text-indigo-400" />
-                <span>NLB Official (9)</span>
+                <Building className="w-3.5 h-3.5 text-indigo-600" />
+                <span>NLB ({nlbCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBoardChange('dlb')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  selectedBoard === 'dlb'
+                    ? 'bg-white text-sky-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5 text-sky-600" />
+                <span>DLB ({dlbCount})</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-              <Calendar className="w-4 h-4 text-blue-400" />
-              <span>Draw Date:</span>
-              <strong className="text-white font-bold">{data?.drawDate || 'Loading...'}</strong>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Matched Lotteries:</span>
-              <strong className="text-emerald-400 font-bold">{data?.matchedCount || 0} / {data?.totalLotteries || 0}</strong>
-            </div>
-
-            {data?.handshakeDetails && (
-              <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-800">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Response Time:</span>
-                <strong className="text-slate-200">{data.handshakeDetails.responseTimeMs}ms</strong>
+            {/* Search Input & View Switch */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Filter by name or draw..."
+                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs font-sans transition"
+                />
               </div>
-            )}
-          </div>
 
-          {/* Search filter */}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search lottery name, draw, or board..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-800/90 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500 w-full md:w-64"
-            />
+              {/* View Switch */}
+              <div className="inline-flex rounded-xl bg-slate-200/80 p-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cards')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    activeTab === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Card View"
+                >
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden md:inline">Cards</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('table')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    activeTab === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Mapping Table View"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden md:inline">Table</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('inspector')}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    activeTab === 'inspector' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Handshake Inspector View"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="hidden md:inline">JSON</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Tabs navigation */}
-      <div className="border-b border-slate-800 bg-slate-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveTab('cards')}
-              className={`px-4 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition ${
-                activeTab === 'cards'
-                  ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Official Result Cards ({filteredLotteries.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('comparison')}
-              className={`px-4 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition ${
-                activeTab === 'comparison'
-                  ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Sheet Mapping (18 Standard Rows)</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('inspector')}
-              className={`px-4 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition ${
-                activeTab === 'inspector'
-                  ? 'border-blue-500 text-blue-400 bg-slate-900/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              <span>Mechanism & JSON Inspector</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCopyJson}
-            className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white bg-slate-850 px-2.5 py-1 rounded-md border border-slate-700/60 transition"
-          >
-            {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedJson ? 'Copied JSON!' : 'Copy JSON'}</span>
-          </button>
-        </div>
-      </div>
+      </section>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+        {/* Error Notification */}
         {error && (
-          <div className="p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-200 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-start gap-3">
+            <Info className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
-              <div className="font-bold text-sm">Failed to connect to official sources</div>
-              <p className="text-xs text-red-300/90 mt-0.5">{error}</p>
-              <button
-                onClick={() => fetchResults(selectedBoard)}
-                className="mt-2 text-xs font-bold px-3 py-1 bg-red-800 hover:bg-red-700 text-white rounded-md transition"
-              >
-                Retry Fetch
-              </button>
+              <p className="font-bold">Fetch Error</p>
+              <p className="text-xs text-rose-700 mt-0.5">{error}</p>
             </div>
           </div>
         )}
 
-        {/* Tab 1: Visual Result Cards */}
-        {activeTab === 'cards' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {isLoading && !data ? (
-              Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 animate-pulse space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="w-28 h-5 bg-slate-800 rounded"></div>
-                    <div className="w-16 h-5 bg-slate-800 rounded"></div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-slate-800"></div>
-                    <div className="w-10 h-10 rounded-full bg-slate-800"></div>
-                    <div className="w-10 h-10 rounded-full bg-slate-800"></div>
-                  </div>
-                </div>
-              ))
-            ) : filteredLotteries.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-slate-500 text-sm">
-                No matching lottery results found.
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="py-16 text-center">
+            <div className="w-12 h-12 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin mx-auto mb-4" />
+            <h3 className="text-base font-bold text-slate-800">Fetching live results from Government Portals...</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Establishing authenticated session handshake with nlb.lk and dlb.lk
+            </p>
+          </div>
+        )}
+
+        {/* Tab 1: Professional Light Visual Cards */}
+        {!isLoading && activeTab === 'cards' && (
+          <div>
+            {filteredLotteries.length === 0 ? (
+              <div className="py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-2xs">
+                <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-700">No lotteries found matching &quot;{searchTerm}&quot;</p>
+                <p className="text-xs text-slate-500 mt-1">Try clearing the search filter or switching board tabs.</p>
               </div>
             ) : (
-              filteredLotteries.map((item, idx) => (
-                <div 
-                  key={idx}
-                  className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 transition flex flex-col justify-between gap-4 shadow-lg group hover:shadow-blue-900/10"
-                >
-                  {/* Card Header */}
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        {item.logoUrl ? (
-                          <img 
-                            src={item.logoUrl} 
-                            alt={item.officialName} 
-                            className="w-8 h-8 object-contain rounded-md bg-white/5 p-0.5 border border-white/10"
-                            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                          />
-                        ) : null}
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="font-extrabold text-base text-white tracking-tight">
-                              {item.lotteryNameSi || item.officialName}
-                            </h3>
-                            <span className="text-[11px] text-slate-400 font-medium">
-                              ({item.officialName})
-                            </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {filteredLotteries.map((item, idx) => {
+                  const isNlb = item.board === 'NLB';
+                  const isTiered = item.matchedLotteryId === 'ada_sampatha' || item.matchedLotteryId === 'jaya_sampatha';
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white rounded-2xl border border-slate-200/90 hover:border-blue-300 p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
+                    >
+                      {/* Card Header */}
+                      <div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            {item.logoUrl ? (
+                              <img
+                                src={item.logoUrl}
+                                alt={item.officialName}
+                                className="w-10 h-10 object-contain rounded-lg border border-slate-100 bg-slate-50 p-0.5 shrink-0"
+                              />
+                            ) : (
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border ${
+                                isNlb
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                  : 'bg-sky-50 border-sky-200 text-sky-700'
+                              }`}>
+                                {item.board}
+                              </div>
+                            )}
+
+                            <div>
+                              <h3 className="font-bold text-base text-slate-900 group-hover:text-blue-600 transition leading-tight">
+                                {item.lotteryNameSi || item.officialName}
+                              </h3>
+                              <span className="text-xs text-slate-500 font-medium block">
+                                {item.officialName}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            Draw No: <strong className="text-white font-mono">{item.drawNo}</strong>
+
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                            isNlb
+                              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                              : 'bg-sky-50 border-sky-200 text-sky-700'
+                          }`}>
+                            {item.board} Official
+                          </span>
+                        </div>
+
+                        {/* Meta: Draw No & Draw Date */}
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                          <div>
+                            <span>Draw No: </span>
+                            <strong className="text-slate-900 font-mono font-bold">{item.drawNo}</strong>
                           </div>
+                          <span className="text-[11px] text-slate-400">{item.drawDate}</span>
                         </div>
                       </div>
 
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
-                        item.board === 'DLB'
-                          ? 'bg-sky-950/80 border-sky-800 text-sky-300'
-                          : 'bg-indigo-950/80 border-indigo-800 text-indigo-300'
-                      }`}>
-                        {item.board} Official
-                      </span>
+                      {/* Results Balls Area */}
+                      <div className="my-4 p-3 rounded-xl bg-slate-50/80 border border-slate-100">
+                        {isTiered ? (
+                          /* Tiered Presentation for Ada Sampatha & Jaya Sampatha */
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                              Tiered Result (1 Row = 1 Number):
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {item.numbers.map((tierNum, tIdx) => (
+                                <React.Fragment key={tIdx}>
+                                  {tIdx > 0 && <span className="text-slate-400 font-black text-sm px-0.5">/</span>}
+                                  <div className="px-2.5 py-1 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-sm font-mono shadow-xs border border-amber-400/80">
+                                    {tierNum}
+                                  </div>
+                                </React.Fragment>
+                              ))}
+
+                              {item.letter && (
+                                <>
+                                  <span className="text-slate-400 font-black text-sm px-0.5">/</span>
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white font-black text-sm flex items-center justify-center shadow-xs border border-blue-600">
+                                    {item.letter}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          /* Regular Lottery Balls Presentation */
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Letter Ball */}
+                            {item.letter && (
+                              <div
+                                className="w-9 h-9 rounded-full bg-gradient-to-b from-blue-600 to-blue-700 text-white font-extrabold text-sm flex items-center justify-center shadow-sm shadow-blue-500/20 ring-2 ring-blue-300/40 shrink-0"
+                                title={`Letter: ${item.letter}`}
+                              >
+                                {item.letter}
+                              </div>
+                            )}
+
+                            {/* Zodiac Sign Badge */}
+                            {(item.zodiacEn || item.zodiacSi) && (
+                              <div
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 font-bold text-xs flex items-center gap-1.5 shadow-2xs shrink-0"
+                                title={`Zodiac: ${item.zodiacEn} (${item.zodiacSi || ''})`}
+                              >
+                                <span className="text-purple-600 text-sm">{item.zodiacSymbol || '♈'}</span>
+                                <span>{item.zodiacSi || item.zodiacEn}</span>
+                                <span className="text-[10px] text-purple-600/80">({item.zodiacEn})</span>
+                              </div>
+                            )}
+
+                            {/* Super / Special Number Ball (Red) e.g. Mega Power, Kapruka */}
+                            {item.superNumber && (
+                              <div
+                                className="w-9 h-9 rounded-full bg-gradient-to-b from-rose-500 to-red-600 text-white font-extrabold text-sm flex items-center justify-center shadow-sm shadow-rose-500/20 ring-2 ring-rose-300/50 shrink-0"
+                                title={`Super / Special Boxed Number: [${item.superNumber}]`}
+                              >
+                                {item.superNumber}
+                              </div>
+                            )}
+
+                            {/* Regular Number Balls (Golden Amber) */}
+                            {item.numbers.map((num, nIdx) => (
+                              <div
+                                key={nIdx}
+                                className="w-9 h-9 rounded-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-xs ring-1 ring-amber-400/50 shrink-0 font-mono"
+                              >
+                                {num}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer */}
+                      <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          #{item.matchedLotteryId || 'unmatched'}
+                        </span>
+
+                        <span className="flex items-center gap-1 text-emerald-600 font-bold">
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span>Official Match</span>
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Results Balls Display */}
-                    <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
-                      {/* Letter Ball */}
-                      {item.letter && (
-                        <div 
-                          className="w-9 h-9 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-blue-500/20 ring-2 ring-blue-400/40 shrink-0"
-                          title={`Letter: ${item.letter}`}
-                        >
-                          {item.letter}
-                        </div>
-                      )}
-
-                      {/* Zodiac Sign Badge */}
-                      {(item.zodiacEn || item.zodiacSi) && (
-                        <div 
-                          className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-700 text-indigo-200 font-bold text-xs flex items-center gap-1.5 shadow-sm shrink-0"
-                          title={`Zodiac: ${item.zodiacEn} (${item.zodiacSi || ''})`}
-                        >
-                          <span className="text-amber-300 text-sm">{item.zodiacSymbol || '♈'}</span>
-                          <span>{item.zodiacSi || item.zodiacEn}</span>
-                          <span className="text-[10px] text-indigo-300/80">({item.zodiacEn})</span>
-                        </div>
-                      )}
-
-                      {/* Regular Number Balls (Authentic Yellow Balls) */}
-                      {item.numbers.map((num, nIdx) => (
-                        <div 
-                          key={nIdx}
-                          className="w-9 h-9 rounded-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-md shadow-amber-500/20 ring-1 ring-amber-200/60 shrink-0"
-                        >
-                          {num}
-                        </div>
-                      ))}
-
-                      {/* Super / Special Number (Red / Boxed Ball) */}
-                      {item.superNumber && (
-                        <div 
-                          className="w-9 h-9 rounded-full bg-gradient-to-b from-rose-500 to-red-700 text-white font-extrabold text-sm flex items-center justify-center shadow-md shadow-rose-600/30 ring-2 ring-rose-400/50 shrink-0"
-                          title={`Special / Boxed Number: [${item.superNumber}]`}
-                        >
-                          [{item.superNumber}]
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Footer: Match Status */}
-                  <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Standard Row: </span>
-                      <strong className="text-slate-200">
-                        {item.matchedLotteryId ? item.matchedLotteryId : 'Unmapped'}
-                      </strong>
-                    </div>
-
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {item.drawDate}
-                    </span>
-                  </div>
-                </div>
-              ))
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
 
-        {/* Tab 2: System Mapping & Comparison */}
-        {activeTab === 'comparison' && (
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/80">
+        {/* Tab 2: Standard Daily Sheet Mapping Table (Light Theme) */}
+        {!isLoading && activeTab === 'table' && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70">
               <div>
-                <h3 className="font-bold text-sm text-white">Daily Sheet Mapping Overview</h3>
-                <p className="text-xs text-slate-400">
-                  Showing how official NLB and DLB results connect to the 18 standard rows on the A4 landscape sheet.
+                <h3 className="font-bold text-sm text-slate-900">Standard Daily Sheet Mapping Overview</h3>
+                <p className="text-xs text-slate-500">
+                  Showing how official NLB and DLB government results align with the 18 standard rows on the print sheet.
                 </p>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>Reference view only • Dual AI & Official Verification runs inside Editor after upload</span>
+
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>Reference Only • Dual-verification is run in Editor after file upload</span>
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold uppercase tracking-wider text-[11px]">
+                <thead className="bg-slate-100 text-slate-600 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="py-3 px-4">#</th>
                     <th className="py-3 px-4">Board</th>
@@ -496,64 +553,64 @@ export default function OfficialResultsExperimentPage() {
                     <th className="py-3 px-4">System ID</th>
                     <th className="py-3 px-4">Draw No</th>
                     <th className="py-3 px-4">Letter / Zodiac</th>
-                    <th className="py-3 px-4">Winning Numbers</th>
+                    <th className="py-3 px-4">Official Numbers</th>
                     <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80 font-mono">
+                <tbody className="divide-y divide-slate-100 font-mono">
                   {filteredLotteries.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-850/50 transition">
-                      <td className="py-3 px-4 text-slate-500 font-bold">{idx + 1}</td>
+                    <tr key={idx} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 text-slate-400 font-bold">{idx + 1}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           item.board === 'DLB'
-                            ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                            : 'bg-indigo-950 text-indigo-400 border border-indigo-800'
+                            ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                            : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                         }`}>
                           {item.board}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-sans font-bold text-white">
+                      <td className="py-3 px-4 font-sans font-bold text-slate-900">
                         {item.lotteryNameSi || item.officialName}
                         <span className="block text-[11px] text-slate-400 font-normal font-sans">
                           {item.officialName}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-blue-300 font-semibold text-[11px]">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 text-blue-700 font-semibold text-[11px]">
                           {item.matchedLotteryId || 'unknown'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-bold text-slate-200">{item.drawNo}</td>
+                      <td className="py-3 px-4 font-bold text-slate-800">{item.drawNo}</td>
                       <td className="py-3 px-4">
                         {item.letter ? (
-                          <span className="px-2 py-0.5 rounded bg-blue-900/60 border border-blue-700 text-blue-200 font-bold">
+                          <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800 font-bold">
                             {item.letter}
                           </span>
                         ) : item.zodiacSi ? (
-                          <span className="px-2 py-0.5 rounded bg-purple-900/60 border border-purple-700 text-purple-200 font-bold font-sans">
+                          <span className="px-2 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-800 font-bold font-sans">
                             {item.zodiacSymbol} {item.zodiacSi} ({item.zodiacEn})
                           </span>
                         ) : (
-                          <span className="text-slate-600">-</span>
+                          <span className="text-slate-400">-</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {item.numbers.map((n, i) => (
-                            <span key={i} className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold">
-                              {n}
-                            </span>
-                          ))}
                           {item.superNumber && (
-                            <span className="px-1.5 py-0.5 rounded bg-red-900/80 border border-red-700 text-red-200 font-bold">
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 border border-rose-300 text-rose-800 font-bold">
                               [{item.superNumber}]
                             </span>
                           )}
+                          {item.numbers.map((n, i) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded bg-amber-100 border border-amber-200 text-amber-900 font-bold">
+                              {n}
+                            </span>
+                          ))}
                         </div>
                       </td>
                       <td className="py-3 px-4 font-sans">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 flex items-center gap-1 w-fit">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center gap-1 w-fit">
                           <CheckCheck className="w-3 h-3" />
                           Ready
                         </span>
@@ -566,72 +623,84 @@ export default function OfficialResultsExperimentPage() {
           </div>
         )}
 
-        {/* Tab 3: Mechanism & JSON Inspector */}
-        {activeTab === 'inspector' && (
+        {/* Tab 3: Handshake & JSON Inspector (Light Theme) */}
+        {!isLoading && activeTab === 'inspector' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Handshake Details */}
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-400" />
-                <h3 className="font-extrabold text-sm text-white">Official Scraper Mechanisms</h3>
+            {/* Handshake Metadata Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Terminal className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-sm text-slate-900">Government Portal Connection Status</h3>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-300 leading-relaxed font-sans">
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1.5 font-mono text-[11px]">
-                  <div className="text-sky-400 font-bold">// DLB Endpoint (Development Lotteries Board)</div>
-                  <div className="text-slate-300">GET https://www.dlb.lk/result/2/</div>
-                  <div className="text-slate-400">Direct HTTP extraction (no cookies required, 9 lotteries)</div>
+              <div className="space-y-3 text-xs">
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Source URLs:</span>
+                  <span className="font-mono text-slate-800 font-bold truncate max-w-xs">nlb.lk/results &amp; dlb.lk/result/2/</span>
                 </div>
 
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1.5 font-mono text-[11px]">
-                  <div className="text-indigo-400 font-bold">// NLB Endpoint (National Lotteries Board)</div>
-                  <div className="text-slate-300">GET https://www.nlb.lk/results</div>
-                  <div className="text-slate-400">2-step cookie handshake bypass (9 lotteries)</div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Session Handshake Cookie:</span>
+                  <span className="font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 truncate max-w-[200px]">
+                    {data?.handshakeDetails?.humanToken ? `human=${data.handshakeDetails.humanToken}` : 'Direct HTTP Auth'}
+                  </span>
                 </div>
 
-                <p>
-                  Together, the combined scraper extracts all <strong>18 standard Sri Lankan lotteries</strong> concurrently in approximately <strong>{data?.handshakeDetails?.responseTimeMs || 0}ms</strong> directly from the respective government board servers.
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Response Latency:</span>
+                  <span className="font-mono text-blue-700 font-bold">
+                    {data?.handshakeDetails?.responseTimeMs || 0} ms
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500">Payload Size:</span>
+                  <span className="font-mono text-slate-700 font-bold">
+                    {((data?.handshakeDetails?.htmlLength || 0) / 1024).toFixed(1)} KB HTML
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-500">Fetched Timestamp:</span>
+                  <span className="font-mono text-slate-700">{data?.fetchedAt}</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-800">
+                <p className="font-bold flex items-center gap-1.5 mb-1">
+                  <Info className="w-3.5 h-3.5 text-blue-600" />
+                  Dual Verification Architecture
                 </p>
-
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-slate-400">
-                  <span className="font-bold text-white block mb-1">Extraction Summary:</span>
-                  <div>• Total Lotteries Found: <strong>{data?.totalLotteries || 0}</strong></div>
-                  <div>• Successfully Matched to 18 Standard Rows: <strong>{data?.matchedCount || 0}</strong></div>
-                  <div>• Active Boards: <strong>{data?.boards?.join(' + ') || 'NLB + DLB'}</strong></div>
-                </div>
+                <p className="text-[11px] text-blue-700 leading-relaxed">
+                  The system fetches directly from the official portals without browser emulation overhead. In the Editor, after file upload, Dual AI Verification cross-references extracted numbers against both your uploaded paper and these official results.
+                </p>
               </div>
             </div>
 
-            {/* Raw JSON Data Viewer */}
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-emerald-400" />
-                    <h3 className="font-bold text-sm text-white">Extracted JSON Payload</h3>
-                  </div>
-                  <button
-                    onClick={handleCopyJson}
-                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold"
-                  >
-                    {copiedJson ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedJson ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-
-                <pre className="p-3 bg-slate-950 rounded-xl font-mono text-[11px] text-emerald-400 border border-slate-800 h-96 overflow-auto">
-                  {JSON.stringify(data, null, 2)}
-                </pre>
+            {/* JSON Code Viewer Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+                <span className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                  <Terminal className="w-4 h-4 text-emerald-600" />
+                  Raw JSON Payload
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyJson}
+                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1 transition"
+                >
+                  {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedJson ? 'Copied' : 'Copy'}</span>
+                </button>
               </div>
+
+              <pre className="flex-1 bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-auto max-h-[460px] leading-relaxed">
+                {JSON.stringify(data, null, 2)}
+              </pre>
             </div>
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800 bg-slate-950/80 px-4 py-4 text-center text-xs text-slate-500">
-        Sinhala Daily Lottery Result Sheet Generator • Official Data Fetcher Laboratory (NLB & DLB)
-      </footer>
     </div>
   );
 }

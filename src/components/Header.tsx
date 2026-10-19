@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown } from 'lucide-react';
+import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown, Globe } from 'lucide-react';
 import { DailySheet } from '@/types/lottery';
 import { WorkflowStep } from './StepNavigation';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -101,6 +101,15 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
 
+            {/* Link to Official Results Hub */}
+            <Link
+              href="/official-results"
+              className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
+              title="View live fetched results from NLB & DLB official portals"
+            >
+              <Globe className="w-3.5 h-3.5 text-blue-600" />
+              <span>Official Results</span>
+            </Link>
           </div>
 
           {/* Right: Dealer Info & Primary Actions */}

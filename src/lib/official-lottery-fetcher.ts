@@ -593,51 +593,27 @@ export function compareSheetWithOfficial(
         numbersMatch = false;
         discrepancies.push(`Digits mismatch: Sheet has "${sheetDigits}", Official has "${officialDigits}"`);
       }
-    } else if (def.id === 'mega_power') {
-      // Mega Power: 4 regular + 1 super red ball
-      const allSheet = [...sheetNums];
-      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) allSheet.push(sheetItem.bonusNumber);
-      const allOfficial = [...officialNums];
-      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) allOfficial.push(officialItem.superNumber);
+    } else if (def.id === 'mega_power' || def.id === 'kapruka' || def.id === 'vasi') {
+      // Lotteries with a special boxed/super ball that may be stored in numbers or bonusNumber
+      const toUniqueSortedInts = (nums: string[], bonus?: string | null) => {
+        const set = new Set<number>();
+        for (const n of nums) {
+          const val = parseInt(n, 10);
+          if (!isNaN(val)) set.add(val);
+        }
+        if (bonus) {
+          const val = parseInt(bonus, 10);
+          if (!isNaN(val)) set.add(val);
+        }
+        return Array.from(set).sort((a, b) => a - b);
+      };
 
-      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
-      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+      const normS = toUniqueSortedInts(sheetNums, sheetItem.bonusNumber);
+      const normO = toUniqueSortedInts(officialNums, officialItem.superNumber);
 
       if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
         numbersMatch = false;
-        discrepancies.push(`Numbers mismatch: Sheet has [${sheetNums.join(', ')}], Official has [${officialNums.join(', ')}] (Super: ${officialItem.superNumber || 'none'})`);
-      }
-    } else if (def.id === 'vasi') {
-      // Vasi: 2 regular + 1 special boxed
-      const allSheet = [...sheetNums];
-      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) {
-        allSheet.push(sheetItem.bonusNumber);
-      }
-      const allOfficial = [...officialNums];
-      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) {
-        allOfficial.push(officialItem.superNumber);
-      }
-      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
-      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
-      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
-        numbersMatch = false;
-        discrepancies.push(`Numbers mismatch: Sheet has [${allSheet.join(', ')}], Official has [${allOfficial.join(', ')}]`);
-      }
-    } else if (def.id === 'kapruka') {
-      // Kapruka: 5 numbers total (1 boxed + 4 regular)
-      const allSheet = [...sheetNums];
-      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) {
-        allSheet.unshift(sheetItem.bonusNumber);
-      }
-      const allOfficial = [...officialNums];
-      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) {
-        allOfficial.unshift(officialItem.superNumber);
-      }
-      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
-      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
-      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
-        numbersMatch = false;
-        discrepancies.push(`Numbers mismatch: Sheet has [${allSheet.join(', ')}], Official has [${allOfficial.join(', ')}]`);
+        discrepancies.push(`Numbers mismatch: Sheet has [${normS.join(', ')}], Official has [${normO.join(', ')}]`);
       }
     } else {
       // Standard regular 4 numbers or 3 numbers (Sasiri, Suba Dawasak)
