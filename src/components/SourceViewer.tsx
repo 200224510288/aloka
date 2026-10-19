@@ -209,27 +209,14 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-blue-600" />
-          <h2 className="text-sm font-bold text-slate-800">Source Verification Viewer</h2>
+          <h2 className="text-sm font-bold text-slate-800">Source Document</h2>
           <span className="text-[10px] font-semibold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">
             {sources.length} file{sources.length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        {/* Actions: AI Verify & Upload Source */}
+        {/* Action: Upload Source */}
         <div className="flex items-center gap-1.5">
-          {onRunAiVerify && (
-            <button
-              type="button"
-              onClick={() => onRunAiVerify()}
-              disabled={isAiVerifying || isUploading || sources.length === 0}
-              className="px-2.5 py-1 text-xs font-bold bg-linear-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-md shadow-2xs flex items-center gap-1.5 transition disabled:opacity-50 active:scale-95 cursor-pointer"
-              title="Audit and verify extracted lottery results against raw source with OpenAI GPT-4o"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{isAiVerifying ? 'Auditing...' : 'AI 2nd Verify'}</span>
-            </button>
-          )}
-
           <input
             ref={fileInputRef}
             type="file"
@@ -258,63 +245,6 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           </div>
         </div>
       )}
-
-      {/* Disclaimers & Verification Guidance Banner */}
-      <div className={`px-3 py-1.5 text-[11px] border-b flex flex-wrap items-center justify-between gap-2 ${
-        (aiStatusSummary?.hasDiscrepancy || officialStatusSummary?.hasDiscrepancy)
-          ? 'bg-amber-50 text-amber-900 border-amber-200' 
-          : (aiStatusSummary?.verified || officialStatusSummary?.matched)
-          ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-          : 'bg-slate-50 text-slate-800 border-slate-200'
-      }`}>
-        <div className="flex items-center gap-2 flex-wrap">
-          {aiStatusSummary ? (
-            <div className="flex items-center gap-1 font-bold">
-              <Sparkles className={`w-3.5 h-3.5 ${aiStatusSummary.hasDiscrepancy ? 'text-amber-600' : 'text-emerald-600'}`} />
-              <span>AI: {aiStatusSummary.verified}/{aiStatusSummary.total} {aiStatusSummary.hasDiscrepancy ? 'Flagged' : 'Verified'}</span>
-            </div>
-          ) : (
-            <span className="text-slate-600">Verification is optional. Click below to verify against document or official web results.</span>
-          )}
-
-          {officialStatusSummary && (
-            <div className="flex items-center gap-1 font-bold pl-2 border-l border-current/20">
-              <Building2 className={`w-3.5 h-3.5 ${officialStatusSummary.hasDiscrepancy ? 'text-amber-600' : 'text-blue-600'}`} />
-              <span>Official: {officialStatusSummary.matched}/{officialStatusSummary.total} {officialStatusSummary.hasDiscrepancy ? 'Mismatch' : 'Match'}</span>
-            </div>
-          )}
-        </div>
-
-        {sources.length > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {onRunAiVerify && (
-              <button
-                type="button"
-                onClick={() => onRunAiVerify()}
-                disabled={isAiVerifying}
-                className="px-2.5 py-0.5 bg-purple-700 hover:bg-purple-800 text-white rounded-md text-[11px] font-bold shadow-2xs cursor-pointer flex items-center gap-1 transition"
-                title="Audit against raw source document via OpenAI GPT-4o"
-              >
-                <Sparkles className={`w-3 h-3 text-amber-300 ${isAiVerifying ? 'animate-spin' : ''}`} />
-                <span>{isAiVerifying ? 'Auditing AI...' : 'AI Verify'}</span>
-              </button>
-            )}
-
-            {onRunOfficialVerify && (
-              <button
-                type="button"
-                onClick={() => onRunOfficialVerify()}
-                disabled={isOfficialVerifying}
-                className="px-2.5 py-0.5 bg-blue-700 hover:bg-blue-800 text-white rounded-md text-[11px] font-bold shadow-2xs cursor-pointer flex items-center gap-1 transition"
-                title="Cross-check against live NLB & DLB official portals"
-              >
-                <Building2 className={`w-3 h-3 ${isOfficialVerifying ? 'animate-spin' : ''}`} />
-                <span>{isOfficialVerifying ? 'Checking...' : 'Official Verify'}</span>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Source selector tabs */}
       {sources.length > 0 && (

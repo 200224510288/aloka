@@ -135,20 +135,21 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
               <button
                 type="button"
                 onClick={() => setShowNoDrawModal(true)}
-                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                className="px-2 py-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
                 title="Mark as No Draw / Excluded"
               >
                 <Ban className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">No Draw</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => handleSetNoDraw(false)}
-                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition flex items-center gap-1 text-xs font-semibold"
+                className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
                 title="Restore lottery draw"
               >
                 <Undo className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Restore</span>
+                <span>Restore</span>
               </button>
             )}
           </div>
@@ -231,19 +232,12 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Source attribution pill */}
-              {item.sourceFileName && (
-                <span className="text-[10px] text-slate-600 font-medium bg-slate-200/60 px-2 py-0.5 rounded-md truncate max-w-[150px]" title={`Source: ${item.sourceFileName} p.${item.sourcePage || 1}`}>
-                  📄 {item.sourceFileName}
-                </span>
-              )}
             </div>
 
             {/* Winning Numbers Area (Large, High Visibility) */}
             <div className="flex items-center gap-2 pt-1 border-t border-slate-200/70 flex-wrap">
-              <span className="text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
-                Winning Digits:
+              <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+                Digits:
               </span>
 
               {definition.isTieredDigits ? (() => {
