@@ -1,4 +1,5 @@
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
+import { ZODIAC_PATH_MAP } from './zodiac-icons';
 import { LotteryResultItem, BoardType, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 
 export interface OfficialFetchedLottery {
@@ -12,6 +13,8 @@ export interface OfficialFetchedLottery {
   zodiacEn: string | null;
   zodiacSi: string | null;
   zodiacSymbol: string | null;
+  zodiacImgUrl?: string | null;
+  zodiacIconPath?: string | null;
   superNumber: string | null;
   numbers: string[];
   logoUrl: string | null;
@@ -37,40 +40,151 @@ export interface OfficialFetchResponse {
   error?: string;
 }
 
-// Map English Zodiac names to Sinhala & Unicode Symbols
-const ZODIAC_MAP: Record<string, { si: string; symbol: string }> = {
-  ARIES: { si: 'මේෂ', symbol: '♈' },
-  TAURUS: { si: 'වෘෂභ', symbol: '♉' },
-  GEMINI: { si: 'මිථුන', symbol: '♊' },
-  CANCER: { si: 'කටක', symbol: '♋' },
-  LEO: { si: 'සිංහ', symbol: '♌' },
-  VIRGO: { si: 'කන්‍යා', symbol: '♍' },
-  LIBRA: { si: 'තුලා', symbol: '♎' },
-  SCORPIO: { si: 'වෘශ්චික', symbol: '♏' },
-  SAGITTARIUS: { si: 'ධනු', symbol: '♐' },
-  CAPRICORN: { si: 'මකර', symbol: '♑' },
-  AQUARIUS: { si: 'කුම්භ', symbol: '♒' },
-  PISCES: { si: 'මීන', symbol: '♓' },
+export interface ZodiacMatchInfo {
+  si: string;
+  en: string;
+  symbol: string;
+  iconPath?: string;
+}
+
+export const ALL_ZODIAC_DEFINITIONS: ZodiacMatchInfo[] = [
+  { si: 'මේෂ', en: 'Aries', symbol: '♈', iconPath: '/zodiac_standard/mesha.png' },
+  { si: 'වෘෂභ', en: 'Taurus', symbol: '♉', iconPath: '/zodiac_standard/vrushabha.png' },
+  { si: 'මිථුන', en: 'Gemini', symbol: '♊', iconPath: '/zodiac_standard/mithuna.png' },
+  { si: 'කටක', en: 'Cancer', symbol: '♋', iconPath: '/zodiac_standard/kataka.png' },
+  { si: 'සිංහ', en: 'Leo', symbol: '♌', iconPath: '/zodiac_standard/sinha.png' },
+  { si: 'කන්‍යා', en: 'Virgo', symbol: '♍', iconPath: '/zodiac_standard/kanya.png' },
+  { si: 'තුලා', en: 'Libra', symbol: '♎', iconPath: '/zodiac_standard/thula.png' },
+  { si: 'වෘශ්චික', en: 'Scorpio', symbol: '♏', iconPath: '/zodiac_standard/vruschika.png' },
+  { si: 'ධනු', en: 'Sagittarius', symbol: '♐', iconPath: '/zodiac_standard/dhanu.png' },
+  { si: 'මකර', en: 'Capricorn', symbol: '♑', iconPath: '/zodiac_standard/makara.png' },
+  { si: 'කුම්භ', en: 'Aquarius', symbol: '♒', iconPath: '/zodiac_standard/kumbha.png' },
+  { si: 'මීන', en: 'Pisces', symbol: '♓', iconPath: '/zodiac_standard/meena.png' },
+];
+
+// Comprehensive keyword mapping covering English, Sinhala, phonetic spellings, and DLB image filenames
+export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
+  // Aries
+  'aries': ALL_ZODIAC_DEFINITIONS[0],
+  'mesha': ALL_ZODIAC_DEFINITIONS[0],
+  'mesa': ALL_ZODIAC_DEFINITIONS[0],
+  'mesham': ALL_ZODIAC_DEFINITIONS[0],
+  'මේෂ': ALL_ZODIAC_DEFINITIONS[0],
+
+  // Taurus (DLB uses wushaba, wushabha, vrushaba, rushaba, etc.)
+  'taurus': ALL_ZODIAC_DEFINITIONS[1],
+  'wushaba': ALL_ZODIAC_DEFINITIONS[1],
+  'wushabha': ALL_ZODIAC_DEFINITIONS[1],
+  'vrushaba': ALL_ZODIAC_DEFINITIONS[1],
+  'vrushabha': ALL_ZODIAC_DEFINITIONS[1],
+  'rushaba': ALL_ZODIAC_DEFINITIONS[1],
+  'rushabha': ALL_ZODIAC_DEFINITIONS[1],
+  'vrishaba': ALL_ZODIAC_DEFINITIONS[1],
+  'vrishabha': ALL_ZODIAC_DEFINITIONS[1],
+  'rishaba': ALL_ZODIAC_DEFINITIONS[1],
+  'rishabha': ALL_ZODIAC_DEFINITIONS[1],
+  'wishaba': ALL_ZODIAC_DEFINITIONS[1],
+  'වෘෂභ': ALL_ZODIAC_DEFINITIONS[1],
+
+  // Gemini
+  'gemini': ALL_ZODIAC_DEFINITIONS[2],
+  'mithuna': ALL_ZODIAC_DEFINITIONS[2],
+  'mithunam': ALL_ZODIAC_DEFINITIONS[2],
+  'mituna': ALL_ZODIAC_DEFINITIONS[2],
+  'mitunam': ALL_ZODIAC_DEFINITIONS[2],
+  'මිථුන': ALL_ZODIAC_DEFINITIONS[2],
+
+  // Cancer
+  'cancer': ALL_ZODIAC_DEFINITIONS[3],
+  'kataka': ALL_ZODIAC_DEFINITIONS[3],
+  'katakam': ALL_ZODIAC_DEFINITIONS[3],
+  'karkataka': ALL_ZODIAC_DEFINITIONS[3],
+  'කටක': ALL_ZODIAC_DEFINITIONS[3],
+
+  // Leo
+  'leo': ALL_ZODIAC_DEFINITIONS[4],
+  'sinha': ALL_ZODIAC_DEFINITIONS[4],
+  'singha': ALL_ZODIAC_DEFINITIONS[4],
+  'simha': ALL_ZODIAC_DEFINITIONS[4],
+  'sinham': ALL_ZODIAC_DEFINITIONS[4],
+  'සිංහ': ALL_ZODIAC_DEFINITIONS[4],
+
+  // Virgo
+  'virgo': ALL_ZODIAC_DEFINITIONS[5],
+  'kanya': ALL_ZODIAC_DEFINITIONS[5],
+  'kanyawa': ALL_ZODIAC_DEFINITIONS[5],
+  'kanyaa': ALL_ZODIAC_DEFINITIONS[5],
+  'කන්‍යා': ALL_ZODIAC_DEFINITIONS[5],
+  'කනා': ALL_ZODIAC_DEFINITIONS[5],
+  'කන': ALL_ZODIAC_DEFINITIONS[5],
+
+  // Libra
+  'libra': ALL_ZODIAC_DEFINITIONS[6],
+  'thula': ALL_ZODIAC_DEFINITIONS[6],
+  'thulam': ALL_ZODIAC_DEFINITIONS[6],
+  'tula': ALL_ZODIAC_DEFINITIONS[6],
+  'tulam': ALL_ZODIAC_DEFINITIONS[6],
+  'තුලා': ALL_ZODIAC_DEFINITIONS[6],
+
+  // Scorpio
+  'scorpio': ALL_ZODIAC_DEFINITIONS[7],
+  'scorpian': ALL_ZODIAC_DEFINITIONS[7],
+  'vrushchika': ALL_ZODIAC_DEFINITIONS[7],
+  'vrushika': ALL_ZODIAC_DEFINITIONS[7],
+  'wruchika': ALL_ZODIAC_DEFINITIONS[7],
+  'wrichika': ALL_ZODIAC_DEFINITIONS[7],
+  'wrischika': ALL_ZODIAC_DEFINITIONS[7],
+  'wrisika': ALL_ZODIAC_DEFINITIONS[7],
+  'vrishchika': ALL_ZODIAC_DEFINITIONS[7],
+  'vrishika': ALL_ZODIAC_DEFINITIONS[7],
+  'වෘශ්චික': ALL_ZODIAC_DEFINITIONS[7],
+
+  // Sagittarius
+  'sagittarius': ALL_ZODIAC_DEFINITIONS[8],
+  'dhanu': ALL_ZODIAC_DEFINITIONS[8],
+  'dhanus': ALL_ZODIAC_DEFINITIONS[8],
+  'ධනු': ALL_ZODIAC_DEFINITIONS[8],
+
+  // Capricorn
+  'capricorn': ALL_ZODIAC_DEFINITIONS[9],
+  'makara': ALL_ZODIAC_DEFINITIONS[9],
+  'makaram': ALL_ZODIAC_DEFINITIONS[9],
+  'මකර': ALL_ZODIAC_DEFINITIONS[9],
+
+  // Aquarius
+  'aquarius': ALL_ZODIAC_DEFINITIONS[10],
+  'kumbha': ALL_ZODIAC_DEFINITIONS[10],
+  'kumbham': ALL_ZODIAC_DEFINITIONS[10],
+  'kumba': ALL_ZODIAC_DEFINITIONS[10],
+  'කුම්භ': ALL_ZODIAC_DEFINITIONS[10],
+
+  // Pisces
+  'pisces': ALL_ZODIAC_DEFINITIONS[11],
+  'meena': ALL_ZODIAC_DEFINITIONS[11],
+  'meen': ALL_ZODIAC_DEFINITIONS[11],
+  'meenam': ALL_ZODIAC_DEFINITIONS[11],
+  'mina': ALL_ZODIAC_DEFINITIONS[11],
+  'මීන': ALL_ZODIAC_DEFINITIONS[11],
 };
 
-// Map DLB image file names to Zodiac names
-const ZODIAC_DLB_MAP: Record<string, { si: string; en: string; symbol: string }> = {
-  mesha: { si: 'මේෂ', en: 'Aries', symbol: '♈' },
-  vrushabha: { si: 'වෘෂභ', en: 'Taurus', symbol: '♉' },
-  vrushaba: { si: 'වෘෂභ', en: 'Taurus', symbol: '♉' },
-  mithuna: { si: 'මිථුන', en: 'Gemini', symbol: '♊' },
-  kataka: { si: 'කටක', en: 'Cancer', symbol: '♋' },
-  sinha: { si: 'සිංහ', en: 'Leo', symbol: '♌' },
-  kanya: { si: 'කන්‍යා', en: 'Virgo', symbol: '♍' },
-  thula: { si: 'තුලා', en: 'Libra', symbol: '♎' },
-  vrushchika: { si: 'වෘශ්චික', en: 'Scorpio', symbol: '♏' },
-  vrushika: { si: 'වෘශ්චික', en: 'Scorpio', symbol: '♏' },
-  dhanu: { si: 'ධනු', en: 'Sagittarius', symbol: '♐' },
-  makara: { si: 'මකර', en: 'Capricorn', symbol: '♑' },
-  kumbha: { si: 'කුම්භ', en: 'Aquarius', symbol: '♒' },
-  meena: { si: 'මීන', en: 'Pisces', symbol: '♓' },
-  meen: { si: 'මීන', en: 'Pisces', symbol: '♓' },
-};
+/**
+ * Robust identification of Zodiac sign from image filenames, URLs, English/Sinhala names
+ */
+export function identifyZodiac(rawText?: string | null): ZodiacMatchInfo | null {
+  if (!rawText) return null;
+  const clean = rawText.toLowerCase().replace(/[^a-z0-9\u0D80-\u0DFF]/g, '');
+  if (!clean) return null;
+  if (ZODIAC_KEYWORD_MAP[clean]) {
+    return ZODIAC_KEYWORD_MAP[clean];
+  }
+  const sortedKeys = Object.keys(ZODIAC_KEYWORD_MAP).sort((a, b) => b.length - a.length);
+  for (const k of sortedKeys) {
+    if (clean.includes(k.toLowerCase())) {
+      return ZODIAC_KEYWORD_MAP[k];
+    }
+  }
+  return null;
+}
 
 // Normalize names for fuzzy mapping
 function normalizeName(str: string): string {
@@ -168,16 +282,22 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
       const letterMatch = block.match(/<li[^>]*title="Letter"[^>]*>([\s\S]*?)<\/li>/i);
       const letter = letterMatch ? letterMatch[1].trim() : null;
 
-      // Zodiac
-      const zodiacMatch = block.match(/<li[^>]*title="Zodiac"[^>]*>([\s\S]*?)<\/li>/i);
-      const zodiacEn = zodiacMatch ? zodiacMatch[1].trim().toUpperCase() : null;
-      const zodiacDetails = zodiacEn ? (ZODIAC_MAP[zodiacEn] || null) : null;
+      const matchedDef = findMatchingLottery(officialName, 'NLB');
+      const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('suba');
+
+      // Zodiac (only for lotteries that feature a Zodiac sign, e.g. Suba Dawasak)
+      let zodiacDetails: ZodiacMatchInfo | null = null;
+      let zodiacEn: string | null = null;
+      if (isZodiacLottery) {
+        const zodiacMatch = block.match(/<li[^>]*title="Zodiac"[^>]*>([\s\S]*?)<\/li>/i);
+        const rawZodiac = zodiacMatch ? zodiacMatch[1].trim() : null;
+        zodiacDetails = rawZodiac ? identifyZodiac(rawZodiac) : null;
+        zodiacEn = zodiacDetails?.en || (rawZodiac ? rawZodiac.toUpperCase() : null);
+      }
 
       // Super Number (Bonus)
       const superNumMatch = block.match(/<li[^>]*title="Super Number"[^>]*>([\s\S]*?)<\/li>/i);
       const superNumber = superNumMatch ? superNumMatch[1].trim() : null;
-
-      const matchedDef = findMatchingLottery(officialName, 'NLB');
 
       // Winning Numbers
       const rawNumberMatches = [...block.matchAll(/<li[^>]*title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
@@ -216,6 +336,8 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
         zodiacEn,
         zodiacSi: zodiacDetails?.si || null,
         zodiacSymbol: zodiacDetails?.symbol || null,
+        zodiacImgUrl: null,
+        zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
         superNumber,
         numbers: finalNumbers,
         logoUrl,
@@ -311,10 +433,34 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
       const letterMatch = ulContent.match(/<h6 class="eng_letter">([\s\S]*?)<\/h6>/i);
       const letter = letterMatch ? letterMatch[1].trim() : null;
 
-      // Zodiac image (e.g. 1483600185mithuna.png)
-      const zodiacImgMatch = ulContent.match(/front_img\/[0-9]*([a-zA-Z]+)\.png/i);
-      const zodiacKey = zodiacImgMatch ? zodiacImgMatch[1].toLowerCase() : null;
-      const zodiacDetails = zodiacKey ? (ZODIAC_DLB_MAP[zodiacKey] || null) : null;
+      const matchedDef = findMatchingLottery(officialName, 'DLB');
+      const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('lagna');
+
+      // Extract Zodiac Image & Details only for lotteries that feature a Zodiac sign (Lagna Wasana)
+      let zodiacDetails: ZodiacMatchInfo | null = null;
+      let zodiacImgUrl: string | null = null;
+
+      if (isZodiacLottery) {
+        // 1. Scan <img> tags in currPart and ulContent
+        const imgMatches = [...currPart.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+        for (const m of imgMatches) {
+          const src = m[1];
+          const match = identifyZodiac(src);
+          if (match) {
+            zodiacDetails = match;
+            zodiacImgUrl = src.startsWith('http') ? src : `https://www.dlb.lk/${src.replace(/^\//, '')}`;
+            break;
+          }
+        }
+
+        // 2. Fallback: check text in ulContent
+        if (!zodiacDetails) {
+          const textMatch = identifyZodiac(ulContent);
+          if (textMatch) {
+            zodiacDetails = textMatch;
+          }
+        }
+      }
 
       // Numbers
       const numbers = [...ulContent.matchAll(/<h6[^>]*class="[^"]*number_circle[^"]*"[^>]*>([\s\S]*?)<\/h6>/gi)]
@@ -334,8 +480,6 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
         superNumber = regularNumbers[4];
         regularNumbers = regularNumbers.slice(0, 4);
       }
-
-      const matchedDef = findMatchingLottery(officialName, 'DLB');
 
       // For tiered lotteries (e.g. Jaya Sampatha), 1 row = 1 number:
       // If DLB gives 4 individual digits "0", "5", "1", "3", expand into the 3 tiers:
@@ -366,6 +510,8 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
         zodiacEn: zodiacDetails?.en || null,
         zodiacSi: zodiacDetails?.si || null,
         zodiacSymbol: zodiacDetails?.symbol || null,
+        zodiacImgUrl: zodiacImgUrl || null,
+        zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
         superNumber,
         numbers: regularNumbers,
         logoUrl: null,
@@ -704,6 +850,9 @@ export function compareSheetWithOfficial(
         letter: officialItem.letter,
         zodiacEn: officialItem.zodiacEn,
         zodiacSi: officialItem.zodiacSi,
+        zodiacSymbol: officialItem.zodiacSymbol,
+        zodiacImgUrl: officialItem.zodiacImgUrl,
+        zodiacIconPath: officialItem.zodiacIconPath,
         numbers: officialItem.numbers,
         superNumber: officialItem.superNumber,
         board: officialItem.board,

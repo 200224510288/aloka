@@ -16,6 +16,7 @@ import {
   Globe
 } from 'lucide-react';
 import { OfficialLotteryMatchResult, OfficialVerificationSummary, LotteryResultItem } from '@/types/lottery';
+import { ZODIAC_PATH_MAP, ZODIAC_IMAGE_MAP } from '@/lib/zodiac-icons';
 
 interface OfficialVerificationModalProps {
   isOpen: boolean;
@@ -325,8 +326,15 @@ export const OfficialVerificationModal: React.FC<OfficialVerificationModalProps>
                               </span>
                             )}
                             {sheetVals?.zodiac && (
-                              <span className="bg-purple-100 text-purple-900 font-bold px-1.5 py-0.5 rounded border border-purple-200">
-                                {sheetVals.zodiac}
+                              <span className="bg-purple-100 text-purple-900 font-bold px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1">
+                                {(ZODIAC_PATH_MAP[sheetVals.zodiac] || ZODIAC_IMAGE_MAP[sheetVals.zodiac]) && (
+                                  <img
+                                    src={ZODIAC_PATH_MAP[sheetVals.zodiac] || ZODIAC_IMAGE_MAP[sheetVals.zodiac]}
+                                    alt={sheetVals.zodiac}
+                                    className="w-4 h-4 object-contain shrink-0"
+                                  />
+                                )}
+                                <span>{sheetVals.zodiac}</span>
                               </span>
                             )}
                             {sheetVals?.numbers && sheetVals.numbers.length > 0 && (
@@ -360,8 +368,23 @@ export const OfficialVerificationModal: React.FC<OfficialVerificationModalProps>
                               </span>
                             )}
                             {(offVals?.zodiacSi || offVals?.zodiacEn) && (
-                              <span className="bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
-                                {offVals.zodiacSi || offVals.zodiacEn}
+                              <span className="bg-purple-600 text-white font-bold px-2 py-0.5 rounded shadow-2xs flex items-center gap-1.5">
+                                {offVals.zodiacSi && (ZODIAC_PATH_MAP[offVals.zodiacSi] || ZODIAC_IMAGE_MAP[offVals.zodiacSi]) ? (
+                                  <img
+                                    src={ZODIAC_PATH_MAP[offVals.zodiacSi] || ZODIAC_IMAGE_MAP[offVals.zodiacSi]}
+                                    alt={offVals.zodiacSi}
+                                    className="w-4 h-4 object-contain invert brightness-200 shrink-0"
+                                  />
+                                ) : offVals.zodiacImgUrl ? (
+                                  <img
+                                    src={offVals.zodiacImgUrl}
+                                    alt={offVals.zodiacEn || 'Zodiac'}
+                                    className="w-4 h-4 object-contain shrink-0"
+                                  />
+                                ) : offVals.zodiacSymbol ? (
+                                  <span>{offVals.zodiacSymbol}</span>
+                                ) : null}
+                                <span>{offVals.zodiacSi || offVals.zodiacEn}</span>
                               </span>
                             )}
                             {offVals?.numbers && offVals.numbers.length > 0 && (

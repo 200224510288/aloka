@@ -257,6 +257,9 @@ export interface OfficialLotteryMatchResult {
     letter?: string | null;
     zodiacEn?: string | null;
     zodiacSi?: string | null;
+    zodiacSymbol?: string | null;
+    zodiacImgUrl?: string | null;
+    zodiacIconPath?: string | null;
     numbers: string[];
     superNumber?: string | null;
     board: BoardType;

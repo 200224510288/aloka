@@ -24,6 +24,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { OfficialFetchResponse, OfficialFetchedLottery } from '@/lib/official-lottery-fetcher';
+import { ZODIAC_PATH_MAP, ZODIAC_IMAGE_MAP } from '@/lib/zodiac-icons';
 
 export default function OfficialResultsPage() {
   const router = useRouter();
@@ -472,15 +473,31 @@ export default function OfficialResultsPage() {
                               </div>
                             )}
 
-                            {/* Zodiac Sign Badge */}
+                            {/* Zodiac Sign Badge with Authentic Icon */}
                             {(item.zodiacEn || item.zodiacSi) && (
                               <div
                                 className="px-2.5 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 font-bold text-xs flex items-center gap-1.5 shadow-2xs shrink-0"
-                                title={`Zodiac: ${item.zodiacEn} (${item.zodiacSi || ''})`}
+                                title={`Zodiac: ${item.zodiacEn || ''} (${item.zodiacSi || ''})`}
                               >
-                                <span className="text-purple-600 text-sm">{item.zodiacSymbol || '♈'}</span>
+                                {item.zodiacSi && (ZODIAC_PATH_MAP[item.zodiacSi] || ZODIAC_IMAGE_MAP[item.zodiacSi]) ? (
+                                  <img
+                                    src={ZODIAC_PATH_MAP[item.zodiacSi] || ZODIAC_IMAGE_MAP[item.zodiacSi]}
+                                    alt={item.zodiacSi}
+                                    className="w-5 h-5 object-contain shrink-0"
+                                  />
+                                ) : item.zodiacImgUrl ? (
+                                  <img
+                                    src={item.zodiacImgUrl}
+                                    alt={item.zodiacEn || 'Zodiac'}
+                                    className="w-5 h-5 object-contain shrink-0"
+                                  />
+                                ) : (
+                                  <span className="text-purple-600 text-sm font-semibold">{item.zodiacSymbol || '♈'}</span>
+                                )}
                                 <span>{item.zodiacSi || item.zodiacEn}</span>
-                                <span className="text-[10px] text-purple-600/80">({item.zodiacEn})</span>
+                                {item.zodiacEn && item.zodiacSi && (
+                                  <span className="text-[10px] text-purple-600/80">({item.zodiacEn})</span>
+                                )}
                               </div>
                             )}
 
@@ -587,9 +604,25 @@ export default function OfficialResultsPage() {
                           <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800 font-bold">
                             {item.letter}
                           </span>
-                        ) : item.zodiacSi ? (
-                          <span className="px-2 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-800 font-bold font-sans">
-                            {item.zodiacSymbol} {item.zodiacSi} ({item.zodiacEn})
+                        ) : (item.zodiacSi || item.zodiacEn) ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-800 font-bold font-sans">
+                            {item.zodiacSi && (ZODIAC_PATH_MAP[item.zodiacSi] || ZODIAC_IMAGE_MAP[item.zodiacSi]) ? (
+                              <img
+                                src={ZODIAC_PATH_MAP[item.zodiacSi] || ZODIAC_IMAGE_MAP[item.zodiacSi]}
+                                alt={item.zodiacSi}
+                                className="w-4 h-4 object-contain shrink-0"
+                              />
+                            ) : item.zodiacImgUrl ? (
+                              <img
+                                src={item.zodiacImgUrl}
+                                alt={item.zodiacEn || 'Zodiac'}
+                                className="w-4 h-4 object-contain shrink-0"
+                              />
+                            ) : null}
+                            <span>{item.zodiacSi || item.zodiacEn}</span>
+                            {item.zodiacEn && item.zodiacSi && (
+                              <span className="text-[10px] text-purple-600/80">({item.zodiacEn})</span>
+                            )}
                           </span>
                         ) : (
                           <span className="text-slate-400">-</span>
