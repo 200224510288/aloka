@@ -96,6 +96,20 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
               {definition.board}
             </span>
 
+            {item.aiVerified && (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md flex items-center gap-1 shrink-0" title="AI audited & verified against source document">
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <span>AI Verified</span>
+              </span>
+            )}
+
+            {item.aiDiscrepancy && (
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded-md flex items-center gap-1 shrink-0" title={item.aiDiscrepancy}>
+                <AlertCircle className="w-3 h-3 text-amber-600" />
+                <span className="max-w-[140px] truncate">{item.aiDiscrepancy}</span>
+              </span>
+            )}
+
             <span className="text-[11px] text-slate-400 hidden md:inline truncate">
               ({definition.nameEn})
             </span>

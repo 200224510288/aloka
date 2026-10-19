@@ -50,6 +50,11 @@ export interface LotteryResultItem {
   extractionNotes?: string[];
   hasConflict?: boolean;
   conflictDetails?: string;
+
+  // AI Second Verification
+  aiVerified?: boolean;
+  aiDiscrepancy?: string;
+  aiConfidence?: number;
 }
 
 export interface SourceDocument {
@@ -161,5 +166,54 @@ export interface PrintSettings {
   printDensity: 'eco' | 'high';
   isDefaultSavingMode?: boolean;
 }
+
+export interface AiLotteryAuditResult {
+  lotteryId: string;
+  nameSi: string;
+  nameEn: string;
+  board: BoardType;
+  status: 'verified' | 'mismatch' | 'missing_in_source' | 'unverified';
+  confidence: number;
+  extracted: {
+    drawNo: string;
+    letter?: string;
+    zodiac?: string;
+    numbers: string[];
+    bonusNumber?: string;
+    isNoDraw?: boolean;
+  };
+  verifiedInSource?: {
+    drawNo: string;
+    letter?: string;
+    zodiac?: string;
+    numbers: string[];
+    bonusNumber?: string;
+  };
+  discrepancies?: string[];
+  suggestedFix?: Partial<LotteryResultItem>;
+  notes?: string;
+}
+
+export interface AiVerificationReport {
+  timestamp: string;
+  model: string;
+  totalLotteries: number;
+  verifiedCount: number;
+  mismatchCount: number;
+  missingCount: number;
+  dateCheck: {
+    sheetDate: string;
+    detectedDateInSource?: string;
+    isDateMatch: boolean;
+  };
+  footerAnnouncementCheck?: {
+    current: string;
+    detectedInSource?: string;
+  };
+  overallStatus: 'perfect_match' | 'discrepancies_found' | 'inconclusive';
+  summary: string;
+  results: AiLotteryAuditResult[];
+}
+
 
 

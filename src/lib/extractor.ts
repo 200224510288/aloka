@@ -89,6 +89,7 @@ export function cleanSinhalaText(str: string): string {
     .replace(/වෘ\s+ෂභ/g, 'වෘෂභ')
     .replace(/මි\s+ථුන/g, 'මිථුන')
     .replace(/කන්\s+යා/g, 'කන්‍යා')
+    .replace(/ක[\s\t]*න[\s\t]*[ා]?/g, 'කන්‍යා')
     .replace(/ක\s+ටක/g, 'කටක')
     .replace(/ම\s+කර/g, 'මකර')
     .replace(/කුම්\s+භ/g, 'කුම්භ')
@@ -123,8 +124,8 @@ export function detectZodiacInText(text: string): string | undefined {
     return 'වෘෂභ';
   }
 
-  // 4. Virgo (කන්‍යා): Matches 'කන්‍යා', 'කන්යා', 'ක න්‍යා', 'කන් යා', 'lkHd', 'virgo'
-  if (/(?:ක\s*(?:න\s*්|න්)\s*[\u200D]?\s*ය[ා]?|lkHd|virgo)/i.test(clean)) {
+  // 4. Virgo (කන්‍යා): Matches 'කන්‍යා', 'කන්යා', 'ක න්‍යා', 'කන් යා', 'ක න ා', 'කනා', 'lkHd', 'virgo'
+  if (/(?:ක\s*(?:(?:න\s*්|න්)\s*[\u200D]?\s*ය|න)\s*[ා]?|lkHd|virgo)/i.test(clean)) {
     return 'කන්‍යා';
   }
 

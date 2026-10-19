@@ -91,6 +91,44 @@ export async function GET(req: NextRequest) {
       console.warn('Sources disk reconciliation error:', recErr);
     }
 
+    // 5. Auto-repair missing zodiac or letter fields using improved extractor on extractedText
+    if (sheet.sources && sheet.sources.length > 0) {
+      try {
+        const { extractLotteryDataFromText } = await import('@/lib/extractor');
+        let needsSave = false;
+        for (const src of sheet.sources) {
+          if (src.extractedText) {
+            const reExt = extractLotteryDataFromText(src.extractedText, date, src.fileName);
+            if (reExt.matchedLotteries && reExt.matchedLotteries.length > 0) {
+              sheet.lotteries = sheet.lotteries.map(lot => {
+                const match = reExt.matchedLotteries.find(m => m.lotteryId === lot.lotteryId);
+                if (match) {
+                  let updatedLot = { ...lot };
+                  if (!lot.zodiac && match.zodiac) {
+                    updatedLot.zodiac = match.zodiac;
+                    needsSave = true;
+                  }
+                  if (!lot.letter && match.letter) {
+                    updatedLot.letter = match.letter;
+                    needsSave = true;
+                  }
+                  return updatedLot;
+                }
+                return lot;
+              });
+            }
+          }
+        }
+        if (needsSave) {
+          sheet.updatedAt = new Date().toISOString();
+          saveSheet(sheet, 'Auto-reconciled missing zodiac/letter from document text');
+          saveSheetToCloud(sheet).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Auto-repair from extracted text error:', err);
+      }
+    }
+
     const revisions = getRevisionsByDate(date);
     const localDates = listAvailableDates();
     let cloudDates: string[] = [];

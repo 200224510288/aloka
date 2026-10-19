@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X, RefreshCw, Sparkles } from 'lucide-react';
 import { SourceDocument, UnassignedExtractedRow } from '@/types/lottery';
 import { STANDARD_LOTTERIES } from '@/lib/constants';
+import { getCachedFile } from '@/lib/source-file-cache';
+import { renderPdfPageToDataUrl } from '@/lib/client-pdf-extractor';
 
 interface SourceViewerProps {
   sources: SourceDocument[];
@@ -14,6 +16,9 @@ interface SourceViewerProps {
   unassignedRows: UnassignedExtractedRow[];
   onAssignRow: (row: UnassignedExtractedRow, targetLotteryId: string) => void;
   dateMismatchWarning?: string;
+  onRunAiVerify?: () => void;
+  isAiVerifying?: boolean;
+  aiStatusSummary?: { verified: number; total: number; hasDiscrepancy: boolean };
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -25,6 +30,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   unassignedRows,
   onAssignRow,
   dateMismatchWarning,
+  onRunAiVerify,
+  isAiVerifying,
+  aiStatusSummary,
 }) => {
   const [selectedSourceId, setSelectedSourceId] = useState<string>(sources[0]?.id || '');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -32,6 +40,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   const [hasImgError, setHasImgError] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'preview' | 'text'>('preview');
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string>('');
+  const [pdfCanvasPreviewUrl, setPdfCanvasPreviewUrl] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto sync active document when sources list changes
@@ -45,15 +54,64 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
   const activeDoc = sources.find(s => s.id === selectedSourceId) || sources[0];
 
-  // Convert PDF data URLs or local files into authentic Blob URLs for iframe viewing
+  const isPlaceholder = !activeDoc?.filePath ||
+    activeDoc.filePath.includes('Browser Session') ||
+    activeDoc.filePath.startsWith('[');
+
+  // Resolve authentic Blob URLs and render raster preview for active document
   useEffect(() => {
-    if (!activeDoc || activeDoc.fileType !== 'pdf' || !activeDoc.filePath) {
+    let isCancelled = false;
+    let createdUrlToRevoke: string | null = null;
+
+    if (!activeDoc) {
       setPdfBlobUrl('');
+      setPdfCanvasPreviewUrl('');
       return;
     }
 
-    if (activeDoc.filePath.startsWith('blob:') || activeDoc.filePath.startsWith('/')) {
+    // Step 1: If filePath is a placeholder string from Cloud sync, check IndexedDB first
+    if (isPlaceholder) {
+      setPdfBlobUrl('');
+      setPdfCanvasPreviewUrl('');
+
+      getCachedFile(activeDoc.id, activeDoc.fileName).then((cachedBlob) => {
+        if (isCancelled || !cachedBlob) {
+          // If not in local cache, default view mode to extracted text so user sees the verified OCR text
+          if (activeDoc.extractedText) {
+            setViewMode('text');
+          }
+          return;
+        }
+
+        const url = URL.createObjectURL(cachedBlob);
+        createdUrlToRevoke = url;
+        setPdfBlobUrl(url);
+
+        if (activeDoc.fileType === 'pdf') {
+          renderPdfPageToDataUrl(cachedBlob).then((dataUrl) => {
+            if (!isCancelled && dataUrl) {
+              setPdfCanvasPreviewUrl(dataUrl);
+            }
+          });
+        }
+      });
+
+      return () => {
+        isCancelled = true;
+        if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
+      };
+    }
+
+    // Step 2: Active document has a valid path (blob, data-url, or server url)
+    if (activeDoc.filePath.startsWith('blob:') || activeDoc.filePath.startsWith('/') || activeDoc.filePath.startsWith('http')) {
       setPdfBlobUrl(activeDoc.filePath);
+      if (activeDoc.fileType === 'pdf') {
+        renderPdfPageToDataUrl(activeDoc.filePath).then((dataUrl) => {
+          if (!isCancelled && dataUrl) {
+            setPdfCanvasPreviewUrl(dataUrl);
+          }
+        });
+      }
       return;
     }
 
@@ -67,24 +125,37 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         }
         const blob = new Blob([byteNumbers], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
+        createdUrlToRevoke = url;
         setPdfBlobUrl(url);
 
+        renderPdfPageToDataUrl(blob).then((dataUrl) => {
+          if (!isCancelled && dataUrl) {
+            setPdfCanvasPreviewUrl(dataUrl);
+          }
+        });
+
         return () => {
-          URL.revokeObjectURL(url);
+          isCancelled = true;
+          if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
         };
       } catch (err) {
         console.warn('Failed to parse PDF data URL to blob:', err);
-        setPdfBlobUrl(activeDoc.filePath);
+        setPdfBlobUrl('');
       }
     } else {
       setPdfBlobUrl(activeDoc.filePath);
     }
-  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.fileType]);
+
+    return () => {
+      isCancelled = true;
+      if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
+    };
+  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.fileType, isPlaceholder]);
 
   // Reset image error state whenever active document changes
   useEffect(() => {
     setHasImgError(false);
-  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.previewImageUrl]);
+  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.previewImageUrl, pdfCanvasPreviewUrl]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -105,12 +176,19 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     if (activeDoc.fileName === 'result sheet wireframe.pdf') {
       return '/samples/sample_page_1.png';
     }
-    // Only use previewImageUrl if it is an actual raster image and not a phantom _preview-1.png
-    if (activeDoc.previewImageUrl && !activeDoc.previewImageUrl.endsWith('_preview-1.png')) {
+    // High-fidelity rendered PDF canvas data URL
+    if (pdfCanvasPreviewUrl) {
+      return pdfCanvasPreviewUrl;
+    }
+    // Pre-rendered raster image if provided
+    if (activeDoc.previewImageUrl && !activeDoc.previewImageUrl.includes('Browser Session')) {
       return activeDoc.previewImageUrl;
     }
-    // For PDFs without pre-rendered raster images, return null to show native PDF iframe directly
+    // For PDFs without pre-rendered raster images, return null to show native PDF fallback
     if (activeDoc.fileType === 'pdf') {
+      return null;
+    }
+    if (isPlaceholder) {
       return null;
     }
     return activeDoc.filePath;
@@ -131,8 +209,21 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           </span>
         </div>
 
-        {/* Upload Trigger Button */}
-        <div>
+        {/* Actions: AI Verify & Upload Source */}
+        <div className="flex items-center gap-1.5">
+          {onRunAiVerify && (
+            <button
+              type="button"
+              onClick={onRunAiVerify}
+              disabled={isAiVerifying || isUploading || sources.length === 0}
+              className="px-2.5 py-1 text-xs font-bold bg-linear-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-md shadow-2xs flex items-center gap-1.5 transition disabled:opacity-50 active:scale-95 cursor-pointer"
+              title="Audit and verify extracted lottery results against raw source with OpenAI GPT-4o"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isAiVerifying ? 'Auditing...' : 'AI 2nd Verify'}</span>
+            </button>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -144,7 +235,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50"
+            className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>{isUploading ? 'Extracting...' : 'Upload Source'}</span>
@@ -163,9 +254,27 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       )}
 
       {/* Disclaimers & Guidance Banner */}
-      <div className="bg-blue-50/60 border-b border-blue-100 px-3 py-1.5 text-[11px] text-blue-800 flex items-center justify-between">
-        <span>⚠️ Check winning digits manually against uploaded source image.</span>
-        <span className="font-semibold text-slate-500">Not official verification</span>
+      <div className={`px-3 py-1.5 text-[11px] border-b flex items-center justify-between ${
+        aiStatusSummary?.hasDiscrepancy 
+          ? 'bg-amber-50 text-amber-900 border-amber-200' 
+          : aiStatusSummary?.verified 
+          ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+          : 'bg-blue-50/60 text-blue-800 border-blue-100'
+      }`}>
+        {aiStatusSummary ? (
+          <div className="flex items-center gap-1.5">
+            <Sparkles className={`w-3.5 h-3.5 ${aiStatusSummary.hasDiscrepancy ? 'text-amber-600' : 'text-emerald-600'}`} />
+            <span className="font-bold">
+              AI 2nd Verification: {aiStatusSummary.verified}/{aiStatusSummary.total} Verified
+              {aiStatusSummary.hasDiscrepancy ? ' (Discrepancies Found - Click AI 2nd Verify to review)' : ' (All matching raw source)'}
+            </span>
+          </div>
+        ) : (
+          <span>⚠️ Check winning digits manually against uploaded source image.</span>
+        )}
+        <span className="font-semibold text-slate-500">
+          {aiStatusSummary ? 'OpenAI GPT-4o Audited' : 'Not official verification'}
+        </span>
       </div>
 
       {/* Source selector tabs */}
@@ -383,8 +492,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     }}
                   />
                 </div>
-              ) : activeDoc?.fileType === 'pdf' ? (
-                /* Native PDF viewer fallback using Blob URL */
+              ) : activeDoc?.fileType === 'pdf' && pdfBlobUrl && !isPlaceholder ? (
+                /* Native PDF viewer fallback using authentic Blob/File URL */
                 <div className="w-full h-full min-h-[550px] flex flex-col bg-white rounded-lg border border-slate-300 overflow-hidden shadow-sm">
                   <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs text-slate-700">
                     <span className="font-semibold flex items-center gap-1.5">
@@ -392,7 +501,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                       <span>Native PDF Viewer (Page 1)</span>
                     </span>
                     <a
-                      href={pdfBlobUrl || activeDoc.filePath}
+                      href={pdfBlobUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
@@ -401,24 +510,42 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     </a>
                   </div>
                   <iframe
-                    src={`${pdfBlobUrl || activeDoc.filePath}#page=1&toolbar=0&navpanes=0`}
+                    src={`${pdfBlobUrl}#page=1&toolbar=0&navpanes=0`}
                     title="Source PDF Document"
                     className="w-full flex-1 min-h-[500px] border-none"
                   />
                 </div>
               ) : (
-                <div className="text-center p-8 bg-white rounded-lg border border-slate-300 shadow-sm max-w-sm">
-                  <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-slate-700 mb-1">{activeDoc?.fileName}</p>
-                  <p className="text-[11px] text-slate-500 mb-3">Uploaded source document</p>
-                  <a
-                    href={pdfBlobUrl || activeDoc?.filePath}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    View Original File ↗
-                  </a>
+                /* Document file not accessible on this device (e.g. synced from cloud) */
+                <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-sm mx-auto my-auto flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 mb-1 truncate max-w-[280px]" title={activeDoc?.fileName}>
+                    {activeDoc?.fileName}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+                    Source document was synced from cloud metadata. All verified winning numbers and OCR text are active.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {activeDoc?.extractedText && (
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('text')}
+                        className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
+                      >
+                        View Extracted Text
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-xs transition flex items-center gap-1"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Re-upload File</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument } from '@/types/lottery';
+import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
 import { StepNavigation, WorkflowStep } from '@/components/StepNavigation';
@@ -10,6 +10,7 @@ import { LotteryRowEditor } from '@/components/LotteryRowEditor';
 import { FooterEditor } from '@/components/FooterEditor';
 import { SheetPreview } from '@/components/SheetPreview';
 import { RevisionsModal } from '@/components/RevisionsModal';
+import { AiVerificationModal } from '@/components/AiVerificationModal';
 import { directPrintSheet } from '@/lib/direct-print';
 import { DateHistoryBar } from '@/components/DateHistoryBar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -65,6 +66,20 @@ export default function Home() {
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
 
+  // AI Second Verification states
+  const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState<boolean>(false);
+  const [isAiVerifying, setIsAiVerifying] = useState<boolean>(false);
+  const [aiVerificationReport, setAiVerificationReport] = useState<AiVerificationReport | null>(null);
+
+  const aiStatusSummary = useMemo(() => {
+    if (!aiVerificationReport) return undefined;
+    return {
+      verified: aiVerificationReport.verifiedCount,
+      total: aiVerificationReport.totalLotteries,
+      hasDiscrepancy: aiVerificationReport.mismatchCount > 0,
+    };
+  }, [aiVerificationReport]);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
@@ -95,6 +110,28 @@ export default function Home() {
       const res = await fetch(`/api/sheet?date=${date}`);
       const data = await res.json();
       if (data.success && data.sheet) {
+        // Reconcile any placeholder sources from IndexedDB cache
+        if (Array.isArray(data.sheet.sources)) {
+          try {
+            const { getCachedFile } = await import('@/lib/source-file-cache');
+            const reconciledSources = await Promise.all(
+              data.sheet.sources.map(async (s: any) => {
+                if (!s.filePath || s.filePath.includes('Browser Session') || s.filePath.startsWith('[')) {
+                  const cachedBlob = await getCachedFile(s.id, s.fileName);
+                  if (cachedBlob) {
+                    return {
+                      ...s,
+                      filePath: URL.createObjectURL(cachedBlob),
+                    };
+                  }
+                }
+                return s;
+              })
+            );
+            data.sheet.sources = reconciledSources;
+          } catch {}
+        }
+
         setSheet(data.sheet);
         setRevisions(data.revisions || []);
         if (data.fromCloud) {
@@ -329,10 +366,23 @@ export default function Home() {
           showToast(`Uploaded ${file.name}, but could not identify lottery results.`, 'error');
         }
 
-        // Prioritize persistent server web path so reloading retains the uploaded file
+        // Cache file in IndexedDB immediately for persistent browser preview across reloads
+        if (data.sourceDoc?.id) {
+          try {
+            const { saveCachedFile } = await import('@/lib/source-file-cache');
+            await saveCachedFile(data.sourceDoc.id, file.name, file);
+          } catch (cacheErr) {
+            console.warn('Could not cache file in IndexedDB:', cacheErr);
+          }
+        }
+
+        const isServerPlaceholder = !data.sourceDoc?.filePath ||
+          data.sourceDoc.filePath.includes('Browser Session') ||
+          data.sourceDoc.filePath.startsWith('[');
+
         const clientSourceDoc: SourceDocument = {
           ...data.sourceDoc,
-          filePath: data.sourceDoc.filePath || localBlobUrl,
+          filePath: isServerPlaceholder ? localBlobUrl : (data.sourceDoc.filePath || localBlobUrl),
           extractedText: data.sourceDoc?.extractedText || browserText,
         };
 
@@ -569,6 +619,156 @@ export default function Home() {
 
     setSheet(newSheet);
     showToast(`✓ All ${verifiedCount} valid lotteries confirmed in 1 click!`, 'success');
+  };
+
+  // AI Second Verification against raw document
+  const handleRunAiVerify = async () => {
+    if (sheet.sources.length === 0) {
+      showToast('Please upload a source document first to audit against', 'info');
+      return;
+    }
+
+    setIsAiVerifying(true);
+    setIsAiVerifyModalOpen(true);
+
+    try {
+      const activeSource = sheet.sources[0];
+      const res = await fetch('/api/ai-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: sheet.date,
+          lotteries: sheet.lotteries,
+          rawText: activeSource.extractedText,
+          imageBase64: activeSource.previewImageUrl?.startsWith('data:image/') ? activeSource.previewImageUrl : undefined,
+          sourceFileName: activeSource.fileName,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.report) {
+        setAiVerificationReport(data.report);
+
+        // Auto-tag verified lotteries and discrepancies on rows
+        setSheet(prev => ({
+          ...prev,
+          lotteries: prev.lotteries.map(lot => {
+            const audit = data.report.results.find((r: AiLotteryAuditResult) => r.lotteryId === lot.lotteryId);
+            if (audit) {
+              return {
+                ...lot,
+                aiVerified: audit.status === 'verified',
+                aiDiscrepancy: audit.status === 'mismatch' ? audit.discrepancies?.[0] : undefined,
+              };
+            }
+            return lot;
+          })
+        }));
+
+        if (data.report.mismatchCount === 0) {
+          showToast(`✓ AI Verification: 100% Match! All ${data.report.verifiedCount} lotteries verified against source.`, 'success');
+        } else {
+          showToast(`⚠️ AI Verification: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
+        }
+      } else {
+        showToast(data.error || 'AI verification failed', 'error');
+      }
+    } catch (err: any) {
+      showToast(`AI verification error: ${err.message}`, 'error');
+    } finally {
+      setIsAiVerifying(false);
+    }
+  };
+
+  const handleApplySingleFix = (result: AiLotteryAuditResult) => {
+    if (!result.suggestedFix) return;
+
+    setSheet(prev => ({
+      ...prev,
+      lotteries: prev.lotteries.map(lot => {
+        if (lot.lotteryId === result.lotteryId) {
+          return {
+            ...lot,
+            ...result.suggestedFix,
+            isCheckedAgainstSource: true,
+            aiVerified: true,
+            aiDiscrepancy: undefined,
+          };
+        }
+        return lot;
+      })
+    }));
+
+    setAiVerificationReport(prev => {
+      if (!prev) return null;
+      const updatedResults = prev.results.map(r => {
+        if (r.lotteryId === result.lotteryId) {
+          return { ...r, status: 'verified' as const, discrepancies: [] };
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        verifiedCount: updatedResults.filter(r => r.status === 'verified').length,
+        mismatchCount: updatedResults.filter(r => r.status === 'mismatch').length,
+        results: updatedResults,
+      };
+    });
+
+    showToast(`✓ Applied AI fix for ${result.nameSi}`, 'success');
+  };
+
+  const handleApplyAllFixes = (report: AiVerificationReport) => {
+    let appliedCount = 0;
+    setSheet(prev => ({
+      ...prev,
+      lotteries: prev.lotteries.map(lot => {
+        const fix = report.results.find(r => r.lotteryId === lot.lotteryId && r.suggestedFix && Object.keys(r.suggestedFix).length > 0);
+        if (fix && fix.suggestedFix) {
+          appliedCount++;
+          return {
+            ...lot,
+            ...fix.suggestedFix,
+            isCheckedAgainstSource: true,
+            aiVerified: true,
+            aiDiscrepancy: undefined,
+          };
+        }
+        return lot;
+      })
+    }));
+
+    setAiVerificationReport(prev => {
+      if (!prev) return null;
+      const updatedResults = prev.results.map(r => ({
+        ...r,
+        status: 'verified' as const,
+        discrepancies: [],
+      }));
+      return {
+        ...prev,
+        verifiedCount: updatedResults.length,
+        mismatchCount: 0,
+        overallStatus: 'perfect_match' as const,
+        results: updatedResults,
+      };
+    });
+
+    showToast(`✓ Applied all ${appliedCount} AI corrections!`, 'success');
+  };
+
+  const handleConfirmAllVerified = () => {
+    setSheet(prev => ({
+      ...prev,
+      lotteries: prev.lotteries.map(lot => ({
+        ...lot,
+        isCheckedAgainstSource: true,
+        aiVerified: true,
+        checkedAt: new Date().toISOString(),
+      }))
+    }));
+    showToast('✓ All lotteries confirmed and marked as verified!', 'success');
+    setIsAiVerifyModalOpen(false);
   };
 
   // Stats calculation
@@ -823,6 +1023,9 @@ export default function Home() {
                   unassignedRows={unassignedRows}
                   onAssignRow={handleAssignRow}
                   dateMismatchWarning={dateMismatchWarning}
+                  onRunAiVerify={handleRunAiVerify}
+                  isAiVerifying={isAiVerifying}
+                  aiStatusSummary={aiStatusSummary}
                 />
               </div>
 
@@ -908,6 +1111,32 @@ export default function Home() {
                   </span>
                 </button>
 
+                {/* AI 2nd Verification Button */}
+                <button
+                  type="button"
+                  onClick={handleRunAiVerify}
+                  disabled={isAiVerifying}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98] ${
+                    isAiVerifying
+                      ? 'bg-purple-100 text-purple-700 cursor-wait animate-pulse border border-purple-300'
+                      : aiStatusSummary?.hasDiscrepancy
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 cursor-pointer'
+                      : aiStatusSummary?.verified
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                      : 'bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white cursor-pointer'
+                  }`}
+                  title="Run AI 2nd Verification against raw source document"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isAiVerifying
+                      ? 'Auditing with AI...'
+                      : aiStatusSummary
+                      ? `AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'AI 2nd Verify'}
+                  </span>
+                </button>
+
                 {/* Next Step Action */}
                 <button
                   type="button"
@@ -937,6 +1166,9 @@ export default function Home() {
                     unassignedRows={unassignedRows}
                     onAssignRow={handleAssignRow}
                     dateMismatchWarning={dateMismatchWarning}
+                    onRunAiVerify={handleRunAiVerify}
+                    isAiVerifying={isAiVerifying}
+                    aiStatusSummary={aiStatusSummary}
                   />
                 </div>
               )}
@@ -1107,6 +1339,17 @@ export default function Home() {
           setSheet(snapshot);
           showToast('Revision snapshot restored successfully.', 'success');
         }}
+      />
+
+      {/* AI Verification Report & Fix Modal */}
+      <AiVerificationModal
+        isOpen={isAiVerifyModalOpen}
+        onClose={() => setIsAiVerifyModalOpen(false)}
+        report={aiVerificationReport}
+        isLoading={isAiVerifying}
+        onApplySingleFix={handleApplySingleFix}
+        onApplyAllFixes={handleApplyAllFixes}
+        onConfirmAllVerified={handleConfirmAllVerified}
       />
 
     </div>
