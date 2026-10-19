@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult } from '@/types/lottery';
+import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
 import { StepNavigation, WorkflowStep } from '@/components/StepNavigation';
@@ -66,9 +66,10 @@ export default function Home() {
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
 
-  // AI Second Verification states
+  // AI & Official Verification states
   const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState<boolean>(false);
   const [isAiVerifying, setIsAiVerifying] = useState<boolean>(false);
+  const [isRefreshingOfficial, setIsRefreshingOfficial] = useState<boolean>(false);
   const [aiVerificationReport, setAiVerificationReport] = useState<AiVerificationReport | null>(null);
 
   const aiStatusSummary = useMemo(() => {
@@ -77,6 +78,9 @@ export default function Home() {
       verified: aiVerificationReport.verifiedCount,
       total: aiVerificationReport.totalLotteries,
       hasDiscrepancy: aiVerificationReport.mismatchCount > 0,
+      officialMatched: aiVerificationReport.officialVerification?.matchedCount ?? 0,
+      officialTotal: aiVerificationReport.officialVerification?.totalLotteries ?? 0,
+      hasOfficialDiscrepancy: (aiVerificationReport.officialVerification?.discrepancyCount ?? 0) > 0,
     };
   }, [aiVerificationReport]);
 
@@ -627,7 +631,7 @@ export default function Home() {
     showToast(`✓ All ${verifiedCount} valid lotteries confirmed in 1 click!`, 'success');
   };
 
-  // AI Second Verification against raw document
+  // AI & Official Government Verification against raw document and live portals
   const handleRunAiVerify = async (targetSheet?: any, targetSource?: SourceDocument) => {
     // Defensively check if targetSheet is an actual DailySheet or a SyntheticEvent from onClick
     const isActualSheet = targetSheet && typeof targetSheet === 'object' && !('nativeEvent' in targetSheet) && !('preventDefault' in targetSheet) && ('lotteries' in targetSheet);
@@ -661,26 +665,37 @@ export default function Home() {
       if (data.success && data.report) {
         setAiVerificationReport(data.report);
 
-        // Auto-tag verified lotteries and discrepancies on rows
+        // Auto-tag verified lotteries and discrepancies on rows for BOTH AI & Official
+        const officialResults = data.report.officialVerification?.results;
+
         setSheet(prev => ({
           ...prev,
           lotteries: prev.lotteries.map(lot => {
             const audit = data.report.results.find((r: AiLotteryAuditResult) => r.lotteryId === lot.lotteryId);
-            if (audit) {
-              return {
-                ...lot,
-                aiVerified: audit.status === 'verified',
-                aiDiscrepancy: audit.status === 'mismatch' ? audit.discrepancies?.[0] : undefined,
-              };
-            }
-            return lot;
+            const offMatch = officialResults?.find((o: OfficialLotteryMatchResult) => o.lotteryId === lot.lotteryId);
+
+            return {
+              ...lot,
+              aiVerified: audit ? audit.status === 'verified' : lot.aiVerified,
+              aiDiscrepancy: audit?.status === 'mismatch' ? audit.discrepancies?.[0] : undefined,
+              officialVerified: offMatch ? offMatch.status === 'match' : lot.officialVerified,
+              officialDiscrepancy: offMatch?.status === 'discrepancy' ? offMatch.discrepancies?.[0] : undefined,
+              officialDrawNo: offMatch?.officialValues?.drawNo || lot.officialDrawNo,
+              officialMatchedAt: offMatch ? new Date().toISOString() : lot.officialMatchedAt,
+            };
           })
         }));
 
-        if (data.report.mismatchCount === 0) {
-          showToast(`✓ AI Verification: 100% Match! All ${data.report.verifiedCount} lotteries verified against source.`, 'success');
+        const aiAllMatch = data.report.mismatchCount === 0;
+        const offSummary = data.report.officialVerification;
+        const offAllMatch = !offSummary || offSummary.discrepancyCount === 0;
+
+        if (aiAllMatch && offAllMatch) {
+          showToast(`✓ Dual Verification 100% Match! AI Document (${data.report.verifiedCount}/18) & Official Government Ground Truth (${offSummary?.matchedCount ?? 18}/18) verified!`, 'success');
+        } else if (!offAllMatch) {
+          showToast(`⚠️ Official Government Audit: ${offSummary?.discrepancyCount} difference flagged against live NLB/DLB results.`, 'info');
         } else {
-          showToast(`⚠️ AI Verification: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
+          showToast(`⚠️ AI Document Audit: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
         }
       } else {
         showToast(data.error || 'AI verification failed', 'error');
@@ -769,6 +784,138 @@ export default function Home() {
     showToast(`✓ Applied all ${appliedCount} AI corrections!`, 'success');
   };
 
+  // Apply single official government fix
+  const handleApplyOfficialFix = (result: OfficialLotteryMatchResult) => {
+    if (!result.suggestedFix) return;
+
+    setSheet(prev => ({
+      ...prev,
+      lotteries: prev.lotteries.map(lot => {
+        if (lot.lotteryId === result.lotteryId) {
+          return {
+            ...lot,
+            ...result.suggestedFix,
+            isCheckedAgainstSource: true,
+            officialVerified: true,
+            officialDiscrepancy: undefined,
+          };
+        }
+        return lot;
+      })
+    }));
+
+    setAiVerificationReport(prev => {
+      if (!prev || !prev.officialVerification) return prev;
+      const updatedOfficialResults = prev.officialVerification.results.map(r => {
+        if (r.lotteryId === result.lotteryId) {
+          return { ...r, status: 'match' as const, discrepancies: [] };
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        officialVerification: {
+          ...prev.officialVerification,
+          matchedCount: updatedOfficialResults.filter(r => r.status === 'match').length,
+          discrepancyCount: updatedOfficialResults.filter(r => r.status === 'discrepancy').length,
+          results: updatedOfficialResults,
+        }
+      };
+    });
+
+    showToast(`✓ Applied Official Government values for ${result.nameSi}`, 'success');
+  };
+
+  // Apply all official government fixes
+  const handleApplyAllOfficialFixes = (officialSummary: OfficialVerificationSummary) => {
+    let appliedCount = 0;
+    setSheet(prev => ({
+      ...prev,
+      lotteries: prev.lotteries.map(lot => {
+        const fix = officialSummary.results.find(r => r.lotteryId === lot.lotteryId && r.suggestedFix && Object.keys(r.suggestedFix).length > 0);
+        if (fix && fix.suggestedFix) {
+          appliedCount++;
+          return {
+            ...lot,
+            ...fix.suggestedFix,
+            isCheckedAgainstSource: true,
+            officialVerified: true,
+            officialDiscrepancy: undefined,
+          };
+        }
+        return lot;
+      })
+    }));
+
+    setAiVerificationReport(prev => {
+      if (!prev || !prev.officialVerification) return prev;
+      const updatedOfficialResults = prev.officialVerification.results.map(r => ({
+        ...r,
+        status: 'match' as const,
+        discrepancies: [],
+      }));
+      return {
+        ...prev,
+        officialVerification: {
+          ...prev.officialVerification,
+          matchedCount: updatedOfficialResults.length,
+          discrepancyCount: 0,
+          results: updatedOfficialResults,
+        }
+      };
+    });
+
+    showToast(`✓ Applied all ${appliedCount} official government fixes!`, 'success');
+  };
+
+  // Re-check official results live from NLB & DLB portals
+  const handleRefreshOfficial = async () => {
+    setIsRefreshingOfficial(true);
+    try {
+      const res = await fetch('/api/official-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lotteries: sheet.lotteries }),
+      });
+      const data = await res.json();
+      if (data.success && data.comparison) {
+        setAiVerificationReport(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            officialVerification: data.comparison,
+          };
+        });
+
+        // Update sheet officialVerified badges
+        setSheet(prev => ({
+          ...prev,
+          lotteries: prev.lotteries.map(lot => {
+            const off = data.comparison.results.find((r: OfficialLotteryMatchResult) => r.lotteryId === lot.lotteryId);
+            if (off) {
+              return {
+                ...lot,
+                officialVerified: off.status === 'match',
+                officialDiscrepancy: off.status === 'discrepancy' ? off.discrepancies?.[0] : undefined,
+                officialDrawNo: off.officialValues?.drawNo || lot.officialDrawNo,
+                officialMatchedAt: new Date().toISOString(),
+              };
+            }
+            return lot;
+          })
+        }));
+
+        showToast(`✓ Refreshed live official results: ${data.comparison.matchedCount}/18 matched with government portals.`, 'success');
+      } else {
+        showToast(data.error || 'Failed to refresh official results', 'error');
+      }
+    } catch (err: any) {
+      showToast(`Error checking official results: ${err.message}`, 'error');
+    } finally {
+      setIsRefreshingOfficial(false);
+    }
+  };
+
   const handleConfirmAllVerified = () => {
     setSheet(prev => ({
       ...prev,
@@ -776,10 +923,11 @@ export default function Home() {
         ...lot,
         isCheckedAgainstSource: true,
         aiVerified: true,
+        officialVerified: true,
         checkedAt: new Date().toISOString(),
       }))
     }));
-    showToast('✓ All lotteries confirmed and marked as verified!', 'success');
+    showToast('✓ All lotteries dual-verified (AI & Official Government) and confirmed!', 'success');
     setIsAiVerifyModalOpen(false);
   };
 
@@ -1169,24 +1317,24 @@ export default function Home() {
                   type="button"
                   onClick={() => handleRunAiVerify()}
                   disabled={isAiVerifying || sheet.sources.length === 0}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98] ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98] cursor-pointer ${
                     isAiVerifying
-                      ? 'bg-purple-100 text-purple-700 cursor-wait animate-pulse border border-purple-300'
-                      : aiStatusSummary?.hasDiscrepancy
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 cursor-pointer'
+                      ? 'bg-indigo-100 text-indigo-700 cursor-wait animate-pulse border border-indigo-300'
+                      : (aiStatusSummary?.hasDiscrepancy || aiStatusSummary?.hasOfficialDiscrepancy)
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 ring-2 ring-amber-300/50'
                       : aiStatusSummary?.verified
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer ring-2 ring-emerald-300/50'
-                      : 'bg-linear-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white cursor-pointer shadow-indigo-200 ring-2 ring-purple-400/30'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300/50'
+                      : 'bg-linear-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-700 hover:to-sky-700 text-white shadow-indigo-200 ring-2 ring-indigo-400/30'
                   }`}
-                  title="Run or view AI 2nd Verification Audit with OpenAI GPT-4o"
+                  title="Run or view Dual Verification (OpenAI GPT-4o Audit + NLB & DLB Government Match)"
                 >
                   <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isAiVerifying ? 'animate-spin' : ''}`} />
                   <span>
                     {isAiVerifying
-                      ? 'Auditing with AI GPT-4o...'
+                      ? 'Dual Auditing (AI & Gov)...'
                       : aiStatusSummary
-                      ? `AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total} Verified)`
-                      : 'AI 2nd Verify (OpenAI)'}
+                      ? `Dual Audit (${aiStatusSummary.verified}/${aiStatusSummary.total} Verified • ${aiStatusSummary.officialMatched} Gov)`
+                      : 'Dual Verification (AI + Gov)'}
                   </span>
                 </button>
 
@@ -1394,7 +1542,7 @@ export default function Home() {
         }}
       />
 
-      {/* AI Verification Report & Fix Modal */}
+      {/* Dual Verification Report & Fix Modal (AI + Official Gov) */}
       <AiVerificationModal
         isOpen={isAiVerifyModalOpen}
         onClose={() => setIsAiVerifyModalOpen(false)}
@@ -1402,7 +1550,11 @@ export default function Home() {
         isLoading={isAiVerifying}
         onApplySingleFix={handleApplySingleFix}
         onApplyAllFixes={handleApplyAllFixes}
+        onApplyOfficialFix={handleApplyOfficialFix}
+        onApplyAllOfficialFixes={handleApplyAllOfficialFixes}
         onConfirmAllVerified={handleConfirmAllVerified}
+        onRefreshOfficial={handleRefreshOfficial}
+        isRefreshingOfficial={isRefreshingOfficial}
       />
 
     </div>

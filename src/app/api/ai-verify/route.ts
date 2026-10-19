@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { STANDARD_LOTTERIES } from '@/lib/constants';
 import { LotteryResultItem, AiVerificationReport, AiLotteryAuditResult } from '@/types/lottery';
+import { fetchAllOfficialResults, compareSheetWithOfficial } from '@/lib/official-lottery-fetcher';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -206,22 +207,36 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
       text: userPromptText,
     });
 
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
+    // Concurrently trigger OpenAI verification audit AND official government results fetch (NLB & DLB)
+    const [openaiResSettled, officialResSettled] = await Promise.allSettled([
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+        }),
       }),
-    });
+      fetchAllOfficialResults(),
+    ]);
+
+    if (openaiResSettled.status === 'rejected') {
+      console.error('OpenAI verification fetch rejected:', openaiResSettled.reason);
+      return NextResponse.json(
+        { success: false, error: `Failed to contact OpenAI: ${openaiResSettled.reason?.message || 'Network error'}` },
+        { status: 500 }
+      );
+    }
+
+    const openaiRes = openaiResSettled.value;
 
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
@@ -330,6 +345,18 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
         remainingTokensPerMinute: rateLimitRemainingTokens,
         limitTokensPerMinute: rateLimitLimitTokens,
       },
+      officialVerification: (() => {
+        const officialFetchData = officialResSettled.status === 'fulfilled' ? officialResSettled.value : null;
+        if (officialFetchData && officialFetchData.lotteries && officialFetchData.lotteries.length > 0) {
+          try {
+            return compareSheetWithOfficial(lotteries, officialFetchData.lotteries);
+          } catch (compErr) {
+            console.warn('Failed to compare sheet with official results:', compErr);
+            return undefined;
+          }
+        }
+        return undefined;
+      })(),
     };
 
     return NextResponse.json({

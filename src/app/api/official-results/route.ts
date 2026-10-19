@@ -3,7 +3,8 @@ import {
   fetchNlbOfficialResults, 
   fetchDlbOfficialResults, 
   fetchAllOfficialResults, 
-  convertOfficialToSheetRows 
+  convertOfficialToSheetRows,
+  compareSheetWithOfficial
 } from '@/lib/official-lottery-fetcher';
 
 export const dynamic = 'force-dynamic';
@@ -47,10 +48,14 @@ export async function POST(req: NextRequest) {
     }
 
     const sheetRows = convertOfficialToSheetRows(data.lotteries);
+    const comparison = Array.isArray(body.lotteries) 
+      ? compareSheetWithOfficial(body.lotteries, data.lotteries)
+      : undefined;
 
     return NextResponse.json({
       ...data,
       convertedSheetRows: sheetRows,
+      comparison,
     });
   } catch (error: any) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
-import { LotteryResultItem, BoardType } from '@/types/lottery';
+import { LotteryResultItem, BoardType, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 
 export interface OfficialFetchedLottery {
   officialName: string;
@@ -421,3 +421,297 @@ export function convertOfficialToSheetRows(fetchedLotteries: OfficialFetchedLott
     };
   });
 }
+
+/**
+ * Normalizes Sinhala Zodiac signs to match canonical names
+ */
+function normalizeZodiacSi(val?: string | null): string {
+  if (!val) return '';
+  const clean = val.replace(/[\s\t\r\n\u0000]/g, '').trim();
+  if (clean.includes('කන්‍යා') || clean.includes('කනා') || clean.includes('කන') || clean.toLowerCase().includes('virgo')) {
+    return 'කන්‍යා';
+  }
+  const match = ZODIAC_SIGNS.find(z => z.si === clean || z.en.toLowerCase() === clean.toLowerCase());
+  return match ? match.si : clean;
+}
+
+/**
+ * Compares an array of daily sheet lotteries against live official government lotteries from NLB & DLB
+ */
+export function compareSheetWithOfficial(
+  sheetLotteries: LotteryResultItem[],
+  officialLotteries: OfficialFetchedLottery[]
+): OfficialVerificationSummary {
+  const results: OfficialLotteryMatchResult[] = [];
+  let matchedCount = 0;
+  let discrepancyCount = 0;
+  let notFoundCount = 0;
+
+  for (const def of STANDARD_LOTTERIES) {
+    const sheetItem = sheetLotteries.find(l => l.lotteryId === def.id) || {
+      lotteryId: def.id,
+      drawNo: '',
+      numbers: [],
+      isNoDraw: false,
+      isCheckedAgainstSource: false,
+    };
+
+    const officialItem = officialLotteries.find(o => o.matchedLotteryId === def.id)
+      || officialLotteries.find(o => {
+        const normO = normalizeName(o.officialName);
+        return normO === normalizeName(def.nameEn) || def.aliases.some(a => normalizeName(a) === normO);
+      });
+
+    if (!officialItem) {
+      notFoundCount++;
+      results.push({
+        lotteryId: def.id,
+        nameSi: def.nameSi,
+        nameEn: def.nameEn,
+        board: def.board,
+        officialFound: false,
+        status: 'not_found',
+        drawNoMatch: false,
+        numbersMatch: false,
+        letterMatch: false,
+        zodiacMatch: false,
+        bonusMatch: false,
+        sheetValues: {
+          drawNo: sheetItem.drawNo || '',
+          letter: sheetItem.letter,
+          zodiac: sheetItem.zodiac,
+          numbers: sheetItem.numbers || [],
+          bonusNumber: sheetItem.bonusNumber,
+          isNoDraw: !!sheetItem.isNoDraw,
+        },
+        discrepancies: ['Not found in live results from official government portal for this date'],
+      });
+      continue;
+    }
+
+    const discrepancies: string[] = [];
+    let drawNoMatch = true;
+    let letterMatch = true;
+    let zodiacMatch = true;
+    let numbersMatch = true;
+    let bonusMatch = true;
+
+    // 1. Draw Number check (tolerant of leading zeroes e.g. 0906 vs 906, 0007 vs 7)
+    const normSheetDraw = (sheetItem.drawNo || '').replace(/\D/g, '').replace(/^0+/, '') || '0';
+    const normOfficialDraw = (officialItem.drawNo || '').replace(/\D/g, '').replace(/^0+/, '') || '0';
+    if (normSheetDraw !== normOfficialDraw) {
+      drawNoMatch = false;
+      discrepancies.push(`Draw No: Sheet has "${sheetItem.drawNo}", Official has "${officialItem.drawNo}"`);
+    }
+
+    // 2. Letter check
+    if (def.requiresLetter) {
+      const sheetLetter = (sheetItem.letter || '').trim().toUpperCase();
+      const officialLetter = (officialItem.letter || '').trim().toUpperCase();
+      if (sheetLetter !== officialLetter) {
+        letterMatch = false;
+        discrepancies.push(`Letter: Sheet has "${sheetItem.letter || ''}", Official has "${officialItem.letter || ''}"`);
+      }
+    }
+
+    // 3. Zodiac check
+    if (def.requiresZodiac) {
+      const normSheetZodiac = normalizeZodiacSi(sheetItem.zodiac);
+      const normOfficialZodiac = normalizeZodiacSi(officialItem.zodiacSi || officialItem.zodiacEn);
+      if (normSheetZodiac !== normOfficialZodiac) {
+        zodiacMatch = false;
+        discrepancies.push(`Zodiac: Sheet has "${sheetItem.zodiac || ''}", Official has "${officialItem.zodiacSi || officialItem.zodiacEn || ''}"`);
+      }
+    }
+
+    // 4. Numbers check
+    const sheetNums = sheetItem.numbers || [];
+    const officialNums = officialItem.numbers || [];
+
+    if (def.isTieredDigits) {
+      // Ada Sampatha / Jaya Sampatha
+      const sheetDigits = sheetNums.join('').replace(/\D/g, '');
+      const officialDigits = officialNums.join('').replace(/\D/g, '');
+      if (sheetDigits !== officialDigits) {
+        numbersMatch = false;
+        discrepancies.push(`Tiered digits mismatch: Sheet has [${sheetNums.join(' / ')}], Official has [${officialNums.join(' / ')}]`);
+      }
+    } else if (def.fieldType === 'letter_and_digits') {
+      // Single-digit stream (e.g. Mahajana Sampatha 6 digits, Ayubo 4 digits, NLB Jaya 4 digits, Dhana Sampatha 6 digits)
+      const sheetDigits = sheetNums.join('').replace(/\D/g, '');
+      const officialDigits = officialNums.join('').replace(/\D/g, '');
+      if (sheetDigits !== officialDigits) {
+        numbersMatch = false;
+        discrepancies.push(`Digits mismatch: Sheet has "${sheetDigits}", Official has "${officialDigits}"`);
+      }
+    } else if (def.id === 'mega_power') {
+      // Mega Power: 4 regular + 1 super red ball
+      const allSheet = [...sheetNums];
+      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) allSheet.push(sheetItem.bonusNumber);
+      const allOfficial = [...officialNums];
+      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) allOfficial.push(officialItem.superNumber);
+
+      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+
+      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
+        numbersMatch = false;
+        discrepancies.push(`Numbers mismatch: Sheet has [${sheetNums.join(', ')}], Official has [${officialNums.join(', ')}] (Super: ${officialItem.superNumber || 'none'})`);
+      }
+    } else if (def.id === 'vasi') {
+      // Vasi: 2 regular + 1 special boxed
+      const allSheet = [...sheetNums];
+      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) {
+        allSheet.push(sheetItem.bonusNumber);
+      }
+      const allOfficial = [...officialNums];
+      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) {
+        allOfficial.push(officialItem.superNumber);
+      }
+      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
+        numbersMatch = false;
+        discrepancies.push(`Numbers mismatch: Sheet has [${allSheet.join(', ')}], Official has [${allOfficial.join(', ')}]`);
+      }
+    } else if (def.id === 'kapruka') {
+      // Kapruka: 5 numbers total (1 boxed + 4 regular)
+      const allSheet = [...sheetNums];
+      if (sheetItem.bonusNumber && !allSheet.includes(sheetItem.bonusNumber)) {
+        allSheet.unshift(sheetItem.bonusNumber);
+      }
+      const allOfficial = [...officialNums];
+      if (officialItem.superNumber && !allOfficial.includes(officialItem.superNumber)) {
+        allOfficial.unshift(officialItem.superNumber);
+      }
+      const normS = allSheet.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+      const normO = allOfficial.map(n => parseInt(n, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
+        numbersMatch = false;
+        discrepancies.push(`Numbers mismatch: Sheet has [${allSheet.join(', ')}], Official has [${allOfficial.join(', ')}]`);
+      }
+    } else {
+      // Standard regular 4 numbers or 3 numbers (Sasiri, Suba Dawasak)
+      const normS = sheetNums.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      const normO = officialNums.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+      if (normS.length !== normO.length || !normS.every((val, i) => val === normO[i])) {
+        numbersMatch = false;
+        discrepancies.push(`Numbers mismatch: Sheet has [${sheetNums.join(', ')}], Official has [${officialNums.join(', ')}]`);
+      }
+    }
+
+    // 5. Bonus Number check (Shanida Wasana, Super Ball, Lagna Wasana)
+    if (def.hasBonusNumber && def.id !== 'mega_power' && def.id !== 'kapruka') {
+      if (officialItem.superNumber) {
+        const cleanSheetBonus = (sheetItem.bonusNumber || '').replace(/\D/g, '');
+        const cleanOfficialBonus = (officialItem.superNumber || '').replace(/\D/g, '');
+        if (cleanSheetBonus && cleanOfficialBonus && cleanSheetBonus !== cleanOfficialBonus) {
+          bonusMatch = false;
+          discrepancies.push(`Bonus No: Sheet has "${sheetItem.bonusNumber}", Official has "${officialItem.superNumber}"`);
+        }
+      }
+    }
+
+    const isMatch = drawNoMatch && letterMatch && zodiacMatch && numbersMatch && bonusMatch;
+
+    if (isMatch) {
+      matchedCount++;
+    } else {
+      discrepancyCount++;
+    }
+
+    // Prepare suggested fix from official government result
+    let suggestedFix: Partial<LotteryResultItem> | undefined;
+    if (!isMatch) {
+      let formattedNumbers = [...officialNums];
+      if (def.isTieredDigits && officialNums.length === 9) {
+        formattedNumbers = [
+          officialNums.slice(0, 2).join(''),
+          officialNums.slice(2, 5).join(''),
+          officialNums.slice(5, 9).join(''),
+        ];
+      } else if (def.id === 'vasi' && officialItem.superNumber && formattedNumbers.length === 2) {
+        formattedNumbers = [formattedNumbers[0], formattedNumbers[1], officialItem.superNumber];
+      } else if (def.id === 'kapruka' && officialItem.superNumber && formattedNumbers.length === 4) {
+        formattedNumbers = [officialItem.superNumber, ...formattedNumbers];
+      } else if (def.id === 'mega_power' && officialItem.superNumber && formattedNumbers.length === 4) {
+        formattedNumbers = [officialItem.superNumber, ...formattedNumbers];
+      }
+
+      suggestedFix = {
+        drawNo: officialItem.drawNo || sheetItem.drawNo,
+        letter: officialItem.letter || sheetItem.letter,
+        zodiac: officialItem.zodiacSi || sheetItem.zodiac,
+        numbers: formattedNumbers,
+        bonusNumber: officialItem.superNumber || sheetItem.bonusNumber,
+      };
+    }
+
+    results.push({
+      lotteryId: def.id,
+      nameSi: def.nameSi,
+      nameEn: def.nameEn,
+      board: def.board,
+      officialFound: true,
+      status: isMatch ? 'match' : 'discrepancy',
+      drawNoMatch,
+      numbersMatch,
+      letterMatch,
+      zodiacMatch,
+      bonusMatch,
+      sheetValues: {
+        drawNo: sheetItem.drawNo || '',
+        letter: sheetItem.letter,
+        zodiac: sheetItem.zodiac,
+        numbers: sheetItem.numbers || [],
+        bonusNumber: sheetItem.bonusNumber,
+        isNoDraw: !!sheetItem.isNoDraw,
+      },
+      officialValues: {
+        officialName: officialItem.officialName,
+        drawNo: officialItem.drawNo,
+        drawDate: officialItem.drawDate,
+        letter: officialItem.letter,
+        zodiacEn: officialItem.zodiacEn,
+        zodiacSi: officialItem.zodiacSi,
+        numbers: officialItem.numbers,
+        superNumber: officialItem.superNumber,
+        board: officialItem.board,
+      },
+      discrepancies,
+      suggestedFix,
+    });
+  }
+
+  const overallStatus = discrepancyCount === 0 && notFoundCount === 0 
+    ? 'all_matched' 
+    : discrepancyCount > 0 
+    ? 'discrepancies_found' 
+    : 'partial_found';
+
+  const summary = discrepancyCount === 0 
+    ? `All ${matchedCount} lotteries 100% matched with official government portals (NLB & DLB Ground Truth).`
+    : `${discrepancyCount} discrepancy found between uploaded sheet and live official government results.`;
+
+  return {
+    timestamp: new Date().toISOString(),
+    fetchedAt: new Date().toISOString(),
+    drawDate: officialLotteries[0]?.drawDate || null,
+    totalLotteries: results.length,
+    matchedCount,
+    discrepancyCount,
+    notFoundCount,
+    overallStatus,
+    summary,
+    results,
+  };
+}
+
+/**
+ * Convenience function to fetch official results live and run full verification against sheet
+ */
+export async function verifySheetAgainstOfficialLive(sheetLotteries: LotteryResultItem[]): Promise<OfficialVerificationSummary> {
+  const officialRes = await fetchAllOfficialResults();
+  return compareSheetWithOfficial(sheetLotteries, officialRes.lotteries);
+}
+

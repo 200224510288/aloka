@@ -55,6 +55,12 @@ export interface LotteryResultItem {
   aiVerified?: boolean;
   aiDiscrepancy?: string;
   aiConfidence?: number;
+
+  // Official Government Live Verification (NLB / DLB)
+  officialVerified?: boolean;
+  officialDiscrepancy?: string;
+  officialDrawNo?: string;
+  officialMatchedAt?: string;
 }
 
 export interface SourceDocument {
@@ -221,7 +227,57 @@ export interface AiVerificationReport {
     remainingTokensPerMinute?: string | null;
     limitTokensPerMinute?: string | null;
   };
+  officialVerification?: OfficialVerificationSummary;
 }
+
+export interface OfficialLotteryMatchResult {
+  lotteryId: string;
+  nameSi: string;
+  nameEn: string;
+  board: BoardType;
+  officialFound: boolean;
+  status: 'match' | 'discrepancy' | 'not_found' | 'unverified';
+  drawNoMatch: boolean;
+  numbersMatch: boolean;
+  letterMatch: boolean;
+  zodiacMatch: boolean;
+  bonusMatch: boolean;
+  sheetValues: {
+    drawNo: string;
+    letter?: string;
+    zodiac?: string;
+    numbers: string[];
+    bonusNumber?: string;
+    isNoDraw?: boolean;
+  };
+  officialValues?: {
+    officialName: string;
+    drawNo: string;
+    drawDate: string;
+    letter?: string | null;
+    zodiacEn?: string | null;
+    zodiacSi?: string | null;
+    numbers: string[];
+    superNumber?: string | null;
+    board: BoardType;
+  };
+  discrepancies: string[];
+  suggestedFix?: Partial<LotteryResultItem>;
+}
+
+export interface OfficialVerificationSummary {
+  timestamp: string;
+  fetchedAt: string;
+  drawDate?: string | null;
+  totalLotteries: number;
+  matchedCount: number;
+  discrepancyCount: number;
+  notFoundCount: number;
+  overallStatus: 'all_matched' | 'discrepancies_found' | 'partial_found';
+  summary: string;
+  results: OfficialLotteryMatchResult[];
+}
+
 
 
 
