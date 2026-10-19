@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, AlertTriangle, FileDown, History, Save, Building2, Sparkles, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, Globe } from 'lucide-react';
+import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown } from 'lucide-react';
 import { DailySheet } from '@/types/lottery';
 import { WorkflowStep } from './StepNavigation';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -101,18 +101,6 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
 
-            {/* Quick Sample Button (Only in Editor Mode) */}
-            {pageMode === 'editor' && onLoadSample && (
-              <button
-                type="button"
-                onClick={onLoadSample}
-                className="hidden lg:flex items-center gap-1 text-[11px] font-semibold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 rounded-lg px-2.5 py-1 transition"
-                title="Load wireframe sample data (2026.10.05)"
-              >
-                <Sparkles className="w-3 h-3 text-amber-600" />
-                <span>Load Sample</span>
-              </button>
-            )}
           </div>
 
           {/* Right: Dealer Info & Primary Actions */}
@@ -228,29 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="text-[11px] font-sinhala">(මුද්‍රණ පුවරුව)</span>
                 </Link>
 
-                {onOpenHistory && (
-                  <button
-                    type="button"
-                    onClick={onOpenHistory}
-                    className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 flex items-center gap-1.5 transition shadow-2xs"
-                    title="View revision history"
-                  >
-                    <History className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="hidden sm:inline">Revisions</span>
-                  </button>
-                )}
 
-                {onSave && (
-                  <button
-                    type="button"
-                    onClick={onSave}
-                    disabled={isSaving}
-                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{isSaving ? 'Saving...' : 'Save'}</span>
-                  </button>
-                )}
 
                 {currentStep === 'setup' && onStepChange && (
                   <button
