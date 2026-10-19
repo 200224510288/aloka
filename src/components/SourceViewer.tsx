@@ -110,6 +110,55 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
     // Step 2: Active document has a valid path (blob, data-url, or server url)
     if (activeDoc.filePath.startsWith('blob:') || activeDoc.filePath.startsWith('/') || activeDoc.filePath.startsWith('http')) {
+      if (activeDoc.filePath.startsWith('/') || activeDoc.filePath.startsWith('http')) {
+        // Verify if server file exists to prevent 404 broken PDF viewer on Vercel
+        fetch(activeDoc.filePath, { method: 'HEAD' })
+          .then((res) => {
+            if (isCancelled) return;
+            if (res.ok) {
+              setPdfBlobUrl(activeDoc.filePath);
+              if (activeDoc.fileType === 'pdf') {
+                renderPdfPageToDataUrl(activeDoc.filePath).then((dataUrl) => {
+                  if (!isCancelled && dataUrl) {
+                    setPdfCanvasPreviewUrl(dataUrl);
+                  }
+                });
+              }
+            } else {
+              // Missing on server (404 on Vercel) -> check local IndexedDB
+              console.warn(`Source file not found on server (${activeDoc.filePath}), checking IndexedDB fallback...`);
+              getCachedFile(activeDoc.id, activeDoc.fileName).then((cachedBlob) => {
+                if (isCancelled) return;
+                if (cachedBlob) {
+                  const url = URL.createObjectURL(cachedBlob);
+                  createdUrlToRevoke = url;
+                  setPdfBlobUrl(url);
+                  if (activeDoc.fileType === 'pdf') {
+                    renderPdfPageToDataUrl(cachedBlob).then((dataUrl) => {
+                      if (!isCancelled && dataUrl) {
+                        setPdfCanvasPreviewUrl(dataUrl);
+                      }
+                    });
+                  }
+                } else {
+                  // Not available: avoid black 404 screen, show verified text/re-upload card
+                  setPdfBlobUrl('');
+                  setPdfCanvasPreviewUrl('');
+                  if (activeDoc.extractedText) {
+                    setViewMode('text');
+                  }
+                }
+              });
+            }
+          })
+          .catch(() => {
+            if (!isCancelled) {
+              setPdfBlobUrl(activeDoc.filePath);
+            }
+          });
+        return;
+      }
+
       setPdfBlobUrl(activeDoc.filePath);
       if (activeDoc.fileType === 'pdf') {
         renderPdfPageToDataUrl(activeDoc.filePath).then((dataUrl) => {
