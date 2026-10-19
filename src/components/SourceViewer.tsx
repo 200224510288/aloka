@@ -259,7 +259,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           ? 'bg-amber-50 text-amber-900 border-amber-200' 
           : aiStatusSummary?.verified 
           ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-          : 'bg-blue-50/60 text-blue-800 border-blue-100'
+          : 'bg-indigo-50/80 text-indigo-950 border-indigo-200'
       }`}>
         {aiStatusSummary ? (
           <div className="flex items-center gap-1.5">
@@ -269,12 +269,30 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               {aiStatusSummary.hasDiscrepancy ? ' (Discrepancies Found - Click AI 2nd Verify to review)' : ' (All matching raw source)'}
             </span>
           </div>
+        ) : sources.length > 0 && onRunAiVerify ? (
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+              <span>Source attached. Audit winning numbers against raw source with OpenAI GPT-4o:</span>
+            </div>
+            <button
+              type="button"
+              onClick={onRunAiVerify}
+              disabled={isAiVerifying}
+              className="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1 transition"
+            >
+              <Sparkles className={`w-3 h-3 text-amber-300 ${isAiVerifying ? 'animate-spin' : ''}`} />
+              <span>{isAiVerifying ? 'Auditing...' : 'Run AI Verify Now'}</span>
+            </button>
+          </div>
         ) : (
-          <span>⚠️ Check winning digits manually against uploaded source image.</span>
+          <span>Upload source PDF or image — OpenAI GPT-4o auto-verifies extracted digits.</span>
         )}
-        <span className="font-semibold text-slate-500">
-          {aiStatusSummary ? 'OpenAI GPT-4o Audited' : 'Not official verification'}
-        </span>
+        {aiStatusSummary && (
+          <span className="font-semibold text-slate-500">
+            OpenAI GPT-4o Audited
+          </span>
+        )}
       </div>
 
       {/* Source selector tabs */}
@@ -340,9 +358,13 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               <Upload className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-slate-800 mb-1">Upload Daily Result Source</h3>
-            <p className="text-xs text-slate-500 max-w-xs mb-4">
+            <p className="text-xs text-slate-500 max-w-xs mb-3">
               Drag and drop lottery result sheet PDF, JPG, or PNG here, or click to browse.
             </p>
+            <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 border border-purple-200 rounded-full text-[11px] font-bold text-purple-800">
+              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+              <span>Auto AI 2nd Verification with OpenAI GPT-4o</span>
+            </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}

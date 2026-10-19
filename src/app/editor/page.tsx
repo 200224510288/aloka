@@ -440,6 +440,12 @@ export default function Home() {
         if (currentStep === 'setup') {
           setCurrentStep('verify');
         }
+
+        // Automatically trigger AI second verification & show audit modal!
+        showToast('🤖 File extracted! Automatically launching AI Second Verification...', 'info');
+        setTimeout(() => {
+          handleRunAiVerify(newSheet, clientSourceDoc);
+        }, 300);
       } else {
         showToast(`Extraction failed: ${data.error}`, 'error');
       }
@@ -622,8 +628,11 @@ export default function Home() {
   };
 
   // AI Second Verification against raw document
-  const handleRunAiVerify = async () => {
-    if (sheet.sources.length === 0) {
+  const handleRunAiVerify = async (targetSheet?: DailySheet, targetSource?: SourceDocument) => {
+    const currentTargetSheet = targetSheet || sheet;
+    const activeSource = targetSource || currentTargetSheet.sources[0];
+
+    if (!activeSource) {
       showToast('Please upload a source document first to audit against', 'info');
       return;
     }
@@ -632,13 +641,12 @@ export default function Home() {
     setIsAiVerifyModalOpen(true);
 
     try {
-      const activeSource = sheet.sources[0];
       const res = await fetch('/api/ai-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: sheet.date,
-          lotteries: sheet.lotteries,
+          date: currentTargetSheet.date,
+          lotteries: currentTargetSheet.lotteries,
           rawText: activeSource.extractedText,
           imageBase64: activeSource.previewImageUrl?.startsWith('data:image/') ? activeSource.previewImageUrl : undefined,
           sourceFileName: activeSource.fileName,
@@ -1000,6 +1008,47 @@ export default function Home() {
 
             </div>
 
+            {/* Auto AI Verification Info Banner in Step 1 */}
+            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Sparkles className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-extrabold text-purple-950">
+                      OpenAI GPT-4o Second Verification
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Auto-Runs on Upload
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-800/80 mt-0.5">
+                    Whenever you upload a result sheet, OpenAI automatically audits raw PDF text against extracted numbers, letters, and zodiac signs.
+                  </p>
+                </div>
+              </div>
+
+              {sheet.sources.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleRunAiVerify()}
+                  disabled={isAiVerifying}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] shrink-0 cursor-pointer"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin' : 'text-amber-300'}`} />
+                  <span>
+                    {isAiVerifying
+                      ? 'Auditing...'
+                      : aiStatusSummary
+                      ? `Re-run AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'Run AI 2nd Verification Now'}
+                  </span>
+                </button>
+              )}
+            </div>
+
             {/* Source Documents Card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
               <div className="flex items-center justify-between mb-4">
@@ -1114,26 +1163,26 @@ export default function Home() {
                 {/* AI 2nd Verification Button */}
                 <button
                   type="button"
-                  onClick={handleRunAiVerify}
-                  disabled={isAiVerifying}
+                  onClick={() => handleRunAiVerify()}
+                  disabled={isAiVerifying || sheet.sources.length === 0}
                   className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98] ${
                     isAiVerifying
                       ? 'bg-purple-100 text-purple-700 cursor-wait animate-pulse border border-purple-300'
                       : aiStatusSummary?.hasDiscrepancy
                       ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 cursor-pointer'
                       : aiStatusSummary?.verified
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                      : 'bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white cursor-pointer'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer ring-2 ring-emerald-300/50'
+                      : 'bg-linear-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white cursor-pointer shadow-indigo-200 ring-2 ring-purple-400/30'
                   }`}
-                  title="Run AI 2nd Verification against raw source document"
+                  title="Run or view AI 2nd Verification Audit with OpenAI GPT-4o"
                 >
-                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin' : ''}`} />
+                  <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isAiVerifying ? 'animate-spin' : ''}`} />
                   <span>
                     {isAiVerifying
-                      ? 'Auditing with AI...'
+                      ? 'Auditing with AI GPT-4o...'
                       : aiStatusSummary
-                      ? `AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                      : 'AI 2nd Verify'}
+                      ? `AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total} Verified)`
+                      : 'AI 2nd Verify (OpenAI)'}
                   </span>
                 </button>
 
