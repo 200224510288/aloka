@@ -113,15 +113,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Load Sample</span>
               </button>
             )}
-
-            <Link
-              href="/official-results"
-              className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100/80 border border-blue-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
-              title="Official Website Live Fetcher (nlb.lk)"
-            >
-              <Globe className="w-3.5 h-3.5 text-blue-600" />
-              <span>Official Fetcher (NLB)</span>
-            </Link>
           </div>
 
           {/* Right: Dealer Info & Primary Actions */}

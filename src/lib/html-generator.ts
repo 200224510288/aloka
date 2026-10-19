@@ -81,7 +81,17 @@ export function renderSingleSheet(sheet: DailySheet, isHighDensity = false, opti
 
       // Tiered digits (e.g. 32 / 432 / 2432 / O)
       if (def.isTieredDigits) {
-        const nums = item.numbers || [];
+        let nums = item.numbers || [];
+        if (nums.length === 9) {
+          nums = [
+            nums.slice(0, 2).join(''),
+            nums.slice(2, 5).join(''),
+            nums.slice(5, 9).join(''),
+          ];
+        } else if (nums.length === 4) {
+          const d4 = nums.join('');
+          nums = [d4.slice(2), d4.slice(1), d4];
+        }
         const tieredHtml = nums.map(n => `<span class="number-item">${escapeHtml(n)}</span>`).join('<span class="tiered-sep">/</span>');
         parts.push(tieredHtml);
         if (item.letter) {

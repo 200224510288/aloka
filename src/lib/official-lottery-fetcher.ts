@@ -177,15 +177,33 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
       const superNumMatch = block.match(/<li[^>]*title="Super Number"[^>]*>([\s\S]*?)<\/li>/i);
       const superNumber = superNumMatch ? superNumMatch[1].trim() : null;
 
+      const matchedDef = findMatchingLottery(officialName, 'NLB');
+
       // Winning Numbers
-      const numberMatches = [...block.matchAll(/<li[^>]*title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
+      const rawNumberMatches = [...block.matchAll(/<li[^>]*title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
         .map(m => m[1].trim());
+
+      // For tiered lotteries (e.g. Ada Sampatha), each row on official site is 1 number:
+      // Row 1 (2 balls) -> e.g. "55"
+      // Row 2 (3 balls) -> e.g. "855"
+      // Row 3 (4 balls) -> e.g. "4855"
+      let finalNumbers = rawNumberMatches;
+      if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+        if (rawNumberMatches.length === 9) {
+          finalNumbers = [
+            rawNumberMatches.slice(0, 2).join(''),
+            rawNumberMatches.slice(2, 5).join(''),
+            rawNumberMatches.slice(5, 9).join(''),
+          ];
+        } else if (rawNumberMatches.length === 4) {
+          const d4 = rawNumberMatches.join('');
+          finalNumbers = [d4.slice(2), d4.slice(1), d4];
+        }
+      }
 
       // Logo URL
       const logoMatch = block.match(/data-src="([^"]+)"/i);
       const logoUrl = logoMatch ? `https://www.nlb.lk/${logoMatch[1]}` : null;
-
-      const matchedDef = findMatchingLottery(officialName, 'NLB');
 
       lotteries.push({
         officialName,
@@ -199,7 +217,7 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
         zodiacSi: zodiacDetails?.si || null,
         zodiacSymbol: zodiacDetails?.symbol || null,
         superNumber,
-        numbers: numberMatches,
+        numbers: finalNumbers,
         logoUrl,
         board: 'NLB',
         rawBlockPreview: block.slice(0, 300),
@@ -318,6 +336,24 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
       }
 
       const matchedDef = findMatchingLottery(officialName, 'DLB');
+
+      // For tiered lotteries (e.g. Jaya Sampatha), 1 row = 1 number:
+      // If DLB gives 4 individual digits "0", "5", "1", "3", expand into the 3 tiers:
+      // Tier 1 (2 digits) -> "13"
+      // Tier 2 (3 digits) -> "513"
+      // Tier 3 (4 digits) -> "0513"
+      if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+        if (regularNumbers.length === 4) {
+          const d4 = regularNumbers.join('');
+          regularNumbers = [d4.slice(2), d4.slice(1), d4];
+        } else if (regularNumbers.length === 9) {
+          regularNumbers = [
+            regularNumbers.slice(0, 2).join(''),
+            regularNumbers.slice(2, 5).join(''),
+            regularNumbers.slice(5, 9).join(''),
+          ];
+        }
+      }
 
       lotteries.push({
         officialName,
@@ -530,11 +566,24 @@ export function compareSheetWithOfficial(
 
     if (def.isTieredDigits) {
       // Ada Sampatha / Jaya Sampatha
-      const sheetDigits = sheetNums.join('').replace(/\D/g, '');
-      const officialDigits = officialNums.join('').replace(/\D/g, '');
-      if (sheetDigits !== officialDigits) {
+      // "one row mean 1 number" -> e.g. ["55", "855", "4855"]
+      const normalizeTiered = (arr: string[]): string[] => {
+        if (arr.length === 9) {
+          return [arr.slice(0, 2).join(''), arr.slice(2, 5).join(''), arr.slice(5, 9).join('')];
+        }
+        if (arr.length === 4) {
+          const d4 = arr.join('');
+          return [d4.slice(2), d4.slice(1), d4];
+        }
+        return arr;
+      };
+
+      const normS = normalizeTiered(sheetNums);
+      const normO = normalizeTiered(officialNums);
+
+      if (normS.join('/') !== normO.join('/')) {
         numbersMatch = false;
-        discrepancies.push(`Tiered digits mismatch: Sheet has [${sheetNums.join(' / ')}], Official has [${officialNums.join(' / ')}]`);
+        discrepancies.push(`Tiered digits mismatch: Sheet has [${normS.join(' / ')}], Official has [${normO.join(' / ')}]`);
       }
     } else if (def.fieldType === 'letter_and_digits') {
       // Single-digit stream (e.g. Mahajana Sampatha 6 digits, Ayubo 4 digits, NLB Jaya 4 digits, Dhana Sampatha 6 digits)
@@ -624,12 +673,17 @@ export function compareSheetWithOfficial(
     let suggestedFix: Partial<LotteryResultItem> | undefined;
     if (!isMatch) {
       let formattedNumbers = [...officialNums];
-      if (def.isTieredDigits && officialNums.length === 9) {
-        formattedNumbers = [
-          officialNums.slice(0, 2).join(''),
-          officialNums.slice(2, 5).join(''),
-          officialNums.slice(5, 9).join(''),
-        ];
+      if (def.isTieredDigits) {
+        if (officialNums.length === 9) {
+          formattedNumbers = [
+            officialNums.slice(0, 2).join(''),
+            officialNums.slice(2, 5).join(''),
+            officialNums.slice(5, 9).join(''),
+          ];
+        } else if (officialNums.length === 4) {
+          const d4 = officialNums.join('');
+          formattedNumbers = [d4.slice(2), d4.slice(1), d4];
+        }
       } else if (def.id === 'vasi' && officialItem.superNumber && formattedNumbers.length === 2) {
         formattedNumbers = [formattedNumbers[0], formattedNumbers[1], officialItem.superNumber];
       } else if (def.id === 'kapruka' && officialItem.superNumber && formattedNumbers.length === 4) {

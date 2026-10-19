@@ -31,7 +31,6 @@ export default function OfficialResultsExperimentPage() {
   const router = useRouter();
   const [data, setData] = useState<OfficialFetchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState<'all' | 'dlb' | 'nlb'>('all');
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'cards' | 'comparison' | 'inspector'>('cards');
@@ -111,74 +110,6 @@ export default function OfficialResultsExperimentPage() {
 
   const targetDateIso = getIsoDate(data?.drawDate);
 
-  // Import into Daily Sheet
-  const handleImportToEditor = async () => {
-    if (!data || data.lotteries.length === 0) return;
-    setIsImporting(true);
-    try {
-      // 1. Fetch current sheet for date
-      const sheetRes = await fetch(`/api/sheet?date=${targetDateIso}`);
-      let currentSheet = null;
-      if (sheetRes.ok) {
-        const sheetData = await sheetRes.json();
-        currentSheet = sheetData.sheet;
-      }
-
-      if (!currentSheet) {
-        throw new Error('Failed to load target sheet for date ' + targetDateIso);
-      }
-
-      // 2. Merge official lotteries into sheet
-      let importCount = 0;
-      const updatedLotteries = currentSheet.lotteries.map((existing: any) => {
-        const officialMatch = data.lotteries.find(
-          l => l.matchedLotteryId === existing.lotteryId
-        );
-        if (!officialMatch) return existing;
-
-        importCount++;
-        return {
-          ...existing,
-          drawNo: officialMatch.drawNo,
-          letter: officialMatch.letter || existing.letter,
-          zodiac: officialMatch.zodiacSi || existing.zodiac,
-          numbers: officialMatch.numbers.length > 0 ? officialMatch.numbers : existing.numbers,
-          bonusNumber: officialMatch.superNumber || existing.bonusNumber,
-          isVerified: true,
-          verificationNotes: `Verified from Official ${officialMatch.board} website on ${new Date().toLocaleTimeString()}`,
-          isNoDraw: false,
-        };
-      });
-
-      const updatedSheet = {
-        ...currentSheet,
-        lotteries: updatedLotteries,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // 3. Save sheet
-      const saveRes = await fetch('/api/sheet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet: updatedSheet,
-          summary: `Imported ${importCount} official lotteries directly from ${data.boards?.join(' & ') || 'official sites'}`,
-        }),
-      });
-
-      if (!saveRes.ok) {
-        throw new Error('Failed to save imported results to server');
-      }
-
-      // 4. Redirect to editor
-      router.push(`/editor?date=${targetDateIso}`);
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Import failed');
-      setIsImporting(false);
-    }
-  };
-
   const filteredLotteries = data?.lotteries.filter(item => {
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase();
@@ -253,17 +184,13 @@ export default function OfficialResultsExperimentPage() {
               <span>{isLoading ? 'Fetching Official...' : 'Fetch Live Results'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleImportToEditor}
-              disabled={isImporting || !data || data.lotteries.length === 0}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center gap-2 shadow-sm transition disabled:opacity-50"
-              title={`Import ${data?.matchedCount || 0} official lotteries directly into sheet for ${targetDateIso}`}
+            <Link
+              href={`/editor?date=${targetDateIso}`}
+              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white flex items-center gap-2 shadow-sm transition border border-slate-700"
             >
-              <DownloadCloud className={`w-3.5 h-3.5 ${isImporting ? 'animate-bounce' : ''}`} />
-              <span>{isImporting ? 'Importing...' : `Import All ${data?.matchedCount || 0} into Editor (${targetDateIso})`}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Editor</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -553,15 +480,10 @@ export default function OfficialResultsExperimentPage() {
                   Showing how official NLB and DLB results connect to the 18 standard rows on the A4 landscape sheet.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleImportToEditor}
-                disabled={isImporting || !data || data.lotteries.length === 0}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition disabled:opacity-50"
-              >
-                <DownloadCloud className="w-3.5 h-3.5" />
-                <span>Import All {data?.matchedCount || 0} into Editor Sheet</span>
-              </button>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Reference view only • Dual AI & Official Verification runs inside Editor after upload</span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">

@@ -246,43 +246,59 @@ export const LotteryRowEditor: React.FC<LotteryRowEditorProps> = ({
                 Winning Digits:
               </span>
 
-              {definition.isTieredDigits ? (
-                /* Tiered Digits: 2-digit / 3-digit / 4-digit / Letter */
-                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                  <input
-                    type="text"
-                    value={item.numbers?.[0] || ''}
-                    onChange={(e) => handleNumberChange(0, e.target.value)}
-                    placeholder="2-dig"
-                    className="w-16 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
-                  />
-                  <span className="text-slate-400 font-black text-lg">/</span>
-                  <input
-                    type="text"
-                    value={item.numbers?.[1] || ''}
-                    onChange={(e) => handleNumberChange(1, e.target.value)}
-                    placeholder="3-dig"
-                    className="w-20 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
-                  />
-                  <span className="text-slate-400 font-black text-lg">/</span>
-                  <input
-                    type="text"
-                    value={item.numbers?.[2] || ''}
-                    onChange={(e) => handleNumberChange(2, e.target.value)}
-                    placeholder="4-dig"
-                    className="w-24 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
-                  />
-                  <span className="text-slate-400 font-black text-lg">/</span>
-                  <input
-                    type="text"
-                    maxLength={2}
-                    value={item.letter || ''}
-                    onChange={(e) => updateField({ letter: e.target.value.toUpperCase() })}
-                    placeholder="Let"
-                    className="w-14 h-10 px-1 text-lg font-black font-sans border-2 border-slate-300 rounded-lg bg-white text-center uppercase focus:border-blue-600 outline-none shadow-2xs transition"
-                  />
-                </div>
-              ) : (
+              {definition.isTieredDigits ? (() => {
+                const raw = item.numbers || [];
+                const tieredNums = raw.length === 9
+                  ? [raw.slice(0, 2).join(''), raw.slice(2, 5).join(''), raw.slice(5, 9).join('')]
+                  : (raw.length === 4 ? [raw.slice(2).join(''), raw.slice(1).join(''), raw.join('')] : raw);
+
+                return (
+                  /* Tiered Digits: 2-digit / 3-digit / 4-digit / Letter */
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                    <input
+                      type="text"
+                      value={tieredNums[0] || ''}
+                      onChange={(e) => {
+                        const next = [e.target.value, tieredNums[1] || '', tieredNums[2] || ''];
+                        updateField({ numbers: next });
+                      }}
+                      placeholder="2-dig"
+                      className="w-16 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
+                    />
+                    <span className="text-slate-400 font-black text-lg">/</span>
+                    <input
+                      type="text"
+                      value={tieredNums[1] || ''}
+                      onChange={(e) => {
+                        const next = [tieredNums[0] || '', e.target.value, tieredNums[2] || ''];
+                        updateField({ numbers: next });
+                      }}
+                      placeholder="3-dig"
+                      className="w-20 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
+                    />
+                    <span className="text-slate-400 font-black text-lg">/</span>
+                    <input
+                      type="text"
+                      value={tieredNums[2] || ''}
+                      onChange={(e) => {
+                        const next = [tieredNums[0] || '', tieredNums[1] || '', e.target.value];
+                        updateField({ numbers: next });
+                      }}
+                      placeholder="4-dig"
+                      className="w-24 h-10 px-1 text-lg font-mono font-black border-2 border-slate-300 rounded-lg bg-white text-center focus:border-blue-600 outline-none shadow-2xs transition"
+                    />
+                    <span className="text-slate-400 font-black text-lg">/</span>
+                    <input
+                      type="text"
+                      maxLength={2}
+                      value={item.letter || ''}
+                      onChange={(e) => updateField({ letter: e.target.value.toUpperCase() })}
+                      placeholder="Let"
+                      className="w-14 h-10 px-1 text-lg font-black font-sans border-2 border-slate-300 rounded-lg bg-white text-center uppercase focus:border-blue-600 outline-none shadow-2xs transition"
+                    />
+                  </div>
+                );
+              })() : (
                 /* Regular Numbers / Digits */
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   {Array.from({ length: definition.numberCount }).map((_, idx) => {

@@ -143,7 +143,14 @@ export function computeRowMetrics(
 
   // 3. Tiered digits
   if (def.isTieredDigits) {
-    const tieredStr = (item.numbers || []).join('/') + (item.letter ? `/${item.letter}` : '');
+    let nums = item.numbers || [];
+    if (nums.length === 9) {
+      nums = [nums.slice(0, 2).join(''), nums.slice(2, 5).join(''), nums.slice(5, 9).join('')];
+    } else if (nums.length === 4) {
+      const d4 = nums.join('');
+      nums = [d4.slice(2), d4.slice(1), d4];
+    }
+    const tieredStr = nums.join('/') + (item.letter ? `/${item.letter}` : '');
     items.push({
       type: 'tiered',
       text: tieredStr,
