@@ -11,6 +11,7 @@ import { FooterEditor } from '@/components/FooterEditor';
 import { SheetPreview } from '@/components/SheetPreview';
 import { RevisionsModal } from '@/components/RevisionsModal';
 import { AiVerificationModal } from '@/components/AiVerificationModal';
+import { OfficialVerificationModal } from '@/components/OfficialVerificationModal';
 import { directPrintSheet } from '@/lib/direct-print';
 import { DateHistoryBar } from '@/components/DateHistoryBar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -66,11 +67,16 @@ export default function Home() {
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
 
-  // AI & Official Verification states
+  // AI Verification states
   const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState<boolean>(false);
   const [isAiVerifying, setIsAiVerifying] = useState<boolean>(false);
-  const [isRefreshingOfficial, setIsRefreshingOfficial] = useState<boolean>(false);
   const [aiVerificationReport, setAiVerificationReport] = useState<AiVerificationReport | null>(null);
+
+  // Official Government Verification states
+  const [isOfficialVerifyModalOpen, setIsOfficialVerifyModalOpen] = useState<boolean>(false);
+  const [isOfficialVerifying, setIsOfficialVerifying] = useState<boolean>(false);
+  const [isRefreshingOfficial, setIsRefreshingOfficial] = useState<boolean>(false);
+  const [officialVerificationSummary, setOfficialVerificationSummary] = useState<OfficialVerificationSummary | null>(null);
 
   const aiStatusSummary = useMemo(() => {
     if (!aiVerificationReport) return undefined;
@@ -83,6 +89,16 @@ export default function Home() {
       hasOfficialDiscrepancy: (aiVerificationReport.officialVerification?.discrepancyCount ?? 0) > 0,
     };
   }, [aiVerificationReport]);
+
+  const officialStatusSummary = useMemo(() => {
+    const summary = officialVerificationSummary || aiVerificationReport?.officialVerification;
+    if (!summary) return undefined;
+    return {
+      matched: summary.matchedCount,
+      total: summary.totalLotteries,
+      hasDiscrepancy: summary.discrepancyCount > 0,
+    };
+  }, [officialVerificationSummary, aiVerificationReport]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -445,11 +461,8 @@ export default function Home() {
           setCurrentStep('verify');
         }
 
-        // Automatically trigger AI second verification & show audit modal!
-        showToast('🤖 File extracted! Automatically launching AI Second Verification...', 'info');
-        setTimeout(() => {
-          handleRunAiVerify(newSheet, clientSourceDoc);
-        }, 300);
+        // Document extracted - verification is optional and available on demand
+        showToast('📄 Document extracted successfully! You can run AI or Official verification when ready.', 'success');
       } else {
         showToast(`Extraction failed: ${data.error}`, 'error');
       }
@@ -631,7 +644,7 @@ export default function Home() {
     showToast(`✓ All ${verifiedCount} valid lotteries confirmed in 1 click!`, 'success');
   };
 
-  // AI & Official Government Verification against raw document and live portals
+  // AI Verification against raw uploaded source document
   const handleRunAiVerify = async (targetSheet?: any, targetSource?: SourceDocument) => {
     // Defensively check if targetSheet is an actual DailySheet or a SyntheticEvent from onClick
     const isActualSheet = targetSheet && typeof targetSheet === 'object' && !('nativeEvent' in targetSheet) && !('preventDefault' in targetSheet) && ('lotteries' in targetSheet);
@@ -665,35 +678,22 @@ export default function Home() {
       if (data.success && data.report) {
         setAiVerificationReport(data.report);
 
-        // Auto-tag verified lotteries and discrepancies on rows for BOTH AI & Official
-        const officialResults = data.report.officialVerification?.results;
-
+        // Auto-tag verified lotteries and discrepancies on rows for AI
         setSheet(prev => ({
           ...prev,
           lotteries: prev.lotteries.map(lot => {
             const audit = data.report.results.find((r: AiLotteryAuditResult) => r.lotteryId === lot.lotteryId);
-            const offMatch = officialResults?.find((o: OfficialLotteryMatchResult) => o.lotteryId === lot.lotteryId);
 
             return {
               ...lot,
               aiVerified: audit ? audit.status === 'verified' : lot.aiVerified,
               aiDiscrepancy: audit?.status === 'mismatch' ? audit.discrepancies?.[0] : undefined,
-              officialVerified: offMatch ? offMatch.status === 'match' : lot.officialVerified,
-              officialDiscrepancy: offMatch?.status === 'discrepancy' ? offMatch.discrepancies?.[0] : undefined,
-              officialDrawNo: offMatch?.officialValues?.drawNo || lot.officialDrawNo,
-              officialMatchedAt: offMatch ? new Date().toISOString() : lot.officialMatchedAt,
             };
           })
         }));
 
-        const aiAllMatch = data.report.mismatchCount === 0;
-        const offSummary = data.report.officialVerification;
-        const offAllMatch = !offSummary || offSummary.discrepancyCount === 0;
-
-        if (aiAllMatch && offAllMatch) {
-          showToast(`✓ Dual Verification 100% Match! AI Document (${data.report.verifiedCount}/18) & Official Government Ground Truth (${offSummary?.matchedCount ?? 18}/18) verified!`, 'success');
-        } else if (!offAllMatch) {
-          showToast(`⚠️ Official Government Audit: ${offSummary?.discrepancyCount} difference flagged against live NLB/DLB results.`, 'info');
+        if (data.report.mismatchCount === 0) {
+          showToast(`✓ AI Document Audit: 100% Match (${data.report.verifiedCount}/18) confirmed against raw source!`, 'success');
         } else {
           showToast(`⚠️ AI Document Audit: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
         }
@@ -804,6 +804,22 @@ export default function Home() {
       })
     }));
 
+    setOfficialVerificationSummary(prev => {
+      if (!prev) return null;
+      const updated = prev.results.map(r => {
+        if (r.lotteryId === result.lotteryId) {
+          return { ...r, status: 'match' as const, discrepancies: [] };
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        matchedCount: updated.filter(r => r.status === 'match').length,
+        discrepancyCount: updated.filter(r => r.status === 'discrepancy').length,
+        results: updated,
+      };
+    });
+
     setAiVerificationReport(prev => {
       if (!prev || !prev.officialVerification) return prev;
       const updatedOfficialResults = prev.officialVerification.results.map(r => {
@@ -847,6 +863,21 @@ export default function Home() {
       })
     }));
 
+    setOfficialVerificationSummary(prev => {
+      if (!prev) return null;
+      const updated = prev.results.map(r => ({
+        ...r,
+        status: 'match' as const,
+        discrepancies: [],
+      }));
+      return {
+        ...prev,
+        matchedCount: updated.length,
+        discrepancyCount: 0,
+        results: updated,
+      };
+    });
+
     setAiVerificationReport(prev => {
       if (!prev || !prev.officialVerification) return prev;
       const updatedOfficialResults = prev.officialVerification.results.map(r => ({
@@ -868,17 +899,27 @@ export default function Home() {
     showToast(`✓ Applied all ${appliedCount} official government fixes!`, 'success');
   };
 
-  // Re-check official results live from NLB & DLB portals
-  const handleRefreshOfficial = async () => {
+  // Official Government Verification against live NLB & DLB portals
+  const handleRunOfficialVerify = async (targetSheet?: any) => {
+    const isActualSheet = targetSheet && typeof targetSheet === 'object' && !('nativeEvent' in targetSheet) && !('preventDefault' in targetSheet) && ('lotteries' in targetSheet);
+    const validSheet: DailySheet = isActualSheet ? targetSheet : sheet;
+
+    setIsOfficialVerifying(true);
     setIsRefreshingOfficial(true);
+    setIsOfficialVerifyModalOpen(true);
+
     try {
       const res = await fetch('/api/official-results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lotteries: sheet.lotteries }),
+        body: JSON.stringify({ 
+          date: validSheet.date,
+          lotteries: validSheet.lotteries 
+        }),
       });
       const data = await res.json();
       if (data.success && data.comparison) {
+        setOfficialVerificationSummary(data.comparison);
         setAiVerificationReport(prev => {
           if (!prev) return prev;
           return {
@@ -905,15 +946,25 @@ export default function Home() {
           })
         }));
 
-        showToast(`✓ Refreshed live official results: ${data.comparison.matchedCount}/18 matched with government portals.`, 'success');
+        if (data.comparison.discrepancyCount === 0) {
+          showToast(`🏛️ Official Ground Truth 100% Match! All ${data.comparison.matchedCount} lotteries verified against NLB & DLB.`, 'success');
+        } else {
+          showToast(`⚠️ Official Government Audit: ${data.comparison.discrepancyCount} discrepancy flagged against live portals.`, 'info');
+        }
       } else {
-        showToast(data.error || 'Failed to refresh official results', 'error');
+        showToast(data.error || 'Failed to check official results', 'error');
       }
     } catch (err: any) {
       showToast(`Error checking official results: ${err.message}`, 'error');
     } finally {
+      setIsOfficialVerifying(false);
       setIsRefreshingOfficial(false);
     }
+  };
+
+  // Convenience re-check wrapper
+  const handleRefreshOfficial = async () => {
+    await handleRunOfficialVerify();
   };
 
   const handleConfirmAllVerified = () => {
@@ -1160,45 +1211,74 @@ export default function Home() {
 
             </div>
 
-            {/* Auto AI Verification Info Banner in Step 1 */}
-            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Dual Verification Info Banner in Step 1 */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-purple-600 via-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
                   <Sparkles className="w-5 h-5 text-amber-300" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-extrabold text-purple-950">
-                      OpenAI GPT-4o Second Verification
+                    <span className="text-sm font-extrabold text-slate-900">
+                      Dual Verification (On-Demand &amp; Optional)
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Auto-Runs on Upload
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                      Optional 1-Click
                     </span>
                   </div>
-                  <p className="text-xs text-purple-800/80 mt-0.5">
-                    Whenever you upload a result sheet, OpenAI automatically audits raw PDF text against extracted numbers, letters, and zodiac signs.
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Click <strong>AI Verify</strong> to audit against your uploaded paper source, or <strong>Official Verify</strong> to check live against NLB &amp; DLB government portals.
                   </p>
                 </div>
               </div>
 
-              {sheet.sources.length > 0 && (
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => handleRunAiVerify()}
-                  disabled={isAiVerifying}
-                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] shrink-0 cursor-pointer"
+                  onClick={() => {
+                    if (aiVerificationReport) {
+                      setIsAiVerifyModalOpen(true);
+                    } else {
+                      handleRunAiVerify();
+                    }
+                  }}
+                  disabled={isAiVerifying || sheet.sources.length === 0}
+                  className="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  title={sheet.sources.length === 0 ? 'Upload a source document to verify with AI' : 'Audit extracted results against raw document with AI'}
                 >
                   <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin' : 'text-amber-300'}`} />
                   <span>
                     {isAiVerifying
-                      ? 'Auditing...'
+                      ? 'AI Auditing...'
                       : aiStatusSummary
-                      ? `Re-run AI Audit (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                      : 'Run AI 2nd Verification Now'}
+                      ? `AI Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'AI Verify'}
                   </span>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (officialVerificationSummary) {
+                      setIsOfficialVerifyModalOpen(true);
+                    } else {
+                      handleRunOfficialVerify();
+                    }
+                  }}
+                  disabled={isOfficialVerifying}
+                  className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  title="Cross-check against live NLB & DLB official portals"
+                >
+                  <Building2 className={`w-3.5 h-3.5 ${isOfficialVerifying ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isOfficialVerifying
+                      ? 'Checking Official...'
+                      : officialStatusSummary
+                      ? `Official Match (${officialStatusSummary.matched}/${officialStatusSummary.total})`
+                      : 'Official Verify'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {/* Source Documents Card */}
@@ -1227,6 +1307,9 @@ export default function Home() {
                   onRunAiVerify={() => handleRunAiVerify()}
                   isAiVerifying={isAiVerifying}
                   aiStatusSummary={aiStatusSummary}
+                  onRunOfficialVerify={() => handleRunOfficialVerify()}
+                  isOfficialVerifying={isOfficialVerifying}
+                  officialStatusSummary={officialStatusSummary}
                 />
               </div>
 
@@ -1312,29 +1395,71 @@ export default function Home() {
                   </span>
                 </button>
 
-                {/* AI 2nd Verification Button */}
+                {/* 1. AI Verification Button */}
                 <button
                   type="button"
-                  onClick={() => handleRunAiVerify()}
+                  onClick={() => {
+                    if (aiVerificationReport) {
+                      setIsAiVerifyModalOpen(true);
+                    } else {
+                      handleRunAiVerify();
+                    }
+                  }}
                   disabled={isAiVerifying || sheet.sources.length === 0}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-[0.98] cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
                     isAiVerifying
-                      ? 'bg-indigo-100 text-indigo-700 cursor-wait animate-pulse border border-indigo-300'
-                      : (aiStatusSummary?.hasDiscrepancy || aiStatusSummary?.hasOfficialDiscrepancy)
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 ring-2 ring-amber-300/50'
+                      ? 'bg-purple-100 text-purple-700 cursor-wait animate-pulse border border-purple-300'
+                      : aiStatusSummary?.hasDiscrepancy
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200'
                       : aiStatusSummary?.verified
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300/50'
-                      : 'bg-linear-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-700 hover:to-sky-700 text-white shadow-indigo-200 ring-2 ring-indigo-400/30'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+                      : 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs'
                   }`}
-                  title="Run or view Dual Verification (OpenAI GPT-4o Audit + NLB & DLB Government Match)"
+                  title={sheet.sources.length === 0 ? 'Upload a source document to verify with AI' : 'Audit extracted results against raw document with AI'}
                 >
-                  <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isAiVerifying ? 'animate-spin' : ''}`} />
+                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin text-purple-700' : aiStatusSummary ? 'text-amber-300' : 'text-purple-600'}`} />
                   <span>
                     {isAiVerifying
-                      ? 'Dual Auditing (AI & Gov)...'
+                      ? 'AI Auditing...'
                       : aiStatusSummary
-                      ? `Dual Audit (${aiStatusSummary.verified}/${aiStatusSummary.total} Verified • ${aiStatusSummary.officialMatched} Gov)`
-                      : 'Dual Verification (AI + Gov)'}
+                      ? aiStatusSummary.hasDiscrepancy
+                        ? `AI Flagged (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                        : `AI Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'AI Verify'}
+                  </span>
+                </button>
+
+                {/* 2. Official Government Verification Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (officialVerificationSummary) {
+                      setIsOfficialVerifyModalOpen(true);
+                    } else {
+                      handleRunOfficialVerify();
+                    }
+                  }}
+                  disabled={isOfficialVerifying}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
+                    isOfficialVerifying
+                      ? 'bg-blue-100 text-blue-700 cursor-wait animate-pulse border border-blue-300'
+                      : officialStatusSummary?.hasDiscrepancy
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
+                      : officialStatusSummary?.matched
+                      ? 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200'
+                      : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
+                  }`}
+                  title="Cross-check extracted results against live NLB & DLB official government results"
+                >
+                  <Building2 className={`w-3.5 h-3.5 ${isOfficialVerifying ? 'animate-spin text-blue-700' : officialStatusSummary ? 'text-white' : 'text-blue-600'}`} />
+                  <span>
+                    {isOfficialVerifying
+                      ? 'Checking Official...'
+                      : officialStatusSummary
+                      ? officialStatusSummary.hasDiscrepancy
+                        ? `Official Discrepancy (${officialStatusSummary.matched}/${officialStatusSummary.total})`
+                        : `Official Match (${officialStatusSummary.matched}/${officialStatusSummary.total})`
+                      : 'Official Verify'}
                   </span>
                 </button>
 
@@ -1370,6 +1495,9 @@ export default function Home() {
                     onRunAiVerify={() => handleRunAiVerify()}
                     isAiVerifying={isAiVerifying}
                     aiStatusSummary={aiStatusSummary}
+                    onRunOfficialVerify={() => handleRunOfficialVerify()}
+                    isOfficialVerifying={isOfficialVerifying}
+                    officialStatusSummary={officialStatusSummary}
                   />
                 </div>
               )}
@@ -1542,7 +1670,7 @@ export default function Home() {
         }}
       />
 
-      {/* Dual Verification Report & Fix Modal (AI + Official Gov) */}
+      {/* AI Verification Report & Fix Modal */}
       <AiVerificationModal
         isOpen={isAiVerifyModalOpen}
         onClose={() => setIsAiVerifyModalOpen(false)}
@@ -1555,6 +1683,17 @@ export default function Home() {
         onConfirmAllVerified={handleConfirmAllVerified}
         onRefreshOfficial={handleRefreshOfficial}
         isRefreshingOfficial={isRefreshingOfficial}
+      />
+
+      {/* Official Government Verification Modal */}
+      <OfficialVerificationModal
+        isOpen={isOfficialVerifyModalOpen}
+        onClose={() => setIsOfficialVerifyModalOpen(false)}
+        summary={officialVerificationSummary}
+        isLoading={isOfficialVerifying}
+        onRefresh={() => handleRunOfficialVerify()}
+        onApplyOfficialFix={handleApplyOfficialFix}
+        onApplyAllOfficialFixes={handleApplyAllOfficialFixes}
       />
 
     </div>
