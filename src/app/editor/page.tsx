@@ -628,9 +628,12 @@ export default function Home() {
   };
 
   // AI Second Verification against raw document
-  const handleRunAiVerify = async (targetSheet?: DailySheet, targetSource?: SourceDocument) => {
-    const currentTargetSheet = targetSheet || sheet;
-    const activeSource = targetSource || currentTargetSheet.sources[0];
+  const handleRunAiVerify = async (targetSheet?: any, targetSource?: SourceDocument) => {
+    // Defensively check if targetSheet is an actual DailySheet or a SyntheticEvent from onClick
+    const isActualSheet = targetSheet && typeof targetSheet === 'object' && !('nativeEvent' in targetSheet) && !('preventDefault' in targetSheet) && ('lotteries' in targetSheet);
+    const validSheet: DailySheet = isActualSheet ? targetSheet : sheet;
+    const sourcesList = Array.isArray(validSheet?.sources) ? validSheet.sources : [];
+    const activeSource = targetSource || sourcesList[0];
 
     if (!activeSource) {
       showToast('Please upload a source document first to audit against', 'info');
@@ -645,8 +648,8 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: currentTargetSheet.date,
-          lotteries: currentTargetSheet.lotteries,
+          date: validSheet.date,
+          lotteries: validSheet.lotteries,
           rawText: activeSource.extractedText,
           imageBase64: activeSource.previewImageUrl?.startsWith('data:image/') ? activeSource.previewImageUrl : undefined,
           sourceFileName: activeSource.fileName,
@@ -1072,7 +1075,7 @@ export default function Home() {
                   unassignedRows={unassignedRows}
                   onAssignRow={handleAssignRow}
                   dateMismatchWarning={dateMismatchWarning}
-                  onRunAiVerify={handleRunAiVerify}
+                  onRunAiVerify={() => handleRunAiVerify()}
                   isAiVerifying={isAiVerifying}
                   aiStatusSummary={aiStatusSummary}
                 />
@@ -1215,7 +1218,7 @@ export default function Home() {
                     unassignedRows={unassignedRows}
                     onAssignRow={handleAssignRow}
                     dateMismatchWarning={dateMismatchWarning}
-                    onRunAiVerify={handleRunAiVerify}
+                    onRunAiVerify={() => handleRunAiVerify()}
                     isAiVerifying={isAiVerifying}
                     aiStatusSummary={aiStatusSummary}
                   />

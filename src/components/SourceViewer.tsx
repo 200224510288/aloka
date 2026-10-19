@@ -214,7 +214,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           {onRunAiVerify && (
             <button
               type="button"
-              onClick={onRunAiVerify}
+              onClick={() => onRunAiVerify()}
               disabled={isAiVerifying || isUploading || sources.length === 0}
               className="px-2.5 py-1 text-xs font-bold bg-linear-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-md shadow-2xs flex items-center gap-1.5 transition disabled:opacity-50 active:scale-95 cursor-pointer"
               title="Audit and verify extracted lottery results against raw source with OpenAI GPT-4o"
@@ -277,7 +277,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             </div>
             <button
               type="button"
-              onClick={onRunAiVerify}
+              onClick={() => onRunAiVerify()}
               disabled={isAiVerifying}
               className="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1 transition"
             >
