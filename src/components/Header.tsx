@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, AlertTriangle, FileDown, History, Save, Building2, Sparkles, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders } from 'lucide-react';
+import { Calendar, CheckCircle2, AlertTriangle, FileDown, History, Save, Building2, Sparkles, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, Globe } from 'lucide-react';
 import { DailySheet } from '@/types/lottery';
 import { WorkflowStep } from './StepNavigation';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -110,9 +110,18 @@ export const Header: React.FC<HeaderProps> = ({
                 title="Load wireframe sample data (2026.10.05)"
               >
                 <Sparkles className="w-3 h-3 text-amber-600" />
-                <span>Load Wireframe Sample</span>
+                <span>Load Sample</span>
               </button>
             )}
+
+            <Link
+              href="/official-results"
+              className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100/80 border border-blue-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
+              title="Official Website Live Fetcher (nlb.lk)"
+            >
+              <Globe className="w-3.5 h-3.5 text-blue-600" />
+              <span>Official Fetcher (NLB)</span>
+            </Link>
           </div>
 
           {/* Right: Dealer Info & Primary Actions */}
