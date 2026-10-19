@@ -84,21 +84,17 @@ export default function Home() {
       verified: aiVerificationReport.verifiedCount,
       total: aiVerificationReport.totalLotteries,
       hasDiscrepancy: aiVerificationReport.mismatchCount > 0,
-      officialMatched: aiVerificationReport.officialVerification?.matchedCount ?? 0,
-      officialTotal: aiVerificationReport.officialVerification?.totalLotteries ?? 0,
-      hasOfficialDiscrepancy: (aiVerificationReport.officialVerification?.discrepancyCount ?? 0) > 0,
     };
   }, [aiVerificationReport]);
 
   const officialStatusSummary = useMemo(() => {
-    const summary = officialVerificationSummary || aiVerificationReport?.officialVerification;
-    if (!summary) return undefined;
+    if (!officialVerificationSummary) return undefined;
     return {
-      matched: summary.matchedCount,
-      total: summary.totalLotteries,
-      hasDiscrepancy: summary.discrepancyCount > 0,
+      matched: officialVerificationSummary.matchedCount,
+      total: officialVerificationSummary.totalLotteries,
+      hasDiscrepancy: officialVerificationSummary.discrepancyCount > 0,
     };
-  }, [officialVerificationSummary, aiVerificationReport]);
+  }, [officialVerificationSummary]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -1678,11 +1674,7 @@ export default function Home() {
         isLoading={isAiVerifying}
         onApplySingleFix={handleApplySingleFix}
         onApplyAllFixes={handleApplyAllFixes}
-        onApplyOfficialFix={handleApplyOfficialFix}
-        onApplyAllOfficialFixes={handleApplyAllOfficialFixes}
         onConfirmAllVerified={handleConfirmAllVerified}
-        onRefreshOfficial={handleRefreshOfficial}
-        isRefreshingOfficial={isRefreshingOfficial}
       />
 
       {/* Official Government Verification Modal */}
