@@ -44,6 +44,27 @@ export async function GET(req: NextRequest) {
         fromCloud = false;
         saveSheetToCloud(localSheet).catch(e => console.warn('Initial cloud sync error:', e));
       }
+
+      // Always restore extractedText from localSheet if cloud sources omitted or stripped it
+      if (localSheet?.sources && localSheet.sources.length > 0 && sheet) {
+        if (!sheet.sources || sheet.sources.length === 0) {
+          sheet.sources = localSheet.sources;
+        } else {
+          sheet.sources = sheet.sources.map(s => {
+            if (!s.extractedText) {
+              const localMatch = localSheet.sources.find(ls => ls.fileName === s.fileName || ls.id === s.id);
+              if (localMatch?.extractedText) {
+                return {
+                  ...s,
+                  extractedText: localMatch.extractedText,
+                  filePath: (s.filePath && !s.filePath.includes('Browser Session')) ? s.filePath : localMatch.filePath,
+                };
+              }
+            }
+            return s;
+          });
+        }
+      }
     } catch (cloudErr) {
       console.warn('Cloud fetch check failed:', cloudErr);
       sheet = localSheet;
@@ -66,12 +87,22 @@ export async function GET(req: NextRequest) {
       if (fs.existsSync(uploadDir)) {
         const diskFiles = fs.readdirSync(uploadDir).filter(f => !f.startsWith('.') && !f.endsWith('.tmp'));
         if (diskFiles.length > 0) {
-          const hasValidSources = sheet.sources && sheet.sources.length > 0 && sheet.sources.some(s => s.filePath && !s.filePath.includes('Browser Session'));
+          const hasValidSources = sheet.sources && sheet.sources.length > 0 && sheet.sources.some(s => s.filePath && !s.filePath.includes('Browser Session') && s.extractedText);
           if (!hasValidSources) {
-            sheet.sources = diskFiles.map((fname, idx) => {
+            sheet.sources = await Promise.all(diskFiles.map(async (fname, idx) => {
               const fullFp = path.join(uploadDir, fname);
               const stats = fs.statSync(fullFp);
               const ext = path.extname(fname).toLowerCase();
+              let extractedText = localSheet?.sources?.[0]?.extractedText || '';
+              if (!extractedText && ext === '.pdf') {
+                try {
+                  const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
+                  const res = await extractTextFromPdfBuffer(fs.readFileSync(fullFp));
+                  extractedText = res.text;
+                } catch (e) {
+                  console.warn('Could not extract text during auto-reconciliation:', e);
+                }
+              }
               return {
                 id: `doc_disk_${idx}_${fname}`,
                 fileName: fname.replace(/^doc_\d+_[a-zA-Z0-9]+_/, ''),
@@ -81,8 +112,9 @@ export async function GET(req: NextRequest) {
                 uploadedAt: stats.mtime.toISOString(),
                 pageCount: 1,
                 status: 'extracted',
+                extractedText,
               };
-            });
+            }));
             saveSheet(sheet, 'Auto-reconciled uploaded sources from disk');
           }
         }

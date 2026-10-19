@@ -650,9 +650,10 @@ export default function Home() {
         body: JSON.stringify({
           date: validSheet.date,
           lotteries: validSheet.lotteries,
-          rawText: activeSource.extractedText,
+          rawText: activeSource.extractedText || '',
           imageBase64: activeSource.previewImageUrl?.startsWith('data:image/') ? activeSource.previewImageUrl : undefined,
           sourceFileName: activeSource.fileName,
+          filePath: activeSource.filePath,
         }),
       });
 
