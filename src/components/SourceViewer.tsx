@@ -13,6 +13,7 @@ interface SourceViewerProps {
   onFileUpload: (file: File) => Promise<void>;
   onAutoFetchSource?: () => Promise<void> | void;
   onRemoveSource?: (sourceId: string) => void;
+  onClearValues?: () => void;
   isUploading: boolean;
   isAutoFetching?: boolean;
   unassignedRows: UnassignedExtractedRow[];
@@ -32,6 +33,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   onFileUpload,
   onAutoFetchSource,
   onRemoveSource,
+  onClearValues,
   isUploading,
   isAutoFetching,
   unassignedRows,
@@ -284,6 +286,18 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             <Upload className="w-3.5 h-3.5" />
             <span>{isUploading ? 'Extracting...' : 'Upload File'}</span>
           </button>
+
+          {onClearValues && (
+            <button
+              type="button"
+              onClick={onClearValues}
+              className="px-2 py-1 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md flex items-center gap-1 transition cursor-pointer"
+              title="Clear all extracted numbers and reset table to blank"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+              <span>Clear</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -471,6 +485,19 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>Remove</span>
+                  </button>
+                )}
+
+                {/* Clear values button */}
+                {onClearValues && (
+                  <button
+                    type="button"
+                    onClick={onClearValues}
+                    className="flex items-center gap-1 text-[11px] font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded transition cursor-pointer"
+                    title="Clear all extracted lottery numbers and reset sheet back to blank"
+                  >
+                    <RotateCcw className="w-3 h-3 text-rose-600" />
+                    <span>Clear Values</span>
                   </button>
                 )}
 

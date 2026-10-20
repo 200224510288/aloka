@@ -747,6 +747,10 @@ export default function Home() {
       return;
     }
 
+    const alsoClearValues = confirm(
+      `Do you also want to clear all lottery numbers, draw numbers, and values extracted from "${docToRemove.fileName}"?`
+    );
+
     try {
       if (docToRemove.filePath && docToRemove.filePath.startsWith('/uploads/')) {
         await fetch('/api/upload', {
@@ -763,7 +767,31 @@ export default function Home() {
     setUnassignedRows(prev => prev.filter(r => r.sourceFileName !== docToRemove.fileName));
 
     const updatedLotteries = sheet.lotteries.map(l => {
-      if (l.sourceFileName === docToRemove.fileName) {
+      const isFromThisDoc = l.sourceFileName === docToRemove.fileName || (alsoClearValues && remainingSources.length === 0);
+      if (isFromThisDoc) {
+        if (alsoClearValues) {
+          return {
+            ...l,
+            drawNo: '',
+            letter: '',
+            zodiac: '',
+            numbers: [],
+            bonusNumber: '',
+            boxedIndex: undefined,
+            isNoDraw: false,
+            noDrawReason: undefined,
+            aiVerified: undefined,
+            aiDiscrepancy: undefined,
+            officialVerified: undefined,
+            officialDiscrepancy: undefined,
+            officialDrawNo: undefined,
+            officialMatchedAt: undefined,
+            extractionConfidence: undefined,
+            isCheckedAgainstSource: false,
+            sourceFileName: undefined,
+            sourcePage: undefined,
+          };
+        }
         return {
           ...l,
           sourceFileName: undefined,
@@ -780,7 +808,12 @@ export default function Home() {
     };
 
     setSheet(newSheet);
-    showToast(`Removed "${docToRemove.fileName}"`, 'info');
+    if (alsoClearValues && remainingSources.length === 0) {
+      setDateMismatchWarning(undefined);
+      setAiVerificationReport(null);
+      setOfficialVerificationSummary(null);
+    }
+    showToast(alsoClearValues ? `Removed "${docToRemove.fileName}" and cleared extracted values` : `Removed "${docToRemove.fileName}"`, 'info');
 
     try {
       await fetch('/api/sheet', {
@@ -791,6 +824,49 @@ export default function Home() {
     } catch (e) {
       console.error('Failed to save sheet after removing source:', e);
     }
+  };
+
+  // Clear all entered/extracted lottery numbers and values back to blank template
+  const handleClearAllValues = async () => {
+    if (!confirm('Are you sure you want to clear all lottery numbers, draw numbers, letters, and results for this date? The sheet will be reset to blank.')) {
+      return;
+    }
+
+    const clearedLotteries: LotteryResultItem[] = sheet.lotteries.map(l => ({
+      ...l,
+      drawNo: '',
+      letter: '',
+      zodiac: '',
+      numbers: [],
+      bonusNumber: '',
+      boxedIndex: undefined,
+      isNoDraw: false,
+      noDrawReason: undefined,
+      aiVerified: undefined,
+      aiDiscrepancy: undefined,
+      officialVerified: undefined,
+      officialDiscrepancy: undefined,
+      officialDrawNo: undefined,
+      officialMatchedAt: undefined,
+      extractionConfidence: undefined,
+      isCheckedAgainstSource: false,
+      sourceFileName: undefined,
+      sourcePage: undefined,
+    }));
+
+    const newSheet: DailySheet = {
+      ...sheet,
+      lotteries: clearedLotteries,
+    };
+
+    setSheet(newSheet);
+    setDateMismatchWarning(undefined);
+    setUnassignedRows([]);
+    setAiVerificationReport(null);
+    setOfficialVerificationSummary(null);
+
+    await handleSave(newSheet, 'Cleared all lottery values');
+    showToast('🧹 Cleared all lottery values and reset sheet to blank!', 'info');
   };
 
   // Assign unassigned row
@@ -1566,6 +1642,17 @@ export default function Home() {
                     <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetchingSource ? 'animate-bounce' : ''}`} />
                     <span>{isAutoFetchingSource ? 'Fetching LK Sheet...' : 'Auto-Fetch LK Lottery'}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearAllValues}
+                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1.5 transition active:scale-[0.98] cursor-pointer"
+                    title="Clear all extracted numbers and reset sheet back to blank"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Clear Values</span>
+                  </button>
+
                   <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                     {sheet.sources.length} document{sheet.sources.length !== 1 ? 's' : ''} attached
                   </span>
@@ -1580,6 +1667,7 @@ export default function Home() {
                   onFileUpload={handleFileUpload}
                   onAutoFetchSource={handleAutoFetchSource}
                   onRemoveSource={handleRemoveSource}
+                  onClearValues={handleClearAllValues}
                   isUploading={isUploading}
                   isAutoFetching={isAutoFetchingSource}
                   unassignedRows={unassignedRows}
@@ -1746,6 +1834,17 @@ export default function Home() {
                       : 'Official Verify'}
                   </span>
                 </button>
+
+                {/* 3. Clear All Values Button */}
+                <button
+                  type="button"
+                  onClick={handleClearAllValues}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer"
+                  title="Clear all extracted numbers and reset lottery sheet back to blank"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Clear Values</span>
+                </button>
               </div>
 
             </div>
@@ -1762,6 +1861,7 @@ export default function Home() {
                     onFileUpload={handleFileUpload}
                     onAutoFetchSource={handleAutoFetchSource}
                     onRemoveSource={handleRemoveSource}
+                    onClearValues={handleClearAllValues}
                     isUploading={isUploading}
                     isAutoFetching={isAutoFetchingSource}
                     unassignedRows={unassignedRows}

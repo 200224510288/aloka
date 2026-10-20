@@ -94,28 +94,32 @@ Reference of 18 Standard Lotteries:
 ${JSON.stringify(lotteryContext, null, 2)}
 
 Sinhala Zodiac Signs (12):
-මේෂ (Aries), වෘෂභ (Taurus), මිථුන (Gemini), කටක (Cancer), සිංහ (Leo), කන්‍යා (Virgo), තුලා (Libra), වෘශ්චික (Scorpio), ධනු (Sagittarius), මකර (Capricorn), කුම්භ (Aquarius), මීන (Pisces).
-Note on OCR errors: "ක නා" or "ක\\tන\\u0000ා" or "කනා" is ALWAYS "කන්‍යා" (Virgo).
+මේෂ (Aries ♈), වෘෂභ (Taurus ♉), මිථුන (Gemini ♊), කටක (Cancer ♋), සිංහ (Leo ♌), කන්‍යා (Virgo ♍), තුලා (Libra ♎), වෘශ්චික (Scorpio ♏), ධනු (Sagittarius ♐), මකර (Capricorn ♑), කුම්භ (Aquarius ♒), මීන (Pisces ♓).
+Note on OCR errors: "ක නා" or "ක\tන\u0000ා" or "කනා" is ALWAYS "කන්‍යා" (Virgo). Ligature spaces like "වෘ ෂභ" or "තු ලා" are identical to "වෘෂභ" and "තුලා".
 
-Rules for Auditing:
-1. Verify the DRAW NUMBER for each lottery against the source.
-2. Verify the WINNING NUMBERS/DIGITS against the source in exact sequence.
-   - Ada Sampatha and Jaya Sampatha have 3 tiered numbers (2-digit, 3-digit, 4-digit) + 1 letter.
-   - Mahajana Sampatha (6 digits), Supiri Dhana Sampatha (6 digits), NLB Jaya (4 digits), Ayubo (4 digits) are single-digit streams.
-   - Treat spaced bonus digits (e.g. "2 8 9 7 4" vs "28974") as matching. DO NOT flag cosmetic spacing differences as mismatch.
-   - Treat leading zeros (e.g. "02" vs "2") as matching.
-3. Verify the ENGLISH LETTER if required.
-4. Verify the SINHALA ZODIAC sign for Handahana, Lagna Wasana, and Suba Dawasak.
-5. Verify the BONUS NUMBER for Shanida Wasana, Super Ball, Lagna Wasana, and Supiri Dhana Sampatha.
-6. Verify the Sheet Date vs any date appearing in the source document.
-7. When all extracted values (draw number, numbers, letter, zodiac, bonus) match the source:
-   - status MUST BE "verified".
-   - discrepancies MUST BE empty array [].
-   - suggestedFix MUST BE empty object {}.
-8. ONLY mark status as "mismatch" if there is an ACTUAL difference or error in numbers, letter, zodiac, or draw number.
-   - When status is "mismatch", discrepancies MUST contain the specific description of the difference, and suggestedFix must provide the correction.
-   - If discrepancies is empty, status CANNOT be "mismatch".
-9. If a lottery is mentioned in the source but marked no-draw or missing in sheet, mark status as "missing_in_sheet".
+CRITICAL LOTTERY-SPECIFIC NUMBER RULES:
+1. Ada Sampatha (NLB): Winning numbers are TIERED in length:
+   - Tier 1: 2 digits (e.g. "32")
+   - Tier 2: 3 digits (e.g. "832") -> THIS IS NOT A TYPO! Do NOT suggest shortening "832" to "83"!
+   - Tier 3: 4 digits (e.g. "6832") -> THIS IS NOT A TYPO! Do NOT suggest shortening!
+   - Letter: 1 English letter (e.g. "V")
+2. Jaya Sampatha (NLB): Also TIERED in length:
+   - Tier 1: 2 digits (e.g. "23")
+   - Tier 2: 3 digits (e.g. "323")
+   - Tier 3: 4 digits (e.g. "7323")
+   - Letter: 1 English letter (e.g. "A")
+3. Mahajana Sampatha (DLB) & Supiri Dhana Sampatha (DLB): 6 single digits (e.g. ["1", "5", "6", "8", "3", "2"]).
+4. Ayubo (NLB) & NLB Jaya (NLB): 4 single digits (e.g. ["9", "2", "6", "8"]).
+5. Sasiri (NLB): 3 two-digit numbers (e.g. ["01", "04", "05"]).
+
+STRICT RULES FOR AUDITING:
+1. GROUND TRUTH RULE: If the sheet's extracted values (draw number, numbers, letter, zodiac, bonus) MATCH what is visible/detected in the source document, status MUST BE "verified".
+   - NEVER invent a discrepancy or suggest a fix if the sheet already matches what is printed in the source document!
+   - Look at your own "DETECTED IN SOURCE DOCUMENT": if it matches the sheet, it is 100% "verified".
+2. Treat leading zeros (e.g. "02" vs "2") and cosmetic whitespace ("9 2 6 8" vs "9268") as matching.
+3. Treat astrological glyphs (e.g. ♎) and Sinhala names ("තුලා") as matching.
+4. ONLY mark status as "mismatch" if there is a REAL, UNAMBIGUOUS ERROR where the sheet has a completely different number/letter than what is clearly printed on the paper source.
+5. If status is "verified", discrepancies MUST be empty array [] and suggestedFix MUST be empty object {}.
 
 Output MUST be a pure JSON object conforming to this exact schema:
 {
