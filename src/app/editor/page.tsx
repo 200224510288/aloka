@@ -31,7 +31,8 @@ import {
   Sparkles,
   Printer,
   FileDown,
-  RotateCcw
+  RotateCcw,
+  Zap
 } from 'lucide-react';
 
 function getYesterdayDateStr(): string {
@@ -78,6 +79,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isAutoFetchingSource, setIsAutoFetchingSource] = useState<boolean>(false);
   const [unassignedRows, setUnassignedRows] = useState<UnassignedExtractedRow[]>([]);
   const [dateMismatchWarning, setDateMismatchWarning] = useState<string | undefined>();
   const [exportBlockedErrors, setExportBlockedErrors] = useState<string[]>([]);
@@ -623,6 +625,116 @@ export default function Home() {
       showToast(`Upload error: ${e.message}`, 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // Handle auto-fetching daily Sinhala raw lottery sheet from lklottery.com
+  const handleAutoFetchSource = async () => {
+    setIsAutoFetchingSource(true);
+    setDateMismatchWarning(undefined);
+
+    try {
+      showToast(`⚡ Fetching daily sheet from lklottery.com for ${selectedDate}...`, 'info');
+
+      const res = await fetch(`/api/auto-fetch-source?date=${selectedDate}`);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        const errDetail = data.error || `Could not fetch sheet for ${selectedDate}`;
+        const latestMsg = data.latestDate ? ` (Latest available sheet on lklottery: ${data.latestDate})` : '';
+        showToast(`${errDetail}${latestMsg}`, 'error');
+        return;
+      }
+
+      const { sourceDoc, dataUrl, extraction, matchedCount } = data;
+      let matchedLotteries = extraction?.matchedLotteries || [];
+      let detectedDate = extraction?.detectedDate;
+      let detectedFooterAnnouncement = extraction?.detectedFooterAnnouncement;
+      let unassignedRows = extraction?.unassignedRows || [];
+      let dateMismatchWarning = extraction?.dateMismatchWarning;
+
+      // Render raster preview and cache into IndexedDB for persistent visual display across reloads
+      let clientPreviewUrl: string | undefined = undefined;
+      try {
+        if (dataUrl) {
+          const blobRes = await fetch(dataUrl);
+          const pdfBlob = await blobRes.blob();
+
+          const { renderPdfPageToDataUrl } = await import('@/lib/client-pdf-extractor');
+          clientPreviewUrl = (await renderPdfPageToDataUrl(pdfBlob)) || undefined;
+
+          const { saveCachedFile } = await import('@/lib/source-file-cache');
+          await saveCachedFile(sourceDoc.id, sourceDoc.fileName, pdfBlob, clientPreviewUrl);
+        }
+      } catch (cacheErr) {
+        console.warn('Could not cache auto-fetched file in IndexedDB:', cacheErr);
+      }
+
+      const clientSourceDoc: SourceDocument = {
+        ...sourceDoc,
+        previewImageUrl: clientPreviewUrl || sourceDoc.previewImageUrl,
+      };
+
+      // Filter out previous version of this same auto-fetched document if re-fetching
+      const existingSources = sheet.sources.filter(s => s.fileName !== sourceDoc.fileName);
+      const newSources = [...existingSources, clientSourceDoc];
+
+      const updatedLotteries = sheet.lotteries.map((existing) => {
+        const match = matchedLotteries.find((m: any) => m.lotteryId === existing.lotteryId);
+        if (match) {
+          const def = STANDARD_LOTTERIES.find(d => d.id === existing.lotteryId);
+          let rawNums = (match.numbers && match.numbers.length > 0) ? match.numbers : existing.numbers;
+          const bNum = match.bonusNumber !== undefined ? match.bonusNumber : existing.bonusNumber;
+          if (def?.hasBonusNumber && bNum) {
+            rawNums = rawNums.filter((n: string) => n !== bNum);
+          }
+          if (def?.numberCount && rawNums.length > def.numberCount) {
+            rawNums = rawNums.slice(0, def.numberCount);
+          }
+
+          return {
+            ...existing,
+            drawNo: match.drawNo || existing.drawNo,
+            letter: match.letter !== undefined ? match.letter : existing.letter,
+            zodiac: match.zodiac || existing.zodiac,
+            numbers: rawNums,
+            bonusNumber: bNum,
+            boxedIndex: match.boxedIndex !== undefined ? match.boxedIndex : existing.boxedIndex,
+            sourceFileName: sourceDoc.fileName,
+            sourcePage: match.sourcePage || 1,
+            extractionConfidence: match.extractionConfidence,
+            isCheckedAgainstSource: true,
+          };
+        }
+        return existing;
+      });
+
+      if (dateMismatchWarning) {
+        setDateMismatchWarning(dateMismatchWarning);
+      }
+      if (unassignedRows && unassignedRows.length > 0) {
+        setUnassignedRows(prev => [...prev, ...unassignedRows]);
+      }
+
+      const newSheet: DailySheet = {
+        ...sheet,
+        sources: newSources,
+        lotteries: updatedLotteries,
+        footerAnnouncement: detectedFooterAnnouncement || sheet.footerAnnouncement,
+      };
+
+      setSheet(newSheet);
+      await handleSave(newSheet, `Auto-fetched source from lklottery.com: ${sourceDoc.fileName}`);
+
+      if (currentStep === 'setup') {
+        setCurrentStep('verify');
+      }
+
+      showToast(`🎉 Auto-fetched & extracted ${matchedCount} lotteries from lklottery.com for ${selectedDate}!`, 'success');
+    } catch (err: any) {
+      showToast(`Auto-fetch error: ${err.message}`, 'error');
+    } finally {
+      setIsAutoFetchingSource(false);
     }
   };
 
@@ -1443,9 +1555,21 @@ export default function Home() {
                   <FileText className="w-4 h-4 text-blue-600" />
                   <h3 className="text-sm font-bold text-slate-800">Source Documents & Extraction</h3>
                 </div>
-                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                  {sheet.sources.length} document{sheet.sources.length !== 1 ? 's' : ''} attached
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAutoFetchSource}
+                    disabled={isAutoFetchingSource || isUploading}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    title={`Download and extract raw Sinhala PDF from lklottery.com for ${selectedDate}`}
+                  >
+                    <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetchingSource ? 'animate-bounce' : ''}`} />
+                    <span>{isAutoFetchingSource ? 'Fetching LK Sheet...' : 'Auto-Fetch LK Lottery'}</span>
+                  </button>
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {sheet.sources.length} document{sheet.sources.length !== 1 ? 's' : ''} attached
+                  </span>
+                </div>
               </div>
 
               {/* Source Viewer Container */}
@@ -1454,8 +1578,10 @@ export default function Home() {
                   sources={sheet.sources}
                   currentDate={sheet.date}
                   onFileUpload={handleFileUpload}
+                  onAutoFetchSource={handleAutoFetchSource}
                   onRemoveSource={handleRemoveSource}
                   isUploading={isUploading}
+                  isAutoFetching={isAutoFetchingSource}
                   unassignedRows={unassignedRows}
                   onAssignRow={handleAssignRow}
                   dateMismatchWarning={dateMismatchWarning}
@@ -1634,8 +1760,10 @@ export default function Home() {
                     sources={sheet.sources}
                     currentDate={sheet.date}
                     onFileUpload={handleFileUpload}
+                    onAutoFetchSource={handleAutoFetchSource}
                     onRemoveSource={handleRemoveSource}
                     isUploading={isUploading}
+                    isAutoFetching={isAutoFetchingSource}
                     unassignedRows={unassignedRows}
                     onAssignRow={handleAssignRow}
                     dateMismatchWarning={dateMismatchWarning}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X, RefreshCw, Sparkles, Building2 } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X, RefreshCw, Sparkles, Building2, Zap } from 'lucide-react';
 import { SourceDocument, UnassignedExtractedRow } from '@/types/lottery';
 import { STANDARD_LOTTERIES } from '@/lib/constants';
 import { getCachedFile, getCachedFileRecord } from '@/lib/source-file-cache';
@@ -11,8 +11,10 @@ interface SourceViewerProps {
   sources: SourceDocument[];
   currentDate: string;
   onFileUpload: (file: File) => Promise<void>;
+  onAutoFetchSource?: () => Promise<void> | void;
   onRemoveSource?: (sourceId: string) => void;
   isUploading: boolean;
+  isAutoFetching?: boolean;
   unassignedRows: UnassignedExtractedRow[];
   onAssignRow: (row: UnassignedExtractedRow, targetLotteryId: string) => void;
   dateMismatchWarning?: string;
@@ -28,8 +30,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   sources,
   currentDate,
   onFileUpload,
+  onAutoFetchSource,
   onRemoveSource,
   isUploading,
+  isAutoFetching,
   unassignedRows,
   onAssignRow,
   dateMismatchWarning,
@@ -249,8 +253,21 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           </span>
         </div>
 
-        {/* Action: Upload Source */}
+        {/* Actions: Auto-Fetch & Manual Upload */}
         <div className="flex items-center gap-1.5">
+          {onAutoFetchSource && (
+            <button
+              type="button"
+              onClick={onAutoFetchSource}
+              disabled={isAutoFetching || isUploading}
+              title={`Auto-fetch daily Sinhala PDF from lklottery.com for ${currentDate}`}
+              className="px-2.5 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-2xs"
+            >
+              <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetching ? 'animate-bounce' : ''}`} />
+              <span>{isAutoFetching ? 'Fetching LK...' : 'Auto-Fetch LK'}</span>
+            </button>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -261,11 +278,11 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || isAutoFetching}
             className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>{isUploading ? 'Extracting...' : 'Upload Source'}</span>
+            <span>{isUploading ? 'Extracting...' : 'Upload File'}</span>
           </button>
         </div>
       </div>
@@ -337,29 +354,60 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className="flex-1 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-slate-300 m-4 rounded-xl bg-white"
+            className="flex-1 flex flex-col items-center justify-center p-5 text-center border-2 border-dashed border-slate-300 m-3 rounded-xl bg-white overflow-y-auto"
           >
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
-              <Upload className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-800 mb-1">Upload Daily Result Source</h3>
-            <p className="text-xs text-slate-500 max-w-xs mb-3">
-              Drag and drop lottery result sheet PDF, JPG, or PNG here, or click to browse.
+            {/* Auto-Fetch Featured Action Card */}
+            {onAutoFetchSource && (
+              <div className="w-full max-w-sm p-4 mb-3.5 bg-gradient-to-br from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/90 rounded-xl shadow-2xs text-center flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center mb-2 shadow-sm ring-4 ring-emerald-100">
+                  <Zap className={`w-5 h-5 text-amber-300 ${isAutoFetching ? 'animate-bounce' : ''}`} />
+                </div>
+                <h3 className="text-xs font-bold text-slate-800">
+                  Auto-Fetch Raw LK Lottery Sheet
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-1 mb-3 leading-relaxed">
+                  Directly download & extract the official Sinhala PDF sheet for <span className="font-bold text-emerald-800">{currentDate}</span> from <span className="font-semibold text-slate-700">lklottery.com</span>.
+                </p>
+                <button
+                  type="button"
+                  onClick={onAutoFetchSource}
+                  disabled={isAutoFetching || isUploading}
+                  className="w-full py-2 px-3 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                >
+                  {isAutoFetching ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Downloading & Extracting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Fetch {currentDate} Raw Sheet</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {onAutoFetchSource && (
+              <div className="w-full max-w-sm flex items-center gap-2 mb-3">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">or upload manual file</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+            )}
+
+            <p className="text-xs text-slate-500 max-w-xs mb-2">
+              Drag & drop lottery result PDF, JPG, or PNG here, or browse files.
             </p>
-            <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 rounded-full text-[11px] font-bold text-slate-700">
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              <span>On-Demand AI &amp; Official Verification Available</span>
-            </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition"
+              disabled={isUploading || isAutoFetching}
+              className="px-4 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition cursor-pointer"
             >
-              Select File
+              Browse File
             </button>
-            <p className="text-[11px] text-slate-400 mt-3">
-              Supports readable PDFs, scanned documents, and photo uploads.
-            </p>
           </div>
         ) : (
           /* Viewer content */
