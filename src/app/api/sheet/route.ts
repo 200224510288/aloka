@@ -51,17 +51,27 @@ export async function GET(req: NextRequest) {
           sheet.sources = localSheet.sources;
         } else {
           sheet.sources = sheet.sources.map(s => {
+            let cleanFilePath = s.filePath;
+            if (cleanFilePath && cleanFilePath.startsWith('blob:')) {
+              cleanFilePath = '[Stored in Browser Session]';
+            }
             if (!s.extractedText) {
               const localMatch = localSheet.sources.find(ls => ls.fileName === s.fileName || ls.id === s.id);
               if (localMatch?.extractedText) {
+                const safeLocalPath = (localMatch.filePath && !localMatch.filePath.startsWith('blob:'))
+                  ? localMatch.filePath
+                  : '[Stored in Browser Session]';
                 return {
                   ...s,
                   extractedText: localMatch.extractedText,
-                  filePath: (s.filePath && !s.filePath.includes('Browser Session')) ? s.filePath : localMatch.filePath,
+                  filePath: (cleanFilePath && !cleanFilePath.includes('Browser Session')) ? cleanFilePath : safeLocalPath,
                 };
               }
             }
-            return s;
+            return {
+              ...s,
+              filePath: cleanFilePath,
+            };
           });
         }
       }
@@ -169,6 +179,15 @@ export async function GET(req: NextRequest) {
     } catch {}
     const availableDates = Array.from(new Set([...localDates, ...cloudDates])).sort().reverse();
 
+    if (sheet && Array.isArray(sheet.sources)) {
+      sheet.sources = sheet.sources.map(s => {
+        if (s.filePath && s.filePath.startsWith('blob:')) {
+          return { ...s, filePath: '[Stored in Browser Session]' };
+        }
+        return s;
+      });
+    }
+
     return NextResponse.json({
       success: true,
       sheet,
@@ -202,6 +221,15 @@ export async function POST(req: NextRequest) {
 
     if (!sheet || !sheet.date) {
       return NextResponse.json({ success: false, error: 'Valid sheet with date is required' }, { status: 400 });
+    }
+
+    if (sheet && Array.isArray(sheet.sources)) {
+      sheet.sources = sheet.sources.map(s => {
+        if (s.filePath && s.filePath.startsWith('blob:')) {
+          return { ...s, filePath: '[Stored in Browser Session]' };
+        }
+        return s;
+      });
     }
 
     const saved = saveSheet(sheet, summary);

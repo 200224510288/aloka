@@ -34,10 +34,10 @@ export async function saveSheetToCloud(sheet: DailySheet): Promise<{ success: bo
     if (Array.isArray(sanitizedSheet.sources)) {
       sanitizedSheet.sources = sanitizedSheet.sources.map((s: any) => {
         const item = { ...s };
-        if (item.filePath && item.filePath.length > 50000) {
+        if (item.filePath && (item.filePath.startsWith('blob:') || item.filePath.length > 50000)) {
           item.filePath = '[Stored in Browser Session]';
         }
-        if (item.previewImageUrl && item.previewImageUrl.length > 50000) {
+        if (item.previewImageUrl && (item.previewImageUrl.startsWith('blob:') || item.previewImageUrl.length > 50000)) {
           delete item.previewImageUrl;
         }
         return item;
@@ -137,6 +137,12 @@ export async function saveSourceDocToCloud(
   try {
     const docRef = doc(db, CLOUD_SOURCES_COLLECTION, docData.id);
     const sanitizedDoc = JSON.parse(JSON.stringify(docData));
+    if (sanitizedDoc.filePath && (sanitizedDoc.filePath.startsWith('blob:') || sanitizedDoc.filePath.length > 50000)) {
+      sanitizedDoc.filePath = '[Stored in Browser Session]';
+    }
+    if (sanitizedDoc.previewImageUrl && (sanitizedDoc.previewImageUrl.startsWith('blob:') || sanitizedDoc.previewImageUrl.length > 50000)) {
+      delete sanitizedDoc.previewImageUrl;
+    }
 
     const payload = cleanFirestoreData({
       ...sanitizedDoc,

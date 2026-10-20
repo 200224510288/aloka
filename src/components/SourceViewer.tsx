@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, RotateCcw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Layers, ArrowRight, Trash2, X, RefreshCw, Sparkles, Building2 } from 'lucide-react';
 import { SourceDocument, UnassignedExtractedRow } from '@/types/lottery';
 import { STANDARD_LOTTERIES } from '@/lib/constants';
-import { getCachedFile } from '@/lib/source-file-cache';
+import { getCachedFile, getCachedFileRecord } from '@/lib/source-file-cache';
 import { renderPdfPageToDataUrl } from '@/lib/client-pdf-extractor';
 
 interface SourceViewerProps {
@@ -62,7 +62,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
   const isPlaceholder = !activeDoc?.filePath ||
     activeDoc.filePath.includes('Browser Session') ||
-    activeDoc.filePath.startsWith('[');
+    activeDoc.filePath.startsWith('[') ||
+    (activeDoc.filePath.startsWith('blob:') && !pdfBlobUrl);
 
   // Resolve authentic Blob URLs and render raster preview for active document
   useEffect(() => {
@@ -75,137 +76,121 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       return;
     }
 
-    // Step 1: If filePath is a placeholder string from Cloud sync, check IndexedDB first
-    if (isPlaceholder) {
-      setPdfBlobUrl('');
-      setPdfCanvasPreviewUrl('');
+    async function resolveActiveDocument() {
+      // Step 1: If activeDoc has a blob URL, check if it is alive in this current browser memory
+      if (activeDoc.filePath && activeDoc.filePath.startsWith('blob:')) {
+        let isAlive = false;
+        try {
+          const testRes = await fetch(activeDoc.filePath, { method: 'GET' });
+          if (testRes.ok) isAlive = true;
+        } catch {
+          isAlive = false;
+        }
 
-      getCachedFile(activeDoc.id, activeDoc.fileName).then((cachedBlob) => {
-        if (isCancelled || !cachedBlob) {
-          // If not in local cache, default view mode to extracted text so user sees the verified OCR text
-          if (activeDoc.extractedText) {
-            setViewMode('text');
+        if (isAlive && !isCancelled) {
+          setPdfBlobUrl(activeDoc.filePath);
+          if (activeDoc.fileType === 'pdf') {
+            const dataUrl = await renderPdfPageToDataUrl(activeDoc.filePath);
+            if (!isCancelled && dataUrl) {
+              setPdfCanvasPreviewUrl(dataUrl);
+            }
           }
           return;
         }
 
-        const url = URL.createObjectURL(cachedBlob);
-        createdUrlToRevoke = url;
-        setPdfBlobUrl(url);
+        // Blob URL is dead (e.g. from previous session, reload, or cloud sync)
+        console.warn('Source blob URL is expired/invalid:', activeDoc.filePath, 'Checking IndexedDB fallback...');
+      }
 
-        if (activeDoc.fileType === 'pdf') {
-          renderPdfPageToDataUrl(cachedBlob).then((dataUrl) => {
+      // Step 2: Check local IndexedDB cache for original file and pre-rendered preview
+      try {
+        const cached = await getCachedFileRecord(activeDoc.id, activeDoc.fileName);
+        if (isCancelled) return;
+
+        if (cached.previewDataUrl) {
+          setPdfCanvasPreviewUrl(cached.previewDataUrl);
+        }
+
+        if (cached.blob) {
+          const freshUrl = URL.createObjectURL(cached.blob);
+          createdUrlToRevoke = freshUrl;
+          setPdfBlobUrl(freshUrl);
+
+          if (activeDoc.fileType === 'pdf' && !cached.previewDataUrl) {
+            const dataUrl = await renderPdfPageToDataUrl(cached.blob);
             if (!isCancelled && dataUrl) {
               setPdfCanvasPreviewUrl(dataUrl);
             }
-          });
+          }
+          return;
         }
-      });
+      } catch (idbErr) {
+        console.warn('IndexedDB retrieval error:', idbErr);
+      }
 
-      return () => {
-        isCancelled = true;
-        if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
-      };
-    }
-
-    // Step 2: Active document has a valid path (blob, data-url, or server url)
-    if (activeDoc.filePath.startsWith('blob:') || activeDoc.filePath.startsWith('/') || activeDoc.filePath.startsWith('http')) {
-      if (activeDoc.filePath.startsWith('/') || activeDoc.filePath.startsWith('http')) {
-        // Verify if server file exists to prevent 404 broken PDF viewer on Vercel
-        fetch(activeDoc.filePath, { method: 'HEAD' })
-          .then((res) => {
-            if (isCancelled) return;
-            if (res.ok) {
-              setPdfBlobUrl(activeDoc.filePath);
-              if (activeDoc.fileType === 'pdf') {
-                renderPdfPageToDataUrl(activeDoc.filePath).then((dataUrl) => {
-                  if (!isCancelled && dataUrl) {
-                    setPdfCanvasPreviewUrl(dataUrl);
-                  }
-                });
+      // Step 3: Check server path (if it's a real HTTP or root path)
+      if (
+        activeDoc.filePath &&
+        (activeDoc.filePath.startsWith('/') || (activeDoc.filePath.startsWith('http') && !activeDoc.filePath.startsWith('blob:')))
+      ) {
+        try {
+          const res = await fetch(activeDoc.filePath, { method: 'HEAD' });
+          if (!isCancelled && res.ok) {
+            setPdfBlobUrl(activeDoc.filePath);
+            if (activeDoc.fileType === 'pdf') {
+              const dataUrl = await renderPdfPageToDataUrl(activeDoc.filePath);
+              if (!isCancelled && dataUrl) {
+                setPdfCanvasPreviewUrl(dataUrl);
               }
-            } else {
-              // Missing on server (404 on Vercel) -> check local IndexedDB
-              console.warn(`Source file not found on server (${activeDoc.filePath}), checking IndexedDB fallback...`);
-              getCachedFile(activeDoc.id, activeDoc.fileName).then((cachedBlob) => {
-                if (isCancelled) return;
-                if (cachedBlob) {
-                  const url = URL.createObjectURL(cachedBlob);
-                  createdUrlToRevoke = url;
-                  setPdfBlobUrl(url);
-                  if (activeDoc.fileType === 'pdf') {
-                    renderPdfPageToDataUrl(cachedBlob).then((dataUrl) => {
-                      if (!isCancelled && dataUrl) {
-                        setPdfCanvasPreviewUrl(dataUrl);
-                      }
-                    });
-                  }
-                } else {
-                  // Not available: avoid black 404 screen, show verified text/re-upload card
-                  setPdfBlobUrl('');
-                  setPdfCanvasPreviewUrl('');
-                  if (activeDoc.extractedText) {
-                    setViewMode('text');
-                  }
-                }
-              });
             }
-          })
-          .catch(() => {
-            if (!isCancelled) {
-              setPdfBlobUrl(activeDoc.filePath);
-            }
-          });
-        return;
+            return;
+          }
+        } catch {}
       }
 
-      setPdfBlobUrl(activeDoc.filePath);
-      if (activeDoc.fileType === 'pdf') {
-        renderPdfPageToDataUrl(activeDoc.filePath).then((dataUrl) => {
+      // Step 4: Check base64 PDF data URL
+      if (activeDoc.filePath?.startsWith('data:application/pdf;base64,')) {
+        try {
+          const base64 = activeDoc.filePath.split(',')[1];
+          const byteCharacters = atob(base64);
+          const byteNumbers = new Uint8Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const blob = new Blob([byteNumbers], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          createdUrlToRevoke = url;
+          setPdfBlobUrl(url);
+
+          const dataUrl = await renderPdfPageToDataUrl(blob);
           if (!isCancelled && dataUrl) {
             setPdfCanvasPreviewUrl(dataUrl);
           }
-        });
-      }
-      return;
-    }
-
-    if (activeDoc.filePath.startsWith('data:application/pdf;base64,')) {
-      try {
-        const base64 = activeDoc.filePath.split(',')[1];
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+          return;
+        } catch (b64Err) {
+          console.warn('Failed to parse PDF data URL:', b64Err);
         }
-        const blob = new Blob([byteNumbers], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        createdUrlToRevoke = url;
-        setPdfBlobUrl(url);
-
-        renderPdfPageToDataUrl(blob).then((dataUrl) => {
-          if (!isCancelled && dataUrl) {
-            setPdfCanvasPreviewUrl(dataUrl);
-          }
-        });
-
-        return () => {
-          isCancelled = true;
-          if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
-        };
-      } catch (err) {
-        console.warn('Failed to parse PDF data URL to blob:', err);
-        setPdfBlobUrl('');
       }
-    } else {
-      setPdfBlobUrl(activeDoc.filePath);
+
+      // Step 5: File is not accessible locally or on server
+      // Clear pdfBlobUrl to NEVER pass an invalid URL to an iframe
+      if (!isCancelled) {
+        setPdfBlobUrl('');
+        setPdfCanvasPreviewUrl('');
+        // Automatically default viewMode to 'text' so user immediately sees the verified OCR text
+        if (activeDoc.extractedText) {
+          setViewMode('text');
+        }
+      }
     }
+
+    resolveActiveDocument();
 
     return () => {
       isCancelled = true;
       if (createdUrlToRevoke) URL.revokeObjectURL(createdUrlToRevoke);
     };
-  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.fileType, isPlaceholder]);
+  }, [activeDoc?.id, activeDoc?.filePath, activeDoc?.fileType, activeDoc?.fileName]);
 
   // Reset image error state whenever active document changes
   useEffect(() => {
@@ -539,33 +524,37 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                 </div>
               ) : (
                 /* Document file not accessible on this device (e.g. synced from cloud) */
-                <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-sm mx-auto my-auto flex flex-col items-center">
+                <div className="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-md mx-auto my-auto flex flex-col items-center">
                   <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
                     <FileText className="w-6 h-6" />
                   </div>
-                  <p className="text-xs font-bold text-slate-800 mb-1 truncate max-w-[280px]" title={activeDoc?.fileName}>
+                  <p className="text-xs font-bold text-slate-800 mb-1 truncate max-w-[320px]" title={activeDoc?.fileName}>
                     {activeDoc?.fileName}
                   </p>
-                  <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-                    Source document was synced from cloud metadata. All verified winning numbers and OCR text are active.
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold mb-3">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>OCR Extracted &amp; Verified</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-4 leading-relaxed max-w-xs">
+                    Original binary file was uploaded in another browser session. All winning numbers, letters, and OCR text have been verified from this document.
                   </p>
                   <div className="flex items-center gap-2">
                     {activeDoc?.extractedText && (
                       <button
                         type="button"
                         onClick={() => setViewMode('text')}
-                        className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
+                        className="px-3.5 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-2xs"
                       >
-                        View Extracted Text
+                        View Raw OCR Text
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-xs transition flex items-center gap-1"
+                      className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-2xs transition flex items-center gap-1.5"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Re-upload File</span>
+                      <span>Attach Original File</span>
                     </button>
                   </div>
                 </div>

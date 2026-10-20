@@ -159,15 +159,26 @@ export default function Home() {
         // Reconcile any placeholder sources from IndexedDB cache
         if (Array.isArray(data.sheet.sources)) {
           try {
-            const { getCachedFile } = await import('@/lib/source-file-cache');
+            const { getCachedFileRecord } = await import('@/lib/source-file-cache');
             const reconciledSources = await Promise.all(
               data.sheet.sources.map(async (s: any) => {
-                if (!s.filePath || s.filePath.includes('Browser Session') || s.filePath.startsWith('[')) {
-                  const cachedBlob = await getCachedFile(s.id, s.fileName);
-                  if (cachedBlob) {
+                const isPlaceholder = !s.filePath ||
+                  s.filePath.startsWith('blob:') ||
+                  s.filePath.includes('Browser Session') ||
+                  s.filePath.startsWith('[');
+
+                if (isPlaceholder) {
+                  const cachedRecord = await getCachedFileRecord(s.id, s.fileName);
+                  if (cachedRecord.blob) {
                     return {
                       ...s,
-                      filePath: URL.createObjectURL(cachedBlob),
+                      filePath: URL.createObjectURL(cachedRecord.blob),
+                      previewImageUrl: cachedRecord.previewDataUrl || s.previewImageUrl,
+                    };
+                  } else {
+                    return {
+                      ...s,
+                      filePath: '[Stored in Browser Session]',
                     };
                   }
                 }
@@ -281,6 +292,10 @@ export default function Home() {
         setIsSaving(true);
         const targetSheet: DailySheet = {
           ...sheet,
+          sources: (sheet.sources || []).map(s => ({
+            ...s,
+            filePath: (s.filePath && s.filePath.startsWith('blob:')) ? '[Stored in Browser Session]' : s.filePath,
+          })),
           updatedAt: new Date().toISOString(),
         };
 
@@ -378,8 +393,13 @@ export default function Home() {
 
   // Save current sheet
   const handleSave = async (sheetToSave?: DailySheet, summary = 'Updated lottery results') => {
+    const raw = sheetToSave || sheet;
     const targetSheet: DailySheet = {
-      ...(sheetToSave || sheet),
+      ...raw,
+      sources: (raw.sources || []).map(s => ({
+        ...s,
+        filePath: (s.filePath && s.filePath.startsWith('blob:')) ? '[Stored in Browser Session]' : s.filePath,
+      })),
       updatedAt: new Date().toISOString(),
     };
     setIsSaving(true);
@@ -506,11 +526,23 @@ export default function Home() {
           showToast(`Uploaded ${file.name}, but could not identify lottery results.`, 'error');
         }
 
+        // Render raster preview for instant visual verification
+        let clientPreviewUrl: string | undefined = undefined;
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+          try {
+            const { renderPdfPageToDataUrl } = await import('@/lib/client-pdf-extractor');
+            const dataUrl = await renderPdfPageToDataUrl(file);
+            if (dataUrl) clientPreviewUrl = dataUrl;
+          } catch (renderErr) {
+            console.warn('Client PDF preview rendering error:', renderErr);
+          }
+        }
+
         // Cache file in IndexedDB immediately for persistent browser preview across reloads
         if (data.sourceDoc?.id) {
           try {
             const { saveCachedFile } = await import('@/lib/source-file-cache');
-            await saveCachedFile(data.sourceDoc.id, file.name, file);
+            await saveCachedFile(data.sourceDoc.id, file.name, file, clientPreviewUrl);
           } catch (cacheErr) {
             console.warn('Could not cache file in IndexedDB:', cacheErr);
           }
@@ -523,6 +555,7 @@ export default function Home() {
         const clientSourceDoc: SourceDocument = {
           ...data.sourceDoc,
           filePath: isServerPlaceholder ? localBlobUrl : (data.sourceDoc.filePath || localBlobUrl),
+          previewImageUrl: clientPreviewUrl || data.sourceDoc?.previewImageUrl,
           extractedText: data.sourceDoc?.extractedText || browserText,
         };
 

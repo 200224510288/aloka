@@ -187,9 +187,9 @@ export async function POST(req: NextRequest) {
       const { saveSourceDocToCloud } = await import('@/lib/cloud-service');
       const cloudDoc: SourceDocument = {
         ...sourceDoc,
-        // Don't blow up Firestore document limit with massive base64 strings
-        filePath: sourceDoc.filePath.length > 50000 ? '[Stored in Browser Session]' : sourceDoc.filePath,
-        previewImageUrl: sourceDoc.previewImageUrl && sourceDoc.previewImageUrl.length > 50000 ? undefined : sourceDoc.previewImageUrl,
+        // Don't blow up Firestore document limit with massive base64 strings and never persist blob URLs
+        filePath: (sourceDoc.filePath.startsWith('blob:') || sourceDoc.filePath.length > 50000) ? '[Stored in Browser Session]' : sourceDoc.filePath,
+        previewImageUrl: sourceDoc.previewImageUrl && (sourceDoc.previewImageUrl.startsWith('blob:') || sourceDoc.previewImageUrl.length > 50000) ? undefined : sourceDoc.previewImageUrl,
       };
       await saveSourceDocToCloud(cloudDoc, date, {
         detectedDate: extraction.detectedDate,
