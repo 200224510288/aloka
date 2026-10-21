@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
@@ -70,7 +71,7 @@ function getSheetContentHash(s: DailySheet): string {
 
 type FilterType = 'all' | 'needs_attention' | 'confirmed' | 'no_draw';
 
-export default function Home() {
+function EditorContent() {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('verify');
   const [selectedDate, setSelectedDate] = useState<string>(() => getYesterdayDateStr());
   const [sheet, setSheet] = useState<DailySheet>(() => createEmptySheet(getYesterdayDateStr()));
@@ -244,23 +245,44 @@ export default function Home() {
     }
   }, []);
 
-  // Check URL query parameter on mount or restore last active date
-  useEffect(() => {
+  const searchParams = useSearchParams();
+  const urlDate = searchParams?.get('date');
+
+  // Handle date change: keeps selectedDate, sheet.date, localStorage, and URL strictly synchronized
+  const handleDateChange = useCallback((newDate: string) => {
+    setSelectedDate(newDate);
+    const d = new Date(newDate);
+    const dayIdx = isNaN(d.getDay()) ? 1 : d.getDay();
+    const dayName = DAYS_OF_WEEK_SI[dayIdx] || 'සඳුදා';
+
+    setSheet(prev => ({
+      ...prev,
+      date: newDate,
+      dayOfWeekSi: dayName,
+    }));
+
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const dateParam = params.get('date');
-      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-        if (dateParam !== selectedDate) {
-          setSelectedDate(dateParam);
-        }
-      } else {
-        const savedDate = localStorage.getItem('sinhala_lottery_last_active_date');
-        if (savedDate && /^\d{4}-\d{2}-\d{2}$/.test(savedDate) && savedDate !== selectedDate) {
-          setSelectedDate(savedDate);
-        }
+      localStorage.setItem('sinhala_lottery_last_active_date', newDate);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('date') !== newDate) {
+        url.searchParams.set('date', newDate);
+        window.history.replaceState({}, '', url.toString());
       }
     }
   }, []);
+
+  // Reactively synchronize active date when URL search parameter changes or from last active date
+  useEffect(() => {
+    const target = (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate))
+      ? urlDate
+      : (typeof window !== 'undefined' ? localStorage.getItem('sinhala_lottery_last_active_date') : null);
+
+    if (target && /^\d{4}-\d{2}-\d{2}$/.test(target)) {
+      if (target !== selectedDate || target !== sheet.date) {
+        handleDateChange(target);
+      }
+    }
+  }, [urlDate, handleDateChange, selectedDate, sheet.date]);
 
   useEffect(() => {
     loadSheet(selectedDate);
@@ -350,26 +372,6 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [sheet]);
 
-  // Handle date change
-  const handleDateChange = (newDate: string) => {
-    setSelectedDate(newDate);
-    const d = new Date(newDate);
-    const dayIdx = isNaN(d.getDay()) ? 1 : d.getDay();
-    const dayName = DAYS_OF_WEEK_SI[dayIdx] || 'සඳුදා';
-
-    setSheet(prev => ({
-      ...prev,
-      date: newDate,
-      dayOfWeekSi: dayName,
-    }));
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('sinhala_lottery_last_active_date', newDate);
-      const url = new URL(window.location.href);
-      url.searchParams.set('date', newDate);
-      window.history.replaceState({}, '', url.toString());
-    }
-  };
 
   // 1-Click Quick Print from Calendar / 4-Day History Bar
   const handleQuickPrint = async (targetDate: string) => {
@@ -480,9 +482,10 @@ export default function Home() {
         }
       }
 
+      const activeDate = sheet.date || selectedDate;
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('date', selectedDate);
+      formData.append('date', activeDate);
       if (browserText && browserText.trim().length > 0) {
         formData.append('clientExtractedText', browserText.trim());
       }
@@ -506,7 +509,7 @@ export default function Home() {
             const { extractLotteryDataFromText } = await import('@/lib/extractor');
             const fallbackExt = extractLotteryDataFromText(
               browserText || data.sourceDoc?.extractedText || '',
-              selectedDate,
+              activeDate,
               file.name,
               1
             );
@@ -633,14 +636,16 @@ export default function Home() {
     setIsAutoFetchingSource(true);
     setDateMismatchWarning(undefined);
 
-    try {
-      showToast(`⚡ Fetching daily sheet from lklottery.com for ${selectedDate}...`, 'info');
+    const activeDate = sheet.date || selectedDate;
 
-      const res = await fetch(`/api/auto-fetch-source?date=${selectedDate}`);
+    try {
+      showToast(`⚡ Fetching daily sheet from lklottery.com for ${activeDate}...`, 'info');
+
+      const res = await fetch(`/api/auto-fetch-source?date=${activeDate}`);
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        const errDetail = data.error || `Could not fetch sheet for ${selectedDate}`;
+        const errDetail = data.error || `Could not fetch sheet for ${activeDate}`;
         const latestMsg = data.latestDate ? ` (Latest available sheet on lklottery: ${data.latestDate})` : '';
         showToast(`${errDetail}${latestMsg}`, 'error');
         return;
@@ -652,6 +657,14 @@ export default function Home() {
       let detectedFooterAnnouncement = extraction?.detectedFooterAnnouncement;
       let unassignedRows = extraction?.unassignedRows || [];
       let dateMismatchWarning = extraction?.dateMismatchWarning;
+
+      // SAFETY CHECK: If detected date in PDF does not match activeDate, do not overwrite the sheet!
+      if (detectedDate && detectedDate !== activeDate) {
+        const mismatchMsg = `Fetched PDF is for date ${detectedDate}, which does not match active sheet date ${activeDate}!`;
+        setDateMismatchWarning(mismatchMsg);
+        showToast(`⚠️ ${mismatchMsg}`, 'error');
+        return;
+      }
 
       // Render raster preview and cache into IndexedDB for persistent visual display across reloads
       let clientPreviewUrl: string | undefined = undefined;
@@ -675,9 +688,14 @@ export default function Home() {
         previewImageUrl: clientPreviewUrl || sourceDoc.previewImageUrl,
       };
 
-      // Filter out previous version of this same auto-fetched document if re-fetching
-      const existingSources = sheet.sources.filter(s => s.fileName !== sourceDoc.fileName);
-      const newSources = [...existingSources, clientSourceDoc];
+      // Strip out any stale auto-fetched lklottery sheets (especially from another date)
+      // and place the newly fetched document first
+      const existingSources = sheet.sources.filter(s => 
+        !s.fileName.startsWith('lklottery_results_') &&
+        s.fileName !== sourceDoc.fileName &&
+        (!s.detectedDate || s.detectedDate === activeDate)
+      );
+      const newSources = [clientSourceDoc, ...existingSources];
 
       const updatedLotteries = sheet.lotteries.map((existing) => {
         const match = matchedLotteries.find((m: any) => m.lotteryId === existing.lotteryId);
@@ -704,7 +722,23 @@ export default function Home() {
             sourcePage: match.sourcePage || 1,
             extractionConfidence: match.extractionConfidence,
             isCheckedAgainstSource: true,
+            isNoDraw: false,
           };
+        } else {
+          // If this lottery is not in today's sheet and had source from another auto-fetched file, clear stale numbers
+          if (existing.sourceFileName && existing.sourceFileName.startsWith('lklottery_results_') && existing.sourceFileName !== sourceDoc.fileName) {
+            return {
+              ...existing,
+              numbers: [],
+              drawNo: '',
+              letter: '',
+              zodiac: '',
+              bonusNumber: '',
+              boxedIndex: undefined,
+              sourceFileName: undefined,
+              isCheckedAgainstSource: false,
+            };
+          }
         }
         return existing;
       });
@@ -718,6 +752,7 @@ export default function Home() {
 
       const newSheet: DailySheet = {
         ...sheet,
+        date: activeDate,
         sources: newSources,
         lotteries: updatedLotteries,
         footerAnnouncement: detectedFooterAnnouncement || sheet.footerAnnouncement,
@@ -730,7 +765,7 @@ export default function Home() {
         setCurrentStep('verify');
       }
 
-      showToast(`🎉 Auto-fetched & extracted ${matchedCount} lotteries from lklottery.com for ${selectedDate}!`, 'success');
+      showToast(`🎉 Auto-fetched & extracted ${matchedCount} lotteries from lklottery.com for ${activeDate}!`, 'success');
     } catch (err: any) {
       showToast(`Auto-fetch error: ${err.message}`, 'error');
     } finally {
@@ -1637,7 +1672,7 @@ export default function Home() {
                     onClick={handleAutoFetchSource}
                     disabled={isAutoFetchingSource || isUploading}
                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                    title={`Download and extract raw Sinhala PDF from lklottery.com for ${selectedDate}`}
+                    title={`Download and extract raw Sinhala PDF from lklottery.com for ${sheet.date}`}
                   >
                     <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetchingSource ? 'animate-bounce' : ''}`} />
                     <span>{isAutoFetchingSource ? 'Fetching LK Sheet...' : 'Auto-Fetch LK Lottery'}</span>
@@ -2054,5 +2089,20 @@ export default function Home() {
       />
 
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="flex items-center gap-2.5 text-slate-700 font-bold text-sm bg-white p-4 rounded-xl shadow-md border border-slate-200">
+          <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+          <span>පූරණය වෙමින් පවතී (Loading editor)...</span>
+        </div>
+      </div>
+    }>
+      <EditorContent />
+    </Suspense>
   );
 }

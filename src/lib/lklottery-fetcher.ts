@@ -63,8 +63,8 @@ export async function getLkLotteryCatalog(): Promise<LkLotteryCatalogItem[]> {
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.warn(`[LkLottery] Failed to load catalog: HTTP ${res.status}`);
-      return [];
+      console.warn(`[LkLottery] Failed to load catalog: HTTP ${res.status}. Generating recent 14 days fallback catalog...`);
+      return generateRecentDaysCatalog();
     }
 
     const html = await res.text();
@@ -73,7 +73,7 @@ export async function getLkLotteryCatalog(): Promise<LkLotteryCatalogItem[]> {
     const match = html.match(/var\s+pdfArr\s*=\s*(\[[\s\S]*?\]);/);
     if (!match || !match[1]) {
       console.warn('[LkLottery] Could not locate var pdfArr in page script');
-      return [];
+      return generateRecentDaysCatalog();
     }
 
     const rawList = JSON.parse(match[1]);
@@ -85,12 +85,30 @@ export async function getLkLotteryCatalog(): Promise<LkLotteryCatalogItem[]> {
       })).filter(item => item.date && item.si_results_pdf_url);
     }
 
-    return [];
+    return generateRecentDaysCatalog();
   } catch (err: any) {
     clearTimeout(timeout);
     console.warn('[LkLottery] Error fetching catalog:', err?.message || err);
-    return [];
+    return generateRecentDaysCatalog();
   }
+}
+
+function generateRecentDaysCatalog(): LkLotteryCatalogItem[] {
+  const fallbackList: LkLotteryCatalogItem[] = [];
+  const now = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now.getTime() - i * 86400000);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const pred = predictLkLotteryPdfUrl(dateStr);
+    fallbackList.push({
+      date: dateStr,
+      si_results_pdf_url: pred.url,
+    });
+  }
+  return fallbackList;
 }
 
 /**
@@ -125,53 +143,86 @@ export async function fetchAndExtractLkLotteryPdf(targetDate: string): Promise<L
     resolvedFileName = predicted.fileName;
   }
 
-  // Step 3: Fetch the PDF binary
-  const fetchController = new AbortController();
-  const fetchTimeout = setTimeout(() => fetchController.abort(), 15000);
+  // Step 3: Fetch the PDF binary (with Cloudflare 403 bypass proxy fallback for Vercel / datacenter IPs)
+  const fetchHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/pdf,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://lklottery.com/pdf/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'same-origin',
+  };
 
-  let pdfBuffer: Buffer;
+  let pdfBuffer: Buffer | null = null;
+  let lastErrorStatus: number | null = null;
+
+  // Attempt 1: Direct fetch from lklottery.com
   try {
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 12000);
     const pdfRes = await fetch(resolvedUrl, {
       signal: fetchController.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://lklottery.com/pdf/',
-      },
+      headers: fetchHeaders,
     });
-
     clearTimeout(fetchTimeout);
 
-    if (!pdfRes.ok) {
-      return {
-        success: false,
-        date: normalizedDate,
-        error: `Could not retrieve PDF for ${normalizedDate} (HTTP ${pdfRes.status}). Sheet may not be uploaded to lklottery.com yet.`,
-        availableDates: availableDates.slice(0, 7),
-        latestDate: availableDates[0],
-      };
+    if (pdfRes.ok) {
+      const arrayBuf = await pdfRes.arrayBuffer();
+      const candidate = Buffer.from(arrayBuf);
+      if (candidate.slice(0, 5).toString('ascii').startsWith('%PDF')) {
+        pdfBuffer = candidate;
+      }
+    } else {
+      lastErrorStatus = pdfRes.status;
+      console.warn(`[LkLottery] Direct fetch returned HTTP ${pdfRes.status} for ${resolvedUrl}`);
     }
+  } catch (directErr: any) {
+    console.warn(`[LkLottery] Direct fetch failed for ${resolvedUrl}:`, directErr?.message || directErr);
+  }
 
-    const arrayBuf = await pdfRes.arrayBuffer();
-    pdfBuffer = Buffer.from(arrayBuf);
+  // Attempt 2: If blocked by Cloudflare (e.g. HTTP 403 on Vercel/datacenter IPs), fetch via Google proxy mirror
+  if (!pdfBuffer) {
+    try {
+      console.info(`[LkLottery] Attempting Cloudflare bypass proxy mirror for ${resolvedFileName}...`);
+      const proxyUrl = `https://translate.google.com/translate?sl=auto&tl=en&u=${encodeURIComponent(resolvedUrl)}`;
+      const proxyController = new AbortController();
+      const proxyTimeout = setTimeout(() => proxyController.abort(), 15000);
 
-    // Validate that it looks like a PDF (starts with %PDF)
-    const header = pdfBuffer.slice(0, 5).toString('ascii');
-    if (!header.startsWith('%PDF')) {
-      return {
-        success: false,
-        date: normalizedDate,
-        error: `Downloaded file for ${normalizedDate} is not a valid PDF document.`,
-        availableDates: availableDates.slice(0, 7),
-        latestDate: availableDates[0],
-      };
+      const proxyRes = await fetch(proxyUrl, {
+        signal: proxyController.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'application/pdf,*/*',
+        },
+      });
+      clearTimeout(proxyTimeout);
+
+      if (proxyRes.ok) {
+        const arrayBuf = await proxyRes.arrayBuffer();
+        const candidate = Buffer.from(arrayBuf);
+        if (candidate.slice(0, 5).toString('ascii').startsWith('%PDF')) {
+          pdfBuffer = candidate;
+          console.info(`[LkLottery] Successfully fetched ${resolvedFileName} via proxy mirror (${candidate.length} bytes)`);
+        }
+      } else {
+        lastErrorStatus = proxyRes.status;
+      }
+    } catch (proxyErr: any) {
+      console.warn(`[LkLottery] Proxy mirror fetch failed:`, proxyErr?.message || proxyErr);
     }
-  } catch (fetchErr: any) {
-    clearTimeout(fetchTimeout);
+  }
+
+  // If both direct and proxy mirror fail, return error
+  if (!pdfBuffer) {
+    const errorReason = lastErrorStatus 
+      ? `Could not retrieve PDF for ${normalizedDate} (HTTP ${lastErrorStatus}). Sheet may not be uploaded to lklottery.com yet.`
+      : `Network error downloading PDF for ${normalizedDate}. Please check your connection or upload manually.`;
     return {
       success: false,
       date: normalizedDate,
-      error: `Network error downloading PDF from lklottery: ${fetchErr?.message || fetchErr}`,
-      availableDates: availableDates.slice(0, 7),
+      error: errorReason,
+      availableDates: availableDates.length > 0 ? availableDates.slice(0, 7) : undefined,
       latestDate: availableDates[0],
     };
   }

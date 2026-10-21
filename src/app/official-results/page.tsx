@@ -76,7 +76,12 @@ export default function OfficialResultsPage() {
 
   // Convert draw date like "Sunday October 18, 2026" or "2026-Oct-18 Sunday" to YYYY-MM-DD
   const getIsoDate = (dateStr?: string | null): string => {
-    if (!dateStr) return '2026-10-18';
+    const now = new Date();
+    const defaultDate = new Date(now);
+    defaultDate.setDate(defaultDate.getDate() - 1);
+    const defIso = defaultDate.toISOString().split('T')[0];
+
+    if (!dateStr) return defIso;
     const isoLike = dateStr.match(/(\d{4})-([A-Za-z]+|\d{2})-(\d{1,2})/);
     if (isoLike) {
       const y = isoLike[1];
@@ -96,9 +101,9 @@ export default function OfficialResultsPage() {
       september: '09', october: '10', november: '11', december: '12'
     };
     const parts = dateStr.split(/[\s,]+/);
-    let foundMonth = '10';
-    let foundDay = '18';
-    let foundYear = '2026';
+    let foundMonth = String(defaultDate.getMonth() + 1).padStart(2, '0');
+    let foundDay = String(defaultDate.getDate()).padStart(2, '0');
+    let foundYear = String(defaultDate.getFullYear());
     for (const p of parts) {
       const low = p.toLowerCase();
       if (monthMap[low]) foundMonth = monthMap[low];

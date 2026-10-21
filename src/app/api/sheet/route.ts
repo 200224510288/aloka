@@ -89,6 +89,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 3.5. Sanitize sources: Strip out any source documents that belong to a different date
+    if (sheet.sources && sheet.sources.length > 0) {
+      const cleanDigits = date.replace(/-/g, '');
+      sheet.sources = sheet.sources.filter(s => {
+        const match = s.fileName.match(/(\d{8})/);
+        if (match && match[1] !== cleanDigits) {
+          return false;
+        }
+        if (s.detectedDate && s.detectedDate !== date) {
+          return false;
+        }
+        return true;
+      });
+    }
+
     // 4. Auto-reconcile physical uploaded files from public/uploads/${date}
     try {
       const fs = await import('fs');
