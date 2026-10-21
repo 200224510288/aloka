@@ -433,8 +433,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           >
             {/* Auto-Fetch Featured Action Card */}
             {onAutoFetchSource && (
-              <div className="w-full max-w-sm p-4 mb-3.5 bg-gradient-to-br from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/90 rounded-xl shadow-2xs text-center flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center mb-2 shadow-sm ring-4 ring-emerald-100">
+              <div className="w-full max-w-sm p-4 mb-3.5 bg-slate-50 border border-slate-200 rounded-xl text-center flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center mb-2 shadow-xs">
                   <Zap className={`w-5 h-5 text-amber-300 ${isAutoFetching ? 'animate-bounce' : ''}`} />
                 </div>
                 <h3 className="text-xs font-bold text-slate-800">

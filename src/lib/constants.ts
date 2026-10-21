@@ -515,7 +515,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
 
 export const INITIAL_HEADER_GREETING = 'ඔබට සුබ දවසක් !';
 export const INITIAL_DEALER_NAME = 'S.W.ඔස්මන් ද සිල්වා';
-export const INITIAL_FOOTER_ANNOUNCEMENT = 'ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්';
+export const INITIAL_FOOTER_ANNOUNCEMENT = '';
 
 // Reference Sample Data strictly from the attached wireframe (2026.10.05 Monday)
 // Clearly labelled as SAMPLE DATA only
@@ -524,7 +524,7 @@ export const SAMPLE_WIREFRAME_SHEET: DailySheet = {
   dayOfWeekSi: 'සඳුදා',
   headerGreeting: 'ඔබට සුබ දවසක් !',
   headerDealerName: 'S.W.ඔස්මන් ද සිල්වා',
-  footerAnnouncement: 'ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්',
+  footerAnnouncement: '',
   isFooterReviewed: true,
   sources: [
     {

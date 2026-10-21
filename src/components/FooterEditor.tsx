@@ -23,7 +23,7 @@ interface FooterEditorProps {
 }
 
 const PRESET_FOOTER_SNIPPETS = [
-  'ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්',
+  'ජයග්‍රාහී ලොතරැයි පත් අපෙන් ලබාගන්න',
   'ජය සම්පත රු. 50 000 ක් ඔස්මන් ද සිල්වා ගෙන්',
   'අද සම්පත රු. 50 000 ක් ඔස්මන් ද සිල්වා ගෙන්',
   'මහජන සම්පත/ කප්රුක රු. ලක්ෂ 01 02 ක් S.W.ඔස්මන් ද සිල්වා ගෙන්',
@@ -239,7 +239,7 @@ export const FooterEditor: React.FC<FooterEditorProps> = ({ sheet, onChange }) =
           onChange={(e) => handleTextChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder="e.g. ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්"
+          placeholder="විශේෂ නිවේදනයක් ඇත්නම් මෙහි සටහන් කරන්න..."
           className={`w-full px-3.5 py-2.5 text-sm font-bold font-sinhala border rounded-xl outline-none transition-all shadow-inner ${
             isOverflow
               ? 'border-red-400 bg-red-50 focus:border-red-500'

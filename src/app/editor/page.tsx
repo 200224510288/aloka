@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
@@ -16,6 +17,8 @@ import { OfficialVerificationModal } from '@/components/OfficialVerificationModa
 import { directPrintSheet } from '@/lib/direct-print';
 import { UnifiedCalendar } from '@/components/UnifiedCalendar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
+import { RoleSelectModal } from '@/components/RoleSelectModal';
+import { UserRole, getStoredUserRole, setStoredUserRole } from '@/lib/user-role';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -69,12 +72,19 @@ function getSheetContentHash(s: DailySheet): string {
   });
 }
 
+function sanitizeSheet(s: DailySheet): DailySheet {
+  if (s && s.footerAnnouncement && s.footerAnnouncement.includes('ගොවි සෙත රු. ලක්ෂ දෙකහමාරක්')) {
+    return { ...s, footerAnnouncement: '' };
+  }
+  return s;
+}
+
 type FilterType = 'all' | 'needs_attention' | 'confirmed' | 'no_draw';
 
 function EditorContent() {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('verify');
   const [selectedDate, setSelectedDate] = useState<string>(() => getYesterdayDateStr());
-  const [sheet, setSheet] = useState<DailySheet>(() => createEmptySheet(getYesterdayDateStr()));
+  const [sheet, setSheet] = useState<DailySheet>(() => sanitizeSheet(createEmptySheet(getYesterdayDateStr())));
   const [revisions, setRevisions] = useState<RevisionRecord[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -95,6 +105,10 @@ function EditorContent() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isLoadingDate, setIsLoadingDate] = useState<boolean>(false);
 
+  // User Role State
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
+
   // Hydrate availableDates from browser localStorage on mount for instant visual indicators
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -113,8 +127,27 @@ function EditorContent() {
           setAvailableDates(prev => Array.from(new Set([...prev, ...localKeys])).sort().reverse());
         }
       } catch {}
+
+      // Hydrate user role
+      setUserRole(getStoredUserRole());
+      const handleRoleChange = (e: any) => {
+        if (e.detail?.role !== undefined) {
+          setUserRole(e.detail.role);
+        }
+      };
+      window.addEventListener('lottery_user_role_changed', handleRoleChange);
+      return () => window.removeEventListener('lottery_user_role_changed', handleRoleChange);
     }
   }, []);
+
+  const handleRoleSelect = (role: UserRole) => {
+    setUserRole(role);
+    setStoredUserRole(role);
+    setIsRoleModalOpen(false);
+    if (role === 'staff') {
+      router.push(`/?date=${selectedDate}`);
+    }
+  };
 
   // Auto-save tracking refs
   const lastSavedHashRef = useRef<string>('');
@@ -252,9 +285,10 @@ function EditorContent() {
           }
         }
 
-        setSheet(data.sheet);
+        const cleanSheet = sanitizeSheet(data.sheet);
+        setSheet(cleanSheet);
         setRevisions(data.revisions || []);
-        lastSavedHashRef.current = getSheetContentHash(data.sheet);
+        lastSavedHashRef.current = getSheetContentHash(cleanSheet);
         isInitialLoadedRef.current = true;
         if (data.fromCloud) {
           setCloudStatus('synced');
@@ -264,7 +298,7 @@ function EditorContent() {
         }
         // Cache to browser localStorage
         try {
-          localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(data.sheet));
+          localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(cleanSheet));
         } catch {}
       } else {
         if (data.availableDates && Array.isArray(data.availableDates)) {
@@ -274,14 +308,14 @@ function EditorContent() {
         try {
           const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
           if (cached) {
-            const parsed = JSON.parse(cached);
+            const parsed = sanitizeSheet(JSON.parse(cached));
             setSheet(parsed);
             lastSavedHashRef.current = getSheetContentHash(parsed);
             isInitialLoadedRef.current = true;
             return;
           }
         } catch {}
-        const empty = createEmptySheet(date);
+        const empty = sanitizeSheet(createEmptySheet(date));
         setSheet(empty);
         lastSavedHashRef.current = getSheetContentHash(empty);
         isInitialLoadedRef.current = true;
@@ -291,14 +325,14 @@ function EditorContent() {
       try {
         const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
         if (cached) {
-          const parsed = JSON.parse(cached);
+          const parsed = sanitizeSheet(JSON.parse(cached));
           setSheet(parsed);
           lastSavedHashRef.current = getSheetContentHash(parsed);
           isInitialLoadedRef.current = true;
           return;
         }
       } catch {}
-      const empty = createEmptySheet(date);
+      const empty = sanitizeSheet(createEmptySheet(date));
       setSheet(empty);
       lastSavedHashRef.current = getSheetContentHash(empty);
       isInitialLoadedRef.current = true;
@@ -1604,6 +1638,8 @@ function EditorContent() {
         currentStep={currentStep}
         pageMode="editor"
         cloudStatus={cloudStatus}
+        currentRole={userRole}
+        onOpenRoleModal={() => setIsRoleModalOpen(true)}
         onStepChange={setCurrentStep}
         onDateChange={handleDateChange}
         onUpdateSheet={setSheet}
@@ -1630,6 +1666,32 @@ function EditorContent() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 flex flex-col gap-4">
         
+        {/* Staff Mode Notice Banner (Links back to Automated Print Portal) */}
+        {userRole === 'staff' && (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Printer className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-emerald-950 font-sinhala">
+                  කාර්ය මණ්ඩල ස්වයංක්‍රීය ප්‍රකාරය (Staff Mode Active)
+                </h4>
+                <p className="text-xs text-emerald-800 font-sinhala">
+                  සම්පූර්ණ ස්වයංක්‍රීය නිල සත්‍යාපනය සහ ක්ෂණික මුද්‍රණය සඳහා මුද්‍රණ අංශයට පිවිසෙන්න.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/?date=${selectedDate}`}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2 shrink-0 font-sinhala"
+            >
+              <span>ස්වයංක්‍රීය මුද්‍රණ අංශයට</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
+
         {/* Single Unified Big User-Friendly Draw Date Calendar */}
         <UnifiedCalendar
           key={`${selectedDate}`}
@@ -2309,6 +2371,14 @@ function EditorContent() {
         onRefresh={() => handleRunOfficialVerify()}
         onApplyOfficialFix={handleApplyOfficialFix}
         onApplyAllOfficialFixes={handleApplyAllOfficialFixes}
+      />
+
+      {/* Role Selection Modal */}
+      <RoleSelectModal
+        isOpen={isRoleModalOpen}
+        currentRole={userRole}
+        onSelectRole={handleRoleSelect}
+        onClose={() => setIsRoleModalOpen(false)}
       />
 
     </div>

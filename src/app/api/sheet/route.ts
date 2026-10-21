@@ -280,6 +280,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Strip legacy default announcement if present
+    if (sheet && sheet.footerAnnouncement && sheet.footerAnnouncement.includes('ගොවි සෙත රු. ලක්ෂ දෙකහමාරක්')) {
+      sheet.footerAnnouncement = '';
+    }
+
     return NextResponse.json({
       success: true,
       sheet,
@@ -313,6 +318,10 @@ export async function POST(req: NextRequest) {
 
     if (!sheet || !sheet.date) {
       return NextResponse.json({ success: false, error: 'Valid sheet with date is required' }, { status: 400 });
+    }
+
+    if (sheet && sheet.footerAnnouncement && sheet.footerAnnouncement.includes('ගොවි සෙත රු. ලක්ෂ දෙකහමාරක්')) {
+      sheet.footerAnnouncement = '';
     }
 
     const cleanDigits = sheet.date.replace(/-/g, '');

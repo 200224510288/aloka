@@ -147,7 +147,7 @@ export default function OfficialResultsPage() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
             
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-xs shrink-0">
               <ShieldCheck className="w-5 h-5 text-blue-100" />
             </div>
 
@@ -202,7 +202,7 @@ export default function OfficialResultsPage() {
       </header>
 
       {/* Hero Stats & Info Banner */}
-      <section className="bg-gradient-to-b from-white to-slate-50/70 border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-5">
+      <section className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-5">
         <div className="max-w-7xl mx-auto space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {/* Metric 1 */}
@@ -449,7 +449,7 @@ export default function OfficialResultsPage() {
                               {item.numbers.map((tierNum, tIdx) => (
                                 <React.Fragment key={tIdx}>
                                   {tIdx > 0 && <span className="text-slate-400 font-black text-sm px-0.5">/</span>}
-                                  <div className="px-2.5 py-1 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-sm font-mono shadow-xs border border-amber-400/80">
+                                  <div className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-sm font-mono shadow-xs border border-amber-500">
                                     {tierNum}
                                   </div>
                                 </React.Fragment>
@@ -458,7 +458,7 @@ export default function OfficialResultsPage() {
                               {item.letter && (
                                 <>
                                   <span className="text-slate-400 font-black text-sm px-0.5">/</span>
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-b from-blue-500 to-blue-700 text-white font-black text-sm flex items-center justify-center shadow-xs border border-blue-600">
+                                  <div className="w-8 h-8 rounded-full bg-blue-700 text-white font-black text-sm flex items-center justify-center shadow-xs">
                                     {item.letter}
                                   </div>
                                 </>
@@ -471,7 +471,7 @@ export default function OfficialResultsPage() {
                             {/* Letter Ball */}
                             {item.letter && (
                               <div
-                                className="w-9 h-9 rounded-full bg-gradient-to-b from-blue-600 to-blue-700 text-white font-extrabold text-sm flex items-center justify-center shadow-sm shadow-blue-500/20 ring-2 ring-blue-300/40 shrink-0"
+                                className="w-9 h-9 rounded-full bg-blue-700 text-white font-extrabold text-sm flex items-center justify-center shadow-xs shrink-0"
                                 title={`Letter: ${item.letter}`}
                               >
                                 {item.letter}
@@ -509,7 +509,7 @@ export default function OfficialResultsPage() {
                             {/* Super / Special Number Ball (Red) e.g. Mega Power, Kapruka */}
                             {item.superNumber && (
                               <div
-                                className="w-9 h-9 rounded-full bg-gradient-to-b from-rose-500 to-red-600 text-white font-extrabold text-sm flex items-center justify-center shadow-sm shadow-rose-500/20 ring-2 ring-rose-300/50 shrink-0"
+                                className="w-9 h-9 rounded-full bg-red-600 text-white font-extrabold text-sm flex items-center justify-center shadow-xs shrink-0"
                                 title={`Super / Special Boxed Number: [${item.superNumber}]`}
                               >
                                 {item.superNumber}
@@ -520,7 +520,7 @@ export default function OfficialResultsPage() {
                             {item.numbers.map((num, nIdx) => (
                               <div
                                 key={nIdx}
-                                className="w-9 h-9 rounded-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-xs ring-1 ring-amber-400/50 shrink-0 font-mono"
+                                className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-xs shrink-0 font-mono"
                               >
                                 {num}
                               </div>

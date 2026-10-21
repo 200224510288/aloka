@@ -12,6 +12,8 @@ interface HeaderProps {
   currentStep?: WorkflowStep;
   pageMode?: 'print' | 'editor';
   cloudStatus?: 'synced' | 'syncing' | 'offline' | 'permission_denied';
+  currentRole?: 'aloka' | 'staff' | null;
+  onOpenRoleModal?: () => void;
   onStepChange?: (step: WorkflowStep) => void;
   onDateChange: (newDate: string) => void;
   onUpdateSheet: (updater: (prev: DailySheet) => DailySheet) => void;
@@ -30,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   currentStep = 'verify',
   pageMode = 'editor',
   cloudStatus = 'synced',
+  currentRole,
+  onOpenRoleModal,
   onStepChange,
   onDateChange,
   onUpdateSheet,
@@ -187,6 +191,40 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'Local Cache'}
               </span>
             </div>
+
+            {/* Role Switcher Pill */}
+            {onOpenRoleModal && (
+              <button
+                type="button"
+                onClick={onOpenRoleModal}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer shadow-2xs ${
+                  currentRole === 'staff'
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                    : currentRole === 'aloka'
+                    ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
+                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 animate-pulse'
+                }`}
+                title="ඔබගේ භූමිකාව මාරු කිරීමට ක්ලික් කරන්න (Click to switch between Aloka and Staff mode)"
+              >
+                {currentRole === 'staff' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-sinhala">කාර්ය මණ්ඩලය (Staff)</span>
+                    <span className="text-[10px] text-emerald-700 font-bold ml-0.5 underline">මාරු</span>
+                  </>
+                ) : currentRole === 'aloka' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="font-sinhala">අලෝක (Admin)</span>
+                    <span className="text-[10px] text-slate-300 font-bold ml-0.5 underline">මාරු</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-sinhala">භූමිකාව තෝරන්න (Select Role)</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {pageMode === 'print' ? (
               /* Staff Quick Print Mode Header Actions */

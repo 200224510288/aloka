@@ -84,7 +84,7 @@ export interface DailySheet {
   dayOfWeekSi: string; // e.g. 'සඳුදා'
   headerGreeting: string; // e.g. 'ඔබට සුබ දවසක් !'
   headerDealerName: string; // e.g. 'S.W.ඔස්මන් ද සිල්වා'
-  footerAnnouncement: string; // e.g. 'ගොවි සෙත රු. ලක්ෂ දෙකහමාරක් ක් ඔස්මන් ද සිල්වා ගෙන්'
+  footerAnnouncement: string; // Optional footer announcement banner text
   isFooterReviewed: boolean;
   lotteries: LotteryResultItem[];
   sources: SourceDocument[];
