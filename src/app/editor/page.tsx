@@ -645,6 +645,24 @@ function EditorContent() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        const is403 = res.status === 403 || data.error?.includes('403');
+        if (is403) {
+          const parts = activeDate.split('-');
+          const yyyy = parts[0];
+          const mm = parts[1].padStart(2, '0');
+          const dd = parts[2].padStart(2, '0');
+          const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const dateObj = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0));
+          const dayName = DAY_NAMES[dateObj.getUTCDay()];
+          const directPdfUrl = `https://lklottery.com/api/lklottery/lklottery_pdf_files/lklottery_results_Sinhala_${yyyy}${mm}${dd}_${dayName}.pdf`;
+
+          showToast(`⚠️ lklottery.com blocked the cloud server (Cloudflare 403). Opening official PDF directly for download & manual upload...`, 'info');
+          try {
+            window.open(directPdfUrl, '_blank');
+          } catch {}
+          return;
+        }
+
         const errDetail = data.error || `Could not fetch sheet for ${activeDate}`;
         const latestMsg = data.latestDate ? ` (Latest available sheet on lklottery: ${data.latestDate})` : '';
         showToast(`${errDetail}${latestMsg}`, 'error');
