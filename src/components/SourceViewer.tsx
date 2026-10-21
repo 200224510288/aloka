@@ -14,6 +14,7 @@ interface SourceViewerProps {
   onAutoFetchSource?: () => Promise<void> | void;
   onRemoveSource?: (sourceId: string) => void;
   onClearValues?: () => void;
+  onExtractFromSource?: (sourceId: string) => void | Promise<void>;
   isUploading: boolean;
   isAutoFetching?: boolean;
   unassignedRows: UnassignedExtractedRow[];
@@ -34,6 +35,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   onAutoFetchSource,
   onRemoveSource,
   onClearValues,
+  onExtractFromSource,
   isUploading,
   isAutoFetching,
   unassignedRows,
@@ -539,6 +541,19 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
               {/* Action buttons & Zoom controls */}
               <div className="flex items-center gap-1.5">
+                {/* Extract to Cards button */}
+                {activeDoc && onExtractFromSource && (
+                  <button
+                    type="button"
+                    onClick={() => onExtractFromSource(activeDoc.id)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded transition cursor-pointer shadow-2xs"
+                    title={`Extract all winning numbers and results from "${activeDoc.fileName}" into the lottery cards`}
+                  >
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    <span>Extract to Cards</span>
+                  </button>
+                )}
+
                 {/* Remove active file button */}
                 {activeDoc && onRemoveSource && (
                   <button

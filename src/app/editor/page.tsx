@@ -192,6 +192,43 @@ function EditorContent() {
           } catch {}
         }
 
+        // Auto-reconciliation: If all lottery cards are blank but an attached document has extracted text,
+        // automatically populate the lottery cards so the user doesn't see blank inputs!
+        const allNumbersEmpty = data.sheet.lotteries.every(
+          (l: any) => !l.numbers || l.numbers.length === 0 || l.numbers.every((n: string) => !n || n.trim() === '')
+        );
+        if (allNumbersEmpty && data.sheet.sources && data.sheet.sources.length > 0) {
+          const primarySource = data.sheet.sources.find((s: any) => s.extractedText && s.extractedText.length > 50) || data.sheet.sources[0];
+          if (primarySource && primarySource.extractedText) {
+            try {
+              const { extractLotteryDataFromText } = await import('@/lib/extractor');
+              const ext = extractLotteryDataFromText(primarySource.extractedText, date, primarySource.fileName, 1);
+              if (ext.matchedLotteries && ext.matchedLotteries.length > 0) {
+                data.sheet.lotteries = data.sheet.lotteries.map((existing: any) => {
+                  const m = ext.matchedLotteries.find((x: any) => x.lotteryId === existing.lotteryId);
+                  if (m) {
+                    return {
+                      ...existing,
+                      drawNo: m.drawNo || existing.drawNo,
+                      letter: m.letter !== undefined ? m.letter : existing.letter,
+                      zodiac: m.zodiac || existing.zodiac,
+                      numbers: (m.numbers && m.numbers.length > 0) ? m.numbers : existing.numbers,
+                      bonusNumber: m.bonusNumber !== undefined ? m.bonusNumber : existing.bonusNumber,
+                      boxedIndex: m.boxedIndex !== undefined ? m.boxedIndex : existing.boxedIndex,
+                      sourceFileName: primarySource.fileName,
+                      isCheckedAgainstSource: true,
+                      isNoDraw: false,
+                    };
+                  }
+                  return existing;
+                });
+              }
+            } catch (autoExtErr) {
+              console.warn('Auto extraction on load note:', autoExtErr);
+            }
+          }
+        }
+
         setSheet(data.sheet);
         setRevisions(data.revisions || []);
         lastSavedHashRef.current = getSheetContentHash(data.sheet);
@@ -920,6 +957,106 @@ function EditorContent() {
 
     await handleSave(newSheet, 'Cleared all lottery values');
     showToast('🧹 Cleared all lottery values and reset sheet to blank!', 'info');
+  };
+
+  // Extract lottery results directly from an attached source document into the cards
+  const handleExtractFromSource = async (sourceId: string) => {
+    const doc = sheet.sources.find(s => s.id === sourceId) || sheet.sources[0];
+    if (!doc) {
+      showToast('No source document found to extract from.', 'error');
+      return;
+    }
+
+    try {
+      showToast(`⚡ Extracting lottery results from "${doc.fileName}"...`, 'info');
+      let text = doc.extractedText || '';
+
+      // If document text is not already present, try to extract it
+      if (!text || text.trim().length === 0) {
+        if (doc.filePath && !doc.filePath.startsWith('[') && !doc.filePath.startsWith('blob:')) {
+          try {
+            const fileRes = await fetch(doc.filePath);
+            const fileBlob = await fileRes.blob();
+            const fileObj = new File([fileBlob], doc.fileName, { type: 'application/pdf' });
+            const { extractTextFromPdfInBrowser } = await import('@/lib/client-pdf-extractor');
+            text = await extractTextFromPdfInBrowser(fileObj);
+          } catch {}
+        }
+      }
+
+      if (!text || text.trim().length === 0) {
+        try {
+          const { getCachedFileRecord } = await import('@/lib/source-file-cache');
+          const cached = await getCachedFileRecord(doc.id, doc.fileName);
+          if (cached.blob) {
+            const cachedFile = new File([cached.blob], doc.fileName, { type: 'application/pdf' });
+            const { extractTextFromPdfInBrowser } = await import('@/lib/client-pdf-extractor');
+            text = await extractTextFromPdfInBrowser(cachedFile);
+          }
+        } catch {}
+      }
+
+      if (!text || text.trim().length === 0) {
+        showToast(`Could not read text content from "${doc.fileName}". Please re-upload the file.`, 'error');
+        return;
+      }
+
+      const { extractLotteryDataFromText } = await import('@/lib/extractor');
+      const activeDate = sheet.date || selectedDate;
+      const extraction = extractLotteryDataFromText(text, activeDate, doc.fileName, 1);
+      const matchedLotteries = extraction.matchedLotteries || [];
+
+      if (matchedLotteries.length === 0) {
+        showToast(`Could not identify lottery rows in "${doc.fileName}".`, 'error');
+        return;
+      }
+
+      const updatedLotteries = sheet.lotteries.map((existing) => {
+        const match = matchedLotteries.find((m: any) => m.lotteryId === existing.lotteryId);
+        if (match) {
+          const def = STANDARD_LOTTERIES.find(d => d.id === existing.lotteryId);
+          let rawNums = (match.numbers && match.numbers.length > 0) ? match.numbers : existing.numbers;
+          const bNum = match.bonusNumber !== undefined ? match.bonusNumber : existing.bonusNumber;
+          if (def?.hasBonusNumber && bNum) {
+            rawNums = rawNums.filter((n: string) => n !== bNum);
+          }
+          if (def?.numberCount && rawNums.length > def.numberCount) {
+            rawNums = rawNums.slice(0, def.numberCount);
+          }
+
+          return {
+            ...existing,
+            drawNo: match.drawNo || existing.drawNo,
+            letter: match.letter !== undefined ? match.letter : existing.letter,
+            zodiac: match.zodiac || existing.zodiac,
+            numbers: rawNums,
+            bonusNumber: bNum,
+            boxedIndex: match.boxedIndex !== undefined ? match.boxedIndex : existing.boxedIndex,
+            sourceFileName: doc.fileName,
+            sourcePage: match.sourcePage || 1,
+            extractionConfidence: match.extractionConfidence || 95,
+            isCheckedAgainstSource: true,
+            isNoDraw: false,
+          };
+        }
+        return existing;
+      });
+
+      const newSheet: DailySheet = {
+        ...sheet,
+        lotteries: updatedLotteries,
+        footerAnnouncement: extraction.detectedFooterAnnouncement || sheet.footerAnnouncement,
+      };
+
+      setSheet(newSheet);
+      if (extraction.unassignedRows && extraction.unassignedRows.length > 0) {
+        setUnassignedRows(extraction.unassignedRows);
+      }
+      await handleSave(newSheet, `Extracted lotteries from attached document: ${doc.fileName}`);
+      showToast(`🎉 Successfully extracted ${matchedLotteries.length} lotteries to cards from ${doc.fileName}!`, 'success');
+    } catch (extractErr: any) {
+      showToast(`Extraction error: ${extractErr?.message || extractErr}`, 'error');
+    }
   };
 
   // Assign unassigned row
@@ -1721,6 +1858,7 @@ function EditorContent() {
                   onAutoFetchSource={handleAutoFetchSource}
                   onRemoveSource={handleRemoveSource}
                   onClearValues={handleClearAllValues}
+                  onExtractFromSource={handleExtractFromSource}
                   isUploading={isUploading}
                   isAutoFetching={isAutoFetchingSource}
                   unassignedRows={unassignedRows}
@@ -1915,6 +2053,7 @@ function EditorContent() {
                     onAutoFetchSource={handleAutoFetchSource}
                     onRemoveSource={handleRemoveSource}
                     onClearValues={handleClearAllValues}
+                    onExtractFromSource={handleExtractFromSource}
                     isUploading={isUploading}
                     isAutoFetching={isAutoFetchingSource}
                     unassignedRows={unassignedRows}
