@@ -12,22 +12,61 @@ export async function GET(req: NextRequest) {
     let sheet: DailySheet | null = null;
     let fromCloud = false;
 
+    const cleanDigits = date.replace(/-/g, '');
+
     // 1. Fetch local and cloud sheet with timestamp comparison to prevent stale overwrites
-    const localSheet = getSheetByDate(date);
+    let localSheet = getSheetByDate(date);
+    if (localSheet && Array.isArray(localSheet.lotteries)) {
+      const hasMismatchedLottery = localSheet.lotteries.some(l => {
+        if (!l.sourceFileName) return false;
+        const m = l.sourceFileName.match(/(\d{8})/);
+        return m && m[1] !== cleanDigits;
+      });
+      if (hasMismatchedLottery) {
+        console.warn(`Resetting local lotteries for ${date} due to contaminated lottery data`);
+        const emptyTemplate = createEmptySheet(date);
+        localSheet.lotteries = emptyTemplate.lotteries;
+      }
+    }
 
     try {
-      const cloudSheet = await loadSheetFromCloud(date);
+      let cloudSheet = await loadSheetFromCloud(date);
+      if (cloudSheet && Array.isArray(cloudSheet.lotteries)) {
+        const hasMismatchedLottery = cloudSheet.lotteries.some(l => {
+          if (!l.sourceFileName) return false;
+          const m = l.sourceFileName.match(/(\d{8})/);
+          return m && m[1] !== cleanDigits;
+        });
+        if (hasMismatchedLottery) {
+          console.warn(`Ignoring cloud sheet for ${date} due to contaminated lottery data`);
+          cloudSheet = null;
+        }
+      }
+
       if (cloudSheet && localSheet) {
+        const localHasData = (localSheet.lotteries || []).some(l => l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== ''));
+        const cloudHasData = (cloudSheet.lotteries || []).some(l => l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== ''));
+
         const localTime = new Date(localSheet.updatedAt || 0).getTime();
         const cloudTime = new Date(cloudSheet.updatedAt || (cloudSheet as any).syncedAt || 0).getTime();
 
-        if (localTime > cloudTime) {
-          // Local sheet is NEWER than cloud: Keep local and update cloud in background
+        // If local sheet has actual numbers but cloud is blank, NEVER let empty cloud wipe local sheet!
+        if (localHasData && !cloudHasData) {
+          sheet = localSheet;
+          fromCloud = false;
+          saveSheetToCloud(localSheet).catch(e => console.warn('Background cloud catchup error:', e));
+        } else if (cloudHasData && !localHasData) {
+          sheet = cloudSheet;
+          fromCloud = true;
+          if ((!sheet.sources || sheet.sources.length === 0) && localSheet.sources && localSheet.sources.length > 0) {
+            sheet.sources = localSheet.sources;
+          }
+          saveSheet(sheet, 'Synced from cloud Firestore');
+        } else if (localTime > cloudTime) {
           sheet = localSheet;
           fromCloud = false;
           saveSheetToCloud(localSheet).catch(e => console.warn('Background cloud catchup error:', e));
         } else {
-          // Cloud sheet is newer or equal
           sheet = cloudSheet;
           fromCloud = true;
           if ((!sheet.sources || sheet.sources.length === 0) && localSheet.sources && localSheet.sources.length > 0) {
@@ -91,7 +130,6 @@ export async function GET(req: NextRequest) {
 
     // 3.5. Sanitize sources: Strip out any source documents that belong to a different date
     if (sheet.sources && sheet.sources.length > 0) {
-      const cleanDigits = date.replace(/-/g, '');
       sheet.sources = sheet.sources.filter(s => {
         const match = s.fileName.match(/(\d{8})/);
         if (match && match[1] !== cleanDigits) {
@@ -146,6 +184,45 @@ export async function GET(req: NextRequest) {
       }
     } catch (recErr) {
       console.warn('Sources disk reconciliation error:', recErr);
+    }
+
+    // 4.5. Server-side auto-extraction: If lottery cards are blank but source document has text, extract now!
+    const allNumbersEmpty = sheet.lotteries.every(
+      (l: any) => !l.numbers || l.numbers.length === 0 || l.numbers.every((n: string) => !n || n.trim() === '')
+    );
+    if (allNumbersEmpty && sheet.sources && sheet.sources.length > 0) {
+      const primarySource = sheet.sources.find(s => s.extractedText && s.extractedText.length > 50) || sheet.sources[0];
+      if (primarySource && primarySource.extractedText) {
+        try {
+          const { extractLotteryDataFromText } = await import('@/lib/extractor');
+          const ext = extractLotteryDataFromText(primarySource.extractedText, date, primarySource.fileName, 1);
+          if (ext.matchedLotteries && ext.matchedLotteries.length > 0) {
+            sheet.lotteries = sheet.lotteries.map(existing => {
+              const m = ext.matchedLotteries.find(x => x.lotteryId === existing.lotteryId);
+              if (m) {
+                return {
+                  ...existing,
+                  drawNo: m.drawNo || existing.drawNo,
+                  letter: m.letter !== undefined ? m.letter : existing.letter,
+                  zodiac: m.zodiac || existing.zodiac,
+                  numbers: (m.numbers && m.numbers.length > 0) ? m.numbers : existing.numbers,
+                  bonusNumber: m.bonusNumber !== undefined ? m.bonusNumber : existing.bonusNumber,
+                  boxedIndex: m.boxedIndex !== undefined ? m.boxedIndex : existing.boxedIndex,
+                  sourceFileName: primarySource.fileName,
+                  isCheckedAgainstSource: true,
+                  isNoDraw: false,
+                };
+              }
+              return existing;
+            });
+            sheet.updatedAt = new Date().toISOString();
+            saveSheet(sheet, 'Auto-extracted lotteries from document text');
+            saveSheetToCloud(sheet).catch(() => {});
+          }
+        } catch (autoExtErr) {
+          console.warn('Server auto-extraction note:', autoExtErr);
+        }
+      }
     }
 
     // 5. Auto-repair missing zodiac or letter fields using improved extractor on extractedText
@@ -238,12 +315,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Valid sheet with date is required' }, { status: 400 });
     }
 
+    const cleanDigits = sheet.date.replace(/-/g, '');
     if (sheet && Array.isArray(sheet.sources)) {
-      sheet.sources = sheet.sources.map(s => {
-        if (s.filePath && s.filePath.startsWith('blob:')) {
-          return { ...s, filePath: '[Stored in Browser Session]' };
+      sheet.sources = sheet.sources
+        .filter(s => {
+          const match = s.fileName?.match(/(\d{8})/);
+          if (match && match[1] !== cleanDigits) return false;
+          if (s.detectedDate && s.detectedDate !== sheet.date) return false;
+          return true;
+        })
+        .map(s => {
+          if (s.filePath && s.filePath.startsWith('blob:')) {
+            return { ...s, filePath: '[Stored in Browser Session]' };
+          }
+          return s;
+        });
+    }
+
+    if (sheet && Array.isArray(sheet.lotteries)) {
+      sheet.lotteries = sheet.lotteries.map(l => {
+        if (l.sourceFileName) {
+          const m = l.sourceFileName.match(/(\d{8})/);
+          if (m && m[1] !== cleanDigits) {
+            return { ...l, sourceFileName: undefined };
+          }
         }
-        return s;
+        return l;
       });
     }
 

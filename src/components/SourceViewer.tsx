@@ -80,28 +80,33 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       return;
     }
 
-    // 1. If first document changed (e.g. freshly auto-fetched or uploaded), switch to it
+    const cleanDateDigits = currentDate ? currentDate.replace(/-/g, '') : '';
+
+    // 1. If a document in sources matches currentDate, ALWAYS select it!
+    if (cleanDateDigits) {
+      const exactMatch = sources.find(s => 
+        s.detectedDate === currentDate || 
+        (s.fileName && s.fileName.replace(/-/g, '').includes(cleanDateDigits))
+      );
+      if (exactMatch) {
+        setSelectedSourceId(exactMatch.id);
+        prevFirstIdRef.current = exactMatch.id;
+        return;
+      }
+    }
+
+    // 2. If first document changed (e.g. freshly auto-fetched or uploaded), switch to it
     if (sources[0]?.id && sources[0].id !== prevFirstIdRef.current) {
       setSelectedSourceId(sources[0].id);
       prevFirstIdRef.current = sources[0].id;
       return;
     }
 
-    // 2. If current active doc doesn't exist, pick matching date or first source
+    // 3. Fallback: ensure selectedSourceId exists in current sources
     const currentActiveExists = sources.some(s => s.id === selectedSourceId);
-    if (!currentActiveExists) {
-      const dateMatch = sources.find(s => s.detectedDate === currentDate || (s.fileName && s.fileName.includes(currentDate.replace(/-/g, ''))));
-      setSelectedSourceId(dateMatch ? dateMatch.id : sources[0].id);
-      return;
-    }
-
-    // 3. If currently selected document does not match currentDate, but a matching doc exists, prefer the matching doc
-    const currentDoc = sources.find(s => s.id === selectedSourceId);
-    if (currentDoc && currentDoc.detectedDate && currentDate && currentDoc.detectedDate !== currentDate) {
-      const exactDateMatch = sources.find(s => s.detectedDate === currentDate || (s.fileName && s.fileName.includes(currentDate.replace(/-/g, ''))));
-      if (exactDateMatch) {
-        setSelectedSourceId(exactDateMatch.id);
-      }
+    if (!currentActiveExists && sources[0]?.id) {
+      setSelectedSourceId(sources[0].id);
+      prevFirstIdRef.current = sources[0].id;
     }
   }, [sources, selectedSourceId, currentDate]);
 
@@ -117,9 +122,11 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     let isCancelled = false;
     let createdUrlToRevoke: string | null = null;
 
+    // Immediately reset preview states when document or date switches to prevent ghost preview leaks
+    setPdfBlobUrl('');
+    setPdfCanvasPreviewUrl('');
+
     if (!activeDoc) {
-      setPdfBlobUrl('');
-      setPdfCanvasPreviewUrl('');
       return;
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DailySheet, LotteryResultItem, RevisionRecord, UnassignedExtractedRow, LotteryDefinition, PreviewStyleOptions, SourceDocument, AiVerificationReport, AiLotteryAuditResult, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES, DAYS_OF_WEEK_SI, DEFAULT_STYLE_OPTIONS } from '@/lib/constants';
 import { Header } from '@/components/Header';
@@ -14,7 +14,7 @@ import { RevisionsModal } from '@/components/RevisionsModal';
 import { AiVerificationModal } from '@/components/AiVerificationModal';
 import { OfficialVerificationModal } from '@/components/OfficialVerificationModal';
 import { directPrintSheet } from '@/lib/direct-print';
-import { DateHistoryBar } from '@/components/DateHistoryBar';
+import { UnifiedCalendar } from '@/components/UnifiedCalendar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 import { 
   CheckCircle2, 
@@ -93,6 +93,28 @@ function EditorContent() {
   const [previewStyles, setPreviewStyles] = useState<PreviewStyleOptions | undefined>(undefined);
   const [cloudStatus, setCloudStatus] = useState<'synced' | 'syncing' | 'offline' | 'permission_denied'>('synced');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [isLoadingDate, setIsLoadingDate] = useState<boolean>(false);
+
+  // Hydrate availableDates from browser localStorage on mount for instant visual indicators
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const localKeys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('sinhala_lottery_sheet_')) {
+            const d = k.replace('sinhala_lottery_sheet_', '');
+            if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+              localKeys.push(d);
+            }
+          }
+        }
+        if (localKeys.length > 0) {
+          setAvailableDates(prev => Array.from(new Set([...prev, ...localKeys])).sort().reverse());
+        }
+      } catch {}
+    }
+  }, []);
 
   // Auto-save tracking refs
   const lastSavedHashRef = useRef<string>('');
@@ -155,6 +177,7 @@ function EditorContent() {
   // Fetch sheet by date with triple redundancy (Cloud -> Local Server -> Browser LocalStorage)
   const loadSheet = useCallback(async (date: string) => {
     isInitialLoadedRef.current = false;
+    setIsLoadingDate(true);
     try {
       const res = await fetch(`/api/sheet?date=${date}`);
       const data = await res.json();
@@ -237,7 +260,7 @@ function EditorContent() {
           setCloudStatus('synced');
         }
         if (data.availableDates && Array.isArray(data.availableDates)) {
-          setAvailableDates(data.availableDates);
+          setAvailableDates(prev => Array.from(new Set([...prev, ...data.availableDates])).sort().reverse());
         }
         // Cache to browser localStorage
         try {
@@ -245,7 +268,7 @@ function EditorContent() {
         } catch {}
       } else {
         if (data.availableDates && Array.isArray(data.availableDates)) {
-          setAvailableDates(data.availableDates);
+          setAvailableDates(prev => Array.from(new Set([...prev, ...data.availableDates])).sort().reverse());
         }
         // Fallback to localStorage before empty sheet
         try {
@@ -279,47 +302,71 @@ function EditorContent() {
       setSheet(empty);
       lastSavedHashRef.current = getSheetContentHash(empty);
       isInitialLoadedRef.current = true;
+    } finally {
+      setIsLoadingDate(false);
     }
   }, []);
 
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlDate = searchParams?.get('date');
+  const activeDateRef = useRef<string>(selectedDate);
 
-  // Handle date change: keeps selectedDate, sheet.date, localStorage, and URL strictly synchronized
+  // Fast, real-time date switcher: instantly sets cached numbers, cancels auto-save on old date, and fetches freshest data
   const handleDateChange = useCallback((newDate: string) => {
-    setSelectedDate(newDate);
-    const d = new Date(newDate);
-    const dayIdx = isNaN(d.getDay()) ? 1 : d.getDay();
-    const dayName = DAYS_OF_WEEK_SI[dayIdx] || 'සඳුදා';
+    if (!newDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return;
 
-    setSheet(prev => ({
-      ...prev,
-      date: newDate,
-      dayOfWeekSi: dayName,
-    }));
+    // 1. Immediately cancel any pending auto-save timer for previous sheet
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    // Block auto-save until fresh sheet is fully loaded
+    isInitialLoadedRef.current = false;
+    setIsLoadingDate(true);
+
+    // 2. Synchronize activeDateRef, selectedDate, URL and localStorage
+    activeDateRef.current = newDate;
+    setSelectedDate(newDate);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('sinhala_lottery_last_active_date', newDate);
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('date') !== newDate) {
-        url.searchParams.set('date', newDate);
-        window.history.replaceState({}, '', url.toString());
-      }
     }
-  }, []);
+    router.replace(`/editor?date=${newDate}`, { scroll: false });
 
-  // Reactively synchronize active date when URL search parameter changes or from last active date
+    // 3. REAL-TIME ZERO-LATENCY CACHE CHECK:
+    // If we have cached sheet for this date in localStorage, apply it synchronously with 0ms delay!
+    let appliedFromCache = false;
+    try {
+      const cached = localStorage.getItem(`sinhala_lottery_sheet_${newDate}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.date === newDate && Array.isArray(parsed.lotteries) && parsed.lotteries.length > 0) {
+          setSheet(parsed);
+          lastSavedHashRef.current = getSheetContentHash(parsed);
+          appliedFromCache = true;
+        }
+      }
+    } catch {}
+
+    // If no cache, initialize an empty sheet for this new date IMMEDIATELY
+    // so old numbers NEVER leak into the new date!
+    if (!appliedFromCache) {
+      const empty = createEmptySheet(newDate);
+      setSheet(empty);
+      lastSavedHashRef.current = getSheetContentHash(empty);
+    }
+  }, [router]);
+
+  // Reactively synchronize active date when external URL query param changes
   useEffect(() => {
-    const target = (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate))
-      ? urlDate
-      : (typeof window !== 'undefined' ? localStorage.getItem('sinhala_lottery_last_active_date') : null);
-
-    if (target && /^\d{4}-\d{2}-\d{2}$/.test(target)) {
-      if (target !== selectedDate || target !== sheet.date) {
-        handleDateChange(target);
+    if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+      if (urlDate !== activeDateRef.current) {
+        activeDateRef.current = urlDate;
+        handleDateChange(urlDate);
       }
     }
-  }, [urlDate, handleDateChange, selectedDate, sheet.date]);
+  }, [urlDate, handleDateChange]);
 
   useEffect(() => {
     loadSheet(selectedDate);
@@ -1583,15 +1630,16 @@ function EditorContent() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 flex flex-col gap-4">
         
-        {/* Calendar, 4 Days Back History & Quick Print Hub (Compact during verification to maximize editor workspace) */}
-        <DateHistoryBar
-          key={`${selectedDate}-${currentStep}`}
+        {/* Single Unified Big User-Friendly Draw Date Calendar */}
+        <UnifiedCalendar
+          key={`${selectedDate}`}
           selectedDate={selectedDate}
           onDateChange={handleDateChange}
           onQuickPrint={handleQuickPrint}
           availableDates={availableDates}
           cloudStatus={cloudStatus}
-          defaultCollapsed={currentStep === 'verify'}
+          isLoading={isLoadingDate}
+          defaultExpanded={true}
         />
 
         {/* Export Blocked Alerts Banner */}
@@ -1641,25 +1689,30 @@ function EditorContent() {
               {/* Date & Sinhala Day Card */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    <h3 className="text-sm font-bold text-slate-800">Result Sheet Date</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-600" />
+                      <h3 className="text-sm font-bold text-slate-800">Result Sheet Date</h3>
+                    </div>
+                    <a
+                      href="#unified-lottery-calendar"
+                      className="text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      Use Calendar ↑
+                    </a>
                   </div>
                   
                   <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-                    <input
-                      type="date"
-                      value={sheet.date}
-                      onChange={(e) => handleDateChange(e.target.value)}
-                      className="bg-transparent font-bold text-sm text-slate-900 outline-none cursor-pointer flex-1"
-                    />
+                    <span className="font-mono font-bold text-base text-slate-900 flex-1">
+                      {sheet.date}
+                    </span>
                     <span className="text-xs font-black text-blue-800 bg-blue-100 px-3 py-1 rounded-lg font-sinhala">
                       {sheet.dayOfWeekSi}
                     </span>
                   </div>
 
                   <p className="text-[11px] text-slate-500 mt-2">
-                    Date formatted as YYYY.MM.DD on the print-ready sheet.
+                    Managed by the single unified calendar above.
                   </p>
                 </div>
 
@@ -2072,10 +2125,23 @@ function EditorContent() {
               {/* Right / Main Pane: Lottery Editor List & Footer Card (Expanded vertical space) */}
               <div className={`${isSplitView ? 'lg:col-span-7' : 'lg:col-span-12'} h-[calc(100vh-230px)] min-h-[560px] flex flex-col gap-3 overflow-hidden`}>
                 
-                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col overflow-hidden">
+                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col overflow-hidden relative">
                   
+                  {/* Real-time Sync Indicator when Date changes */}
+                  {isLoadingDate && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center justify-between mb-2 shadow-2xs animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                        <span>Updating numbers for {selectedDate}...</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                        Real-time Update
+                      </span>
+                    </div>
+                  )}
+
                   {/* Scrollable Lottery Row Cards */}
-                  <div className="flex-1 overflow-y-auto space-y-2.5 py-1 pr-1">
+                  <div className={`flex-1 overflow-y-auto space-y-2.5 py-1 pr-1 transition-opacity duration-150 ${isLoadingDate ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
                     {filteredLotteries.length === 0 ? (
                       <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
                         <p className="text-xs font-bold text-slate-600">

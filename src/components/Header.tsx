@@ -87,19 +87,20 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="h-6 w-px bg-slate-200 hidden md:block" />
 
-            {/* Quick Date Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1 px-2 hover:border-slate-300 transition-colors">
-              <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <input
-                type="date"
-                value={sheet.date}
-                onChange={(e) => onDateChange(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
-              />
-              <span className="text-[11px] font-black text-slate-800 bg-slate-200 px-1.5 py-0.5 rounded font-sinhala shrink-0">
+            {/* Synchronized Active Date Display (Anchors to single unified calendar) */}
+            <a
+              href="#unified-lottery-calendar"
+              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg py-1 px-2.5 transition text-slate-800 cursor-pointer shadow-2xs"
+              title="Active Sheet Date (controlled by the unified calendar below)"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="text-xs font-black font-mono tracking-tight text-slate-900">
+                {sheet.date}
+              </span>
+              <span className="text-[11px] font-black text-blue-900 bg-blue-100 px-1.5 py-0.5 rounded font-sinhala shrink-0">
                 {sheet.dayOfWeekSi}
               </span>
-            </div>
+            </a>
 
             {/* Link to Official Results Hub */}
             <Link
