@@ -1,6 +1,7 @@
 import { LotteryDefinition, LotteryResultItem, DailySheet } from '@/types/lottery';
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS, DAYS_OF_WEEK_SI, INITIAL_HEADER_GREETING, INITIAL_DEALER_NAME, INITIAL_FOOTER_ANNOUNCEMENT } from '@/lib/constants';
 import { OfficialFetchedLottery } from '@/lib/official-lottery-fetcher';
+import { parseToIsoDate } from '@/lib/date-utils';
 
 /**
  * Normalizes Sinhala Zodiac signs to match canonical names
@@ -299,16 +300,22 @@ export function buildSheetFromOfficialData(
 
   const existingLotteries = baseSheet.lotteries || [];
 
+  const targetIso = parseToIsoDate(targetDate) || targetDate;
+
   const builtLotteries: LotteryResultItem[] = STANDARD_LOTTERIES.map((def) => {
     const existing = existingLotteries.find(l => l.lotteryId === def.id);
 
-    // Find official match
-    const official = officialLotteries.find(o => o.matchedLotteryId === def.id) ||
-      officialLotteries.find(o => {
-        const normO = o.officialName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const normDef = def.nameEn.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normO === normDef || def.aliases.some(a => a.toLowerCase().replace(/[^a-z0-9]/g, '') === normO);
-      });
+    // Find official match that strictly corresponds to targetDate
+    const official = officialLotteries.find(o => {
+      if (targetIso) {
+        const oIso = parseToIsoDate(o.drawDate);
+        if (oIso && oIso !== targetIso) return false;
+      }
+      if (o.matchedLotteryId === def.id) return true;
+      const normO = o.officialName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normDef = def.nameEn.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normO === normDef || def.aliases.some(a => a.toLowerCase().replace(/[^a-z0-9]/g, '') === normO);
+    });
 
     if (official) {
       // Secure format from live official portal

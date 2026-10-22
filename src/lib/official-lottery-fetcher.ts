@@ -207,13 +207,65 @@ function findMatchingLottery(officialName: string, boardHint: BoardType) {
   });
 }
 
+export function parseToIsoDate(rawDateStr?: string | null): string | null {
+  if (!rawDateStr) return null;
+  const s = rawDateStr.trim();
+
+  // If already YYYY-MM-DD
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  // DLB format: "2026-Oct-20 Tuesday" or "2026-Oct-20"
+  const dlbMatch = s.match(/(\d{4})-([A-Za-z]{3})-(\d{1,2})/i);
+  if (dlbMatch) {
+    const year = dlbMatch[1];
+    const monthStr = dlbMatch[2].toLowerCase();
+    const day = dlbMatch[3].padStart(2, '0');
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    const month = months[monthStr];
+    if (month) return `${year}-${month}-${day}`;
+  }
+
+  // NLB format: "Tuesday October 20, 2026" or "October 20, 2026"
+  const nlbMatch = s.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i);
+  if (nlbMatch) {
+    const monthStr = nlbMatch[1].slice(0, 3).toLowerCase();
+    const day = nlbMatch[2].padStart(2, '0');
+    const year = nlbMatch[3];
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    const month = months[monthStr];
+    if (month) return `${year}-${month}-${day}`;
+  }
+
+  // Fallback to Native Date parse
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  } catch {}
+
+  return null;
+}
+
 /**
- * Fetch and extract live results directly from NLB official website (https://www.nlb.lk/results)
+ * Fetch and extract results directly from NLB official website (https://www.nlb.lk/results)
+ * Supports live homepage or date-specific archive queries.
  * Handles dynamic cookie handshake ("human=...") automatically.
  */
-export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> {
+export async function fetchNlbOfficialResults(targetDate?: string): Promise<OfficialFetchResponse> {
   const startTime = Date.now();
   const targetUrl = 'https://www.nlb.lk/results';
+  const targetIso = targetDate ? parseToIsoDate(targetDate) : null;
 
   try {
     // Step 1: Initial request to obtain challenge cookie
@@ -239,16 +291,17 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
     }
 
     const humanToken = tokenMatch[1];
+    const nlbHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': targetUrl,
+      'Cookie': `human=${humanToken}`,
+    };
 
     // Step 2: Request live results HTML with validated authorization cookie
     const res2 = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': targetUrl,
-        'Cookie': `human=${humanToken}`,
-      },
+      headers: nlbHeaders,
       cache: 'no-store',
       signal: AbortSignal.timeout(20000),
     });
@@ -258,111 +311,226 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
     }
 
     const html = await res2.text();
-    const responseTimeMs = Date.now() - startTime;
-
-    // Step 3: Parse lottery cards from HTML
     const blocks = html.split('<li class="lbox">').slice(1);
-    const lotteries: OfficialFetchedLottery[] = [];
-    let detectedDrawDate: string | null = null;
 
+    // Extract draw date from homepage
+    let homepageDrawDate: string | null = null;
     for (const rawBlock of blocks) {
-      const block = rawBlock.split('<div class="but">')[0];
-
-      // Extract header: name, draw number, date
-      const titleMatch = block.match(/<h4><span>(.*?)<\/span>\s*<span>(.*?)<\/span>\s*<span>(.*?)<\/span><\/h4>/i);
-      if (!titleMatch) continue;
-
-      const [_, rawName, rawDrawNo, rawDate] = titleMatch;
-      const officialName = rawName.trim();
-      const drawNo = rawDrawNo.trim();
-      const drawDate = rawDate.trim();
-
-      if (!detectedDrawDate) {
-        detectedDrawDate = drawDate;
+      const titleMatch = rawBlock.match(/<h4><span>(.*?)<\/span>\s*<span>(.*?)<\/span>\s*<span>(.*?)<\/span><\/h4>/i);
+      if (titleMatch) {
+        homepageDrawDate = titleMatch[3].trim();
+        break;
       }
-
-      // Letter
-      const letterMatch = block.match(/<li[^>]*title="Letter"[^>]*>([\s\S]*?)<\/li>/i);
-      const letter = letterMatch ? letterMatch[1].trim() : null;
-
-      const matchedDef = findMatchingLottery(officialName, 'NLB');
-      const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('suba');
-
-      // Zodiac (only for lotteries that feature a Zodiac sign, e.g. Suba Dawasak)
-      let zodiacDetails: ZodiacMatchInfo | null = null;
-      let zodiacEn: string | null = null;
-      if (isZodiacLottery) {
-        const zodiacMatch = block.match(/<li[^>]*title="Zodiac"[^>]*>([\s\S]*?)<\/li>/i);
-        const rawZodiac = zodiacMatch ? zodiacMatch[1].trim() : null;
-        zodiacDetails = rawZodiac ? identifyZodiac(rawZodiac) : null;
-        zodiacEn = zodiacDetails?.en || (rawZodiac ? rawZodiac.toUpperCase() : null);
-      }
-
-      // Super Number (Bonus)
-      const superNumMatch = block.match(/<li[^>]*title="Super Number"[^>]*>([\s\S]*?)<\/li>/i);
-      const superNumber = superNumMatch ? superNumMatch[1].trim() : null;
-
-      // Winning Numbers
-      const rawNumberMatches = [...block.matchAll(/<li[^>]*title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
-        .map(m => m[1].trim());
-
-      // For tiered lotteries (e.g. Ada Sampatha), each row on official site is 1 number:
-      // Row 1 (2 balls) -> e.g. "55"
-      // Row 2 (3 balls) -> e.g. "855"
-      // Row 3 (4 balls) -> e.g. "4855"
-      let finalNumbers = rawNumberMatches;
-      if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
-        if (rawNumberMatches.length === 9) {
-          finalNumbers = [
-            rawNumberMatches.slice(0, 2).join(''),
-            rawNumberMatches.slice(2, 5).join(''),
-            rawNumberMatches.slice(5, 9).join(''),
-          ];
-        } else if (rawNumberMatches.length === 4) {
-          const d4 = rawNumberMatches.join('');
-          finalNumbers = [d4.slice(2), d4.slice(1), d4];
-        }
-      }
-
-      // Logo URL
-      const logoMatch = block.match(/data-src="([^"]+)"/i);
-      const logoUrl = logoMatch ? `https://www.nlb.lk/${logoMatch[1]}` : null;
-
-      lotteries.push({
-        officialName,
-        matchedLotteryId: matchedDef ? matchedDef.id : null,
-        lotteryNameSi: matchedDef?.nameSi,
-        lotteryNameEn: matchedDef?.nameEn,
-        drawNo,
-        drawDate,
-        letter,
-        zodiacEn,
-        zodiacSi: zodiacDetails?.si || null,
-        zodiacSymbol: zodiacDetails?.symbol || null,
-        zodiacImgUrl: null,
-        zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
-        superNumber,
-        numbers: finalNumbers,
-        logoUrl,
-        board: 'NLB',
-        rawBlockPreview: block.slice(0, 300),
-      });
     }
 
+    const homepageIso = parseToIsoDate(homepageDrawDate);
+
+    // If no targetDate requested, OR homepage matches targetDate: parse homepage directly
+    if (!targetIso || homepageIso === targetIso) {
+      const lotteries: OfficialFetchedLottery[] = [];
+      let detectedDrawDate: string | null = homepageDrawDate;
+
+      for (const rawBlock of blocks) {
+        const block = rawBlock.split('<div class="but">')[0];
+
+        const titleMatch = block.match(/<h4><span>(.*?)<\/span>\s*<span>(.*?)<\/span>\s*<span>(.*?)<\/span><\/h4>/i);
+        if (!titleMatch) continue;
+
+        const [_, rawName, rawDrawNo, rawDate] = titleMatch;
+        const officialName = rawName.trim();
+        const drawNo = rawDrawNo.trim();
+        const drawDate = rawDate.trim();
+
+        if (!detectedDrawDate) {
+          detectedDrawDate = drawDate;
+        }
+
+        const letterMatch = block.match(/<li[^>]*title="Letter"[^>]*>([\s\S]*?)<\/li>/i);
+        const letter = letterMatch ? letterMatch[1].trim() : null;
+
+        const matchedDef = findMatchingLottery(officialName, 'NLB');
+        const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('suba') || officialName.toLowerCase().includes('handahana');
+
+        let zodiacDetails: ZodiacMatchInfo | null = null;
+        let zodiacEn: string | null = null;
+        if (isZodiacLottery) {
+          const zodiacMatch = block.match(/<li[^>]*title="Zodiac"[^>]*>([\s\S]*?)<\/li>/i);
+          const rawZodiac = zodiacMatch ? zodiacMatch[1].trim() : null;
+          zodiacDetails = rawZodiac ? identifyZodiac(rawZodiac) : null;
+          zodiacEn = zodiacDetails?.en || (rawZodiac ? rawZodiac.toUpperCase() : null);
+        }
+
+        const superNumMatch = block.match(/<li[^>]*title="Super Number"[^>]*>([\s\S]*?)<\/li>/i);
+        const superNumber = superNumMatch ? superNumMatch[1].trim() : null;
+
+        const rawNumberMatches = [...block.matchAll(/<li[^>]*title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
+          .map(m => m[1].trim());
+
+        let finalNumbers = rawNumberMatches;
+        if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+          if (rawNumberMatches.length === 9) {
+            finalNumbers = [
+              rawNumberMatches.slice(0, 2).join(''),
+              rawNumberMatches.slice(2, 5).join(''),
+              rawNumberMatches.slice(5, 9).join(''),
+            ];
+          } else if (rawNumberMatches.length === 4) {
+            const d4 = rawNumberMatches.join('');
+            finalNumbers = [d4.slice(2), d4.slice(1), d4];
+          }
+        }
+
+        const logoMatch = block.match(/data-src="([^"]+)"/i);
+        const logoUrl = logoMatch ? `https://www.nlb.lk/${logoMatch[1]}` : null;
+
+        lotteries.push({
+          officialName,
+          matchedLotteryId: matchedDef ? matchedDef.id : null,
+          lotteryNameSi: matchedDef?.nameSi,
+          lotteryNameEn: matchedDef?.nameEn,
+          drawNo,
+          drawDate,
+          letter,
+          zodiacEn,
+          zodiacSi: zodiacDetails?.si || null,
+          zodiacSymbol: zodiacDetails?.symbol || null,
+          zodiacImgUrl: null,
+          zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
+          superNumber,
+          numbers: finalNumbers,
+          logoUrl,
+          board: 'NLB',
+          rawBlockPreview: block.slice(0, 300),
+        });
+      }
+
+      return {
+        success: true,
+        sourceUrl: targetUrl,
+        fetchedAt: new Date().toISOString(),
+        drawDate: detectedDrawDate,
+        totalLotteries: lotteries.length,
+        matchedCount: lotteries.filter(l => !!l.matchedLotteryId).length,
+        lotteries,
+        boards: ['NLB'],
+        handshakeDetails: {
+          humanToken,
+          responseTimeMs: Date.now() - startTime,
+          htmlLength: html.length,
+          notes: 'NLB live landing page extraction',
+        },
+      };
+    }
+
+    // Step 3: Target date archive query for NLB lotteries
+    const nlbLotterySlugs = [
+      { name: 'Suba Dawasak', slug: 'suba-dawasak', id: 'suba_dawasak' },
+      { name: 'Ayubo', slug: 'ayubo', id: 'ayubo' },
+      { name: 'Govisetha', slug: 'govisetha', id: 'govisetha' },
+      { name: 'Mahajana Sampatha', slug: 'mahajana-sampatha', id: 'mahajana_sampatha' },
+      { name: 'Dhana Nidhanaya', slug: 'dhana-nidhanaya', id: 'dhana_nidhanaya' },
+      { name: 'Mega Power', slug: 'mega-power', id: 'mega_power' },
+      { name: 'Handahana', slug: 'handahana', id: 'handahana' },
+      { name: 'Ada Sampatha', slug: 'ada-sampatha', id: 'ada_sampatha' },
+      { name: 'NLB Jaya', slug: 'nlb-jaya', id: 'nlb_jaya' },
+    ];
+
+    const historicalPromises = nlbLotterySlugs.map(async (lot): Promise<OfficialFetchedLottery | null> => {
+      try {
+        const res = await fetch(`https://www.nlb.lk/results/${lot.slug}`, {
+          headers: nlbHeaders,
+          cache: 'no-store',
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return null;
+        const pageHtml = await res.text();
+        const rows = [...pageHtml.matchAll(/<tr>\s*<td><b>(\d+)<\/b><br>([^<]+)<\/td>([\s\S]*?)<\/tr>/gi)];
+
+        for (const r of rows) {
+          const drawNo = r[1].trim();
+          const drawDate = r[2].trim();
+          if (parseToIsoDate(drawDate) === targetIso) {
+            const content = r[3];
+            const letterMatch = content.match(/<li title="Letter"[^>]*>([\s\S]*?)<\/li>/i);
+            const letter = letterMatch ? letterMatch[1].trim() : null;
+
+            const matchedDef = STANDARD_LOTTERIES.find(d => d.id === lot.id) || findMatchingLottery(lot.name, 'NLB');
+            const isZodiacLottery = matchedDef?.requiresZodiac || lot.slug.includes('suba') || lot.slug.includes('handahana');
+
+            let zodiacDetails: ZodiacMatchInfo | null = null;
+            let zodiacEn: string | null = null;
+            if (isZodiacLottery) {
+              const zodiacMatch = content.match(/<li title="Zodiac"[^>]*>([\s\S]*?)<\/li>/i);
+              const rawZodiac = zodiacMatch ? zodiacMatch[1].trim() : null;
+              zodiacDetails = rawZodiac ? identifyZodiac(rawZodiac) : null;
+              zodiacEn = zodiacDetails?.en || (rawZodiac ? rawZodiac.toUpperCase() : null);
+            }
+
+            const superNumMatch = content.match(/<li title="Super Number"[^>]*>([\s\S]*?)<\/li>/i);
+            const superNumber = superNumMatch ? superNumMatch[1].trim() : null;
+
+            const rawNumberMatches = [...content.matchAll(/<li title="Number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
+              .map(m => m[1].trim());
+
+            let finalNumbers = rawNumberMatches;
+            if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+              if (rawNumberMatches.length === 9) {
+                finalNumbers = [
+                  rawNumberMatches.slice(0, 2).join(''),
+                  rawNumberMatches.slice(2, 5).join(''),
+                  rawNumberMatches.slice(5, 9).join(''),
+                ];
+              } else if (rawNumberMatches.length === 4) {
+                const d4 = rawNumberMatches.join('');
+                finalNumbers = [d4.slice(2), d4.slice(1), d4];
+              }
+            }
+
+            return {
+              officialName: lot.name,
+              matchedLotteryId: matchedDef ? matchedDef.id : lot.id,
+              lotteryNameSi: matchedDef?.nameSi,
+              lotteryNameEn: matchedDef?.nameEn,
+              drawNo,
+              drawDate,
+              letter,
+              zodiacEn,
+              zodiacSi: zodiacDetails?.si || null,
+              zodiacSymbol: zodiacDetails?.symbol || null,
+              zodiacImgUrl: null,
+              zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
+              superNumber,
+              numbers: finalNumbers,
+              logoUrl: null,
+              board: 'NLB' as BoardType,
+              rawBlockPreview: content.slice(0, 200),
+            };
+          }
+        }
+        return null;
+      } catch (err) {
+        console.warn(`[NLB Fetcher] Failed historical fetch for ${lot.name}:`, err);
+        return null;
+      }
+    });
+
+    const settled = await Promise.all(historicalPromises);
+    const lotteries: OfficialFetchedLottery[] = settled.filter((item): item is OfficialFetchedLottery => item !== null);
+
     return {
-      success: true,
+      success: lotteries.length > 0,
       sourceUrl: targetUrl,
       fetchedAt: new Date().toISOString(),
-      drawDate: detectedDrawDate,
+      drawDate: targetDate || homepageDrawDate,
       totalLotteries: lotteries.length,
       matchedCount: lotteries.filter(l => !!l.matchedLotteryId).length,
       lotteries,
       boards: ['NLB'],
       handshakeDetails: {
         humanToken,
-        responseTimeMs,
+        responseTimeMs: Date.now() - startTime,
         htmlLength: html.length,
-        notes: '2-step cookie handshake completed',
+        notes: `Date-specific archive lookup for ${targetDate}`,
       },
     };
   } catch (error: any) {
@@ -381,11 +549,12 @@ export async function fetchNlbOfficialResults(): Promise<OfficialFetchResponse> 
 }
 
 /**
- * Fetch and extract live results directly from DLB official website (https://www.dlb.lk/result/2/)
+ * Fetch and extract live or archive results directly from DLB official website (https://www.dlb.lk/result/2/)
  */
-export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> {
+export async function fetchDlbOfficialResults(targetDate?: string): Promise<OfficialFetchResponse> {
   const startTime = Date.now();
   const targetUrl = 'https://www.dlb.lk/result/2/';
+  const targetIso = targetDate ? parseToIsoDate(targetDate) : null;
 
   try {
     const res = await fetch(targetUrl, {
@@ -405,153 +574,294 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
     const html = await res.text();
     const responseTimeMs = Date.now() - startTime;
 
-    // Parse DLB lottery blocks by splitting on '<h3 class="lot_m_re_date">'
+    // Check detected draw date on DLB homepage
     const parts = html.split('<h3 class="lot_m_re_date">');
-    const lotteries: OfficialFetchedLottery[] = [];
-    let detectedDrawDate: string | null = null;
-
+    let homepageDrawDate: string | null = null;
     for (let i = 1; i < parts.length; i++) {
-      const prevPart = parts[i - 1];
-      const currPart = parts[i];
-
-      // Extract official lottery name from previous <h2>
-      const nameMatch = [...prevPart.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].pop();
-      if (!nameMatch) continue;
-      const officialName = nameMatch[1].replace(/<[^>]+>/g, '').trim();
-
-      // Extract draw number and date
-      const dateMatch = currPart.match(/^\s*Draw Number\s*-\s*(\d+)\s*\|\s*([^<]+)/i);
-      const drawNo = dateMatch ? dateMatch[1].trim() : '';
-      const drawDate = dateMatch ? dateMatch[2].trim() : '';
-
-      if (!detectedDrawDate && drawDate) {
-        detectedDrawDate = drawDate;
+      const dateMatch = parts[i].match(/^\s*Draw Number\s*-\s*(\d+)\s*\|\s*([^<]+)/i);
+      if (dateMatch) {
+        homepageDrawDate = dateMatch[2].trim();
+        break;
       }
-
-      // Extract results container
-      const ulMatch = currPart.match(/<ul class="result_detail_result">([\s\S]*?)<\/ul>/i);
-      const ulContent = ulMatch ? ulMatch[1] : '';
-
-      // Letter
-      const letterMatch = ulContent.match(/<h6 class="eng_letter">([\s\S]*?)<\/h6>/i);
-      const letter = letterMatch ? letterMatch[1].trim() : null;
-
-      const matchedDef = findMatchingLottery(officialName, 'DLB');
-      const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('lagna');
-
-      // Extract Zodiac Image & Details only for lotteries that feature a Zodiac sign (Lagna Wasana)
-      let zodiacDetails: ZodiacMatchInfo | null = null;
-      let zodiacImgUrl: string | null = null;
-
-      if (isZodiacLottery) {
-        // 1. Scan <img> tags in currPart and ulContent
-        const imgMatches = [...currPart.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
-        for (const m of imgMatches) {
-          const src = m[1];
-          const match = identifyZodiac(src);
-          if (match) {
-            zodiacDetails = match;
-            zodiacImgUrl = src.startsWith('http') ? src : `https://www.dlb.lk/${src.replace(/^\//, '')}`;
-            break;
-          }
-        }
-
-        // 2. Fallback: check text in ulContent
-        if (!zodiacDetails) {
-          const textMatch = identifyZodiac(ulContent);
-          if (textMatch) {
-            zodiacDetails = textMatch;
-          }
-        }
-      }
-
-      // Numbers
-      const numbers = [...ulContent.matchAll(/<h6[^>]*class="[^"]*number_circle[^"]*"[^>]*>([\s\S]*?)<\/h6>/gi)]
-        .map(m => m[1].trim());
-
-      // Special number / bonus identification for specific lotteries
-      let superNumber: string | null = null;
-      let regularNumbers = [...numbers];
-
-      // 1. Check for modal special draw image (Lagna Wasana, Shanida, Super Ball, Supiri Dhana Sampatha)
-      const specialImgMatch = currPart.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
-      
-      if (specialImgMatch && matchedDef?.id) {
-        const rawSrc = specialImgMatch[1];
-        const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
-        try {
-          const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
-          if (extractedBonus) {
-            superNumber = extractedBonus;
-          }
-        } catch (e) {
-          console.warn(`[DLB Fetcher] Special OCR failed for ${officialName}:`, e);
-        }
-      }
-
-      // 2. For Kapruka: 5 numbers total, 1 special boxed
-      // For Waasi: 3 numbers total (last is boxed)
-      if (officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
-        superNumber = regularNumbers[2];
-        regularNumbers = [regularNumbers[0], regularNumbers[1]];
-      } else if (officialName.toLowerCase().includes('kapruka') && regularNumbers.length === 5) {
-        // Kapruka special is typically displayed with distinct style or as 5th
-        superNumber = regularNumbers[4];
-        regularNumbers = regularNumbers.slice(0, 4);
-      }
-
-      // For tiered lotteries (e.g. Jaya Sampatha), 1 row = 1 number:
-      // If DLB gives 4 individual digits "0", "5", "1", "3", expand into the 3 tiers:
-      // Tier 1 (2 digits) -> "13"
-      // Tier 2 (3 digits) -> "513"
-      // Tier 3 (4 digits) -> "0513"
-      if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
-        if (regularNumbers.length === 4) {
-          const d4 = regularNumbers.join('');
-          regularNumbers = [d4.slice(2), d4.slice(1), d4];
-        } else if (regularNumbers.length === 9) {
-          regularNumbers = [
-            regularNumbers.slice(0, 2).join(''),
-            regularNumbers.slice(2, 5).join(''),
-            regularNumbers.slice(5, 9).join(''),
-          ];
-        }
-      }
-
-      lotteries.push({
-        officialName,
-        matchedLotteryId: matchedDef ? matchedDef.id : null,
-        lotteryNameSi: matchedDef?.nameSi,
-        lotteryNameEn: matchedDef?.nameEn,
-        drawNo,
-        drawDate,
-        letter,
-        zodiacEn: zodiacDetails?.en || null,
-        zodiacSi: zodiacDetails?.si || null,
-        zodiacSymbol: zodiacDetails?.symbol || null,
-        zodiacImgUrl: zodiacImgUrl || null,
-        zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
-        superNumber,
-        numbers: regularNumbers,
-        logoUrl: null,
-        board: 'DLB',
-        rawBlockPreview: ulContent.replace(/\s+/g, ' ').slice(0, 250),
-      });
     }
 
+    const homepageIso = parseToIsoDate(homepageDrawDate);
+
+    // If no targetDate requested, OR homepage matches targetDate: parse homepage directly
+    if (!targetIso || homepageIso === targetIso) {
+      const lotteries: OfficialFetchedLottery[] = [];
+      let detectedDrawDate: string | null = homepageDrawDate;
+
+      for (let i = 1; i < parts.length; i++) {
+        const prevPart = parts[i - 1];
+        const currPart = parts[i];
+
+        const nameMatch = [...prevPart.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].pop();
+        if (!nameMatch) continue;
+        const officialName = nameMatch[1].replace(/<[^>]+>/g, '').trim();
+
+        const dateMatch = currPart.match(/^\s*Draw Number\s*-\s*(\d+)\s*\|\s*([^<]+)/i);
+        const drawNo = dateMatch ? dateMatch[1].trim() : '';
+        const drawDate = dateMatch ? dateMatch[2].trim() : '';
+
+        if (!detectedDrawDate && drawDate) {
+          detectedDrawDate = drawDate;
+        }
+
+        const ulMatch = currPart.match(/<ul class="result_detail_result">([\s\S]*?)<\/ul>/i);
+        const ulContent = ulMatch ? ulMatch[1] : '';
+
+        const letterMatch = ulContent.match(/<h6 class="eng_letter">([\s\S]*?)<\/h6>/i);
+        const letter = letterMatch ? letterMatch[1].trim() : null;
+
+        const matchedDef = findMatchingLottery(officialName, 'DLB');
+        const isZodiacLottery = matchedDef?.requiresZodiac || officialName.toLowerCase().includes('lagna');
+
+        let zodiacDetails: ZodiacMatchInfo | null = null;
+        let zodiacImgUrl: string | null = null;
+
+        if (isZodiacLottery) {
+          const imgMatches = [...currPart.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+          for (const m of imgMatches) {
+            const src = m[1];
+            const match = identifyZodiac(src);
+            if (match) {
+              zodiacDetails = match;
+              zodiacImgUrl = src.startsWith('http') ? src : `https://www.dlb.lk/${src.replace(/^\//, '')}`;
+              break;
+            }
+          }
+
+          if (!zodiacDetails) {
+            const textMatch = identifyZodiac(ulContent);
+            if (textMatch) {
+              zodiacDetails = textMatch;
+            }
+          }
+        }
+
+        const numbers = [...ulContent.matchAll(/<h6[^>]*class="[^"]*number_circle[^"]*"[^>]*>([\s\S]*?)<\/h6>/gi)]
+          .map(m => m[1].trim());
+
+        let superNumber: string | null = null;
+        let regularNumbers = [...numbers];
+
+        const specialImgMatch = currPart.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
+        if (specialImgMatch && matchedDef?.id) {
+          const rawSrc = specialImgMatch[1];
+          const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
+          try {
+            const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
+            if (extractedBonus) {
+              superNumber = extractedBonus;
+            }
+          } catch (e) {
+            console.warn(`[DLB Fetcher] Special OCR failed for ${officialName}:`, e);
+          }
+        }
+
+        if (officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
+          superNumber = regularNumbers[2];
+          regularNumbers = [regularNumbers[0], regularNumbers[1]];
+        } else if (officialName.toLowerCase().includes('kapruka') && regularNumbers.length === 5) {
+          superNumber = regularNumbers[4];
+          regularNumbers = regularNumbers.slice(0, 4);
+        }
+
+        if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+          if (regularNumbers.length === 4) {
+            const d4 = regularNumbers.join('');
+            regularNumbers = [d4.slice(2), d4.slice(1), d4];
+          } else if (regularNumbers.length === 9) {
+            regularNumbers = [
+              regularNumbers.slice(0, 2).join(''),
+              regularNumbers.slice(2, 5).join(''),
+              regularNumbers.slice(5, 9).join(''),
+            ];
+          }
+        }
+
+        lotteries.push({
+          officialName,
+          matchedLotteryId: matchedDef ? matchedDef.id : null,
+          lotteryNameSi: matchedDef?.nameSi,
+          lotteryNameEn: matchedDef?.nameEn,
+          drawNo,
+          drawDate,
+          letter,
+          zodiacEn: zodiacDetails?.en || null,
+          zodiacSi: zodiacDetails?.si || null,
+          zodiacSymbol: zodiacDetails?.symbol || null,
+          zodiacImgUrl: zodiacImgUrl || null,
+          zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
+          superNumber,
+          numbers: regularNumbers,
+          logoUrl: null,
+          board: 'DLB',
+          rawBlockPreview: ulContent.replace(/\s+/g, ' ').slice(0, 250),
+        });
+      }
+
+      return {
+        success: true,
+        sourceUrl: targetUrl,
+        fetchedAt: new Date().toISOString(),
+        drawDate: detectedDrawDate,
+        totalLotteries: lotteries.length,
+        matchedCount: lotteries.filter(l => !!l.matchedLotteryId).length,
+        lotteries,
+        boards: ['DLB'],
+        handshakeDetails: {
+          responseTimeMs,
+          htmlLength: html.length,
+          notes: 'Direct HTTP extraction from dlb.lk/result/2/',
+        },
+      };
+    }
+
+    // Step 2: Target date archive query for DLB lotteries via result/pagination_re
+    const dlbLotteriesPagination = [
+      { officialName: 'Ada Kotipathi', dlbId: 11, id: 'ada_kotipathi' },
+      { officialName: 'Shanida', dlbId: 1, id: 'shanida_wasana' },
+      { officialName: 'Lagna Wasana', dlbId: 2, id: 'lagna_wasana' },
+      { officialName: 'Supiri Dhana Sampatha', dlbId: 17, id: 'supiri_dhana_sampatha' },
+      { officialName: 'Super Ball', dlbId: 3, id: 'super_ball' },
+      { officialName: 'Kapruka', dlbId: 12, id: 'kapruka' },
+      { officialName: 'Waasi', dlbId: 19, id: 'waasi' },
+      { officialName: 'Sasiri', dlbId: 13, id: 'sasiri' },
+      { officialName: 'Jaya Sampatha', dlbId: 18, id: 'jaya_sampatha' },
+    ];
+
+    const historicalPromises = dlbLotteriesPagination.map(async (lot): Promise<OfficialFetchedLottery | null> => {
+      try {
+        const pagRes = await fetch('https://www.dlb.lk/result/pagination_re', {
+          method: 'POST',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: `pageId=0&resultID=&lotteryID=${lot.dlbId}&lastsegment=2`,
+          cache: 'no-store',
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!pagRes.ok) return null;
+        const pagHtml = await pagRes.text();
+        const rows = pagHtml.split('<tr>').filter(r => r.trim());
+
+        for (const r of rows) {
+          const dm = r.match(/(\d+)\s*\|\s*([^<]+)/);
+          if (dm) {
+            const drawNo = dm[1].trim();
+            const rawDate = dm[2].trim();
+            if (parseToIsoDate(rawDate) === targetIso) {
+              const matchedDef = STANDARD_LOTTERIES.find(d => d.id === lot.id) || findMatchingLottery(lot.officialName, 'DLB');
+
+              const letter = r.match(/<li[^>]*class="[^"]*res_eng_letter[^"]*"[^>]*>([\s\S]*?)<\/li>/i)?.[1]?.trim() || null;
+              const numbers = [...r.matchAll(/<li[^>]*class="[^"]*res_number[^"]*"[^>]*>([\s\S]*?)<\/li>/gi)]
+                .map(m => m[1].trim())
+                .filter(n => n.length > 0);
+
+              let zodiacDetails: ZodiacMatchInfo | null = null;
+              let zodiacImgUrl: string | null = null;
+              const isZodiacLottery = matchedDef?.requiresZodiac || lot.officialName.toLowerCase().includes('lagna');
+              if (isZodiacLottery) {
+                const imgMatches = [...r.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)];
+                for (const m of imgMatches) {
+                  const src = m[1];
+                  const match = identifyZodiac(src);
+                  if (match) {
+                    zodiacDetails = match;
+                    zodiacImgUrl = src.startsWith('http') ? src : `https://www.dlb.lk/${src.replace(/^\//, '')}`;
+                    break;
+                  }
+                }
+              }
+
+              let superNumber: string | null = null;
+              let regularNumbers = [...numbers];
+
+              const specialImgMatch = r.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
+              if (specialImgMatch && matchedDef?.id) {
+                const rawSrc = specialImgMatch[1];
+                const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
+                try {
+                  const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
+                  if (extractedBonus) {
+                    superNumber = extractedBonus;
+                  }
+                } catch (e) {
+                  console.warn(`[DLB Fetcher] Special OCR failed for ${lot.officialName}:`, e);
+                }
+              }
+
+              if (lot.officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
+                superNumber = regularNumbers[2];
+                regularNumbers = [regularNumbers[0], regularNumbers[1]];
+              } else if (lot.officialName.toLowerCase().includes('kapruka') && regularNumbers.length === 5) {
+                superNumber = regularNumbers[4];
+                regularNumbers = regularNumbers.slice(0, 4);
+              }
+
+              if (matchedDef?.isTieredDigits || matchedDef?.fieldType === 'tiered_digits_letter') {
+                if (regularNumbers.length === 4) {
+                  const d4 = regularNumbers.join('');
+                  regularNumbers = [d4.slice(2), d4.slice(1), d4];
+                } else if (regularNumbers.length === 9) {
+                  regularNumbers = [
+                    regularNumbers.slice(0, 2).join(''),
+                    regularNumbers.slice(2, 5).join(''),
+                    regularNumbers.slice(5, 9).join(''),
+                  ];
+                }
+              }
+
+              return {
+                officialName: lot.officialName,
+                matchedLotteryId: matchedDef ? matchedDef.id : lot.id,
+                lotteryNameSi: matchedDef?.nameSi,
+                lotteryNameEn: matchedDef?.nameEn,
+                drawNo,
+                drawDate: rawDate,
+                letter,
+                zodiacEn: zodiacDetails?.en || null,
+                zodiacSi: zodiacDetails?.si || null,
+                zodiacSymbol: zodiacDetails?.symbol || null,
+                zodiacImgUrl: zodiacImgUrl || null,
+                zodiacIconPath: zodiacDetails?.iconPath || (zodiacDetails?.si ? ZODIAC_PATH_MAP[zodiacDetails.si] : null),
+                superNumber,
+                numbers: regularNumbers,
+                logoUrl: null,
+                board: 'DLB' as BoardType,
+                rawBlockPreview: r.slice(0, 200),
+              };
+            }
+          }
+        }
+        return null;
+      } catch (err) {
+        console.warn(`[DLB Fetcher] Failed historical fetch for ${lot.officialName}:`, err);
+        return null;
+      }
+    });
+
+    const settled = await Promise.all(historicalPromises);
+    const lotteries: OfficialFetchedLottery[] = settled.filter((item): item is OfficialFetchedLottery => item !== null);
+
     return {
-      success: true,
+      success: lotteries.length > 0,
       sourceUrl: targetUrl,
       fetchedAt: new Date().toISOString(),
-      drawDate: detectedDrawDate,
+      drawDate: targetDate || homepageDrawDate,
       totalLotteries: lotteries.length,
       matchedCount: lotteries.filter(l => !!l.matchedLotteryId).length,
       lotteries,
       boards: ['DLB'],
       handshakeDetails: {
-        responseTimeMs,
+        responseTimeMs: Date.now() - startTime,
         htmlLength: html.length,
-        notes: 'Direct HTTP extraction from dlb.lk/result/2/',
+        notes: `Date-specific archive lookup for ${targetDate}`,
       },
     };
   } catch (error: any) {
@@ -571,12 +881,13 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
 
 /**
  * Fetch both NLB and DLB concurrently to provide 100% full coverage (18 lotteries)
+ * Supports targeting a specific date (live or archive).
  */
-export async function fetchAllOfficialResults(): Promise<OfficialFetchResponse> {
+export async function fetchAllOfficialResults(targetDate?: string): Promise<OfficialFetchResponse> {
   const startTime = Date.now();
   const [nlbResult, dlbResult] = await Promise.allSettled([
-    fetchNlbOfficialResults(),
-    fetchDlbOfficialResults(),
+    fetchNlbOfficialResults(targetDate),
+    fetchDlbOfficialResults(targetDate),
   ]);
 
   const nlb = nlbResult.status === 'fulfilled' ? nlbResult.value : null;
@@ -586,22 +897,28 @@ export async function fetchAllOfficialResults(): Promise<OfficialFetchResponse> 
   if (nlb?.lotteries) combinedLotteries.push(...nlb.lotteries);
   if (dlb?.lotteries) combinedLotteries.push(...dlb.lotteries);
 
-  const matchedCount = combinedLotteries.filter(l => !!l.matchedLotteryId).length;
-  const drawDate = nlb?.drawDate || dlb?.drawDate || null;
+  // If a targetDate was requested, ensure lotteries belong to targetDate
+  const targetIso = targetDate ? parseToIsoDate(targetDate) : null;
+  const filteredLotteries = targetIso
+    ? combinedLotteries.filter(l => parseToIsoDate(l.drawDate) === targetIso)
+    : combinedLotteries;
+
+  const matchedCount = filteredLotteries.filter(l => !!l.matchedLotteryId).length;
+  const drawDate = targetDate || nlb?.drawDate || dlb?.drawDate || null;
 
   return {
-    success: combinedLotteries.length > 0,
+    success: filteredLotteries.length > 0,
     sourceUrl: 'https://www.nlb.lk/results & https://www.dlb.lk/result/2/',
     fetchedAt: new Date().toISOString(),
     drawDate,
-    totalLotteries: combinedLotteries.length,
+    totalLotteries: filteredLotteries.length,
     matchedCount,
-    lotteries: combinedLotteries,
+    lotteries: filteredLotteries,
     boards: ['NLB', 'DLB'],
     handshakeDetails: {
       responseTimeMs: Date.now() - startTime,
       htmlLength: (nlb?.handshakeDetails?.htmlLength || 0) + (dlb?.handshakeDetails?.htmlLength || 0),
-      notes: `Combined NLB (${nlb?.lotteries.length || 0}) and DLB (${dlb?.lotteries.length || 0})`,
+      notes: `Combined NLB (${nlb?.lotteries.length || 0}) and DLB (${dlb?.lotteries.length || 0}) for ${targetDate || 'latest'}`,
     },
   };
 }

@@ -10,22 +10,23 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-async function getOfficialResultsByBoard(board?: string | null) {
+async function getOfficialResultsByBoard(board?: string | null, targetDate?: string | null) {
   if (board === 'dlb') {
-    return await fetchDlbOfficialResults();
+    return await fetchDlbOfficialResults(targetDate || undefined);
   } else if (board === 'nlb') {
-    return await fetchNlbOfficialResults();
+    return await fetchNlbOfficialResults(targetDate || undefined);
   }
   // default: all (NLB + DLB combined 18 lotteries)
-  return await fetchAllOfficialResults();
+  return await fetchAllOfficialResults(targetDate || undefined);
 }
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const board = searchParams.get('board')?.toLowerCase();
+    const date = searchParams.get('date');
 
-    const data = await getOfficialResultsByBoard(board);
+    const data = await getOfficialResultsByBoard(board, date);
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
@@ -40,8 +41,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { searchParams } = new URL(req.url);
     const board = body.board || searchParams.get('board')?.toLowerCase();
+    const date = body.date || searchParams.get('date');
 
-    const data = await getOfficialResultsByBoard(board);
+    const data = await getOfficialResultsByBoard(board, date);
 
     if (!data.success) {
       return NextResponse.json(data, { status: 502 });

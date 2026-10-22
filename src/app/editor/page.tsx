@@ -1643,6 +1643,11 @@ function EditorContent() {
         throw new Error(data.error || 'Failed to fetch live official results from NLB & DLB.');
       }
 
+      if (data.lotteries.length === 0) {
+        showToast(`⚠️ No official results found on NLB/DLB for ${activeDate}.`, 'info');
+        return;
+      }
+
       // Build sheet with guaranteed format security directly from official ground truth
       const updatedSheet = buildSheetFromOfficialData(activeDate, data.lotteries, sheet);
       setSheet(updatedSheet);
@@ -1651,9 +1656,13 @@ function EditorContent() {
         setOfficialVerificationSummary(data.comparison);
       }
 
-      await handleSave(updatedSheet, 'Directly built 100% from Official Government Sites (NLB & DLB)');
+      await handleSave(updatedSheet, `Directly built 100% from Official Government Sites (NLB & DLB) for ${activeDate}`);
       const matchedCount = (updatedSheet.lotteries || []).filter(l => l.officialVerified).length;
-      showToast(`🎉 100% Built from Official Government Portals! (${matchedCount} lotteries verified)`, 'success');
+      if (matchedCount > 0) {
+        showToast(`🎉 100% Built from Official Government Portals for ${activeDate}! (${matchedCount} lotteries verified)`, 'success');
+      } else {
+        showToast(`⚠️ Date mismatch: Official portals did not have matching draws for ${activeDate}.`, 'info');
+      }
     } catch (err: any) {
       console.error('Error building from official:', err);
       showToast(`Error building from official portals: ${err.message}`, 'error');

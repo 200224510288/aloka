@@ -1,0 +1,623 @@
+[
+  {
+    "id": "rev_1792655472470_vkgzb",
+    "sheetDate": "2026-10-20",
+    "timestamp": "2026-10-22T07:51:12.470Z",
+    "summary": "Synced from cloud Firestore",
+    "changedFields": [],
+    "snapshot": {
+      "branch": "result-generator",
+      "updatedAt": "2026-10-22T07:51:12.468Z",
+      "syncedAt": "2026-10-22T07:51:11.541Z",
+      "date": "2026-10-20",
+      "lotteries": [
+        {
+          "officialMatchedAt": "2026-10-22T07:51:11.506Z",
+          "numbers": [
+            "15",
+            "35",
+            "37"
+          ],
+          "drawNo": "0462",
+          "isCheckedAgainstSource": true,
+          "isNoDraw": false,
+          "zodiac": "මීන",
+          "officialDrawNo": "0462",
+          "lotteryId": "suba_dawasak",
+          "officialVerified": true
+        },
+        {
+          "drawNo": "0009",
+          "lotteryId": "ayubo",
+          "letter": "T",
+          "numbers": [
+            "9",
+            "6",
+            "5",
+            "5"
+          ],
+          "isCheckedAgainstSource": true,
+          "officialDrawNo": "0009",
+          "officialVerified": true,
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isNoDraw": false
+        },
+        {
+          "officialDrawNo": "4588",
+          "lotteryId": "govisetha",
+          "isNoDraw": false,
+          "officialVerified": true,
+          "drawNo": "4588",
+          "numbers": [
+            "5",
+            "36",
+            "41",
+            "57"
+          ],
+          "letter": "H",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isCheckedAgainstSource": true
+        },
+        {
+          "letter": "U",
+          "numbers": [
+            "9",
+            "8",
+            "9",
+            "6",
+            "8",
+            "1"
+          ],
+          "drawNo": "6346",
+          "isCheckedAgainstSource": true,
+          "officialDrawNo": "6346",
+          "officialVerified": true,
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "lotteryId": "mahajana_sampatha",
+          "isNoDraw": false
+        },
+        {
+          "lotteryId": "dhana_nidhanaya",
+          "isCheckedAgainstSource": true,
+          "officialDrawNo": "2376",
+          "officialVerified": true,
+          "drawNo": "2376",
+          "numbers": [
+            "19",
+            "20",
+            "58",
+            "71"
+          ],
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "letter": "P",
+          "isNoDraw": false
+        },
+        {
+          "officialVerified": true,
+          "numbers": [
+            "4",
+            "20",
+            "22",
+            "28",
+            "46"
+          ],
+          "lotteryId": "mega_power",
+          "isCheckedAgainstSource": true,
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "officialDrawNo": "2694",
+          "letter": "J",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "drawNo": "2694"
+        },
+        {
+          "officialDrawNo": "1655",
+          "numbers": [
+            "6",
+            "22",
+            "26",
+            "55"
+          ],
+          "officialVerified": true,
+          "zodiac": "වෘෂභ",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "lotteryId": "handahana",
+          "drawNo": "1655",
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true
+        },
+        {
+          "lotteryId": "ada_sampatha",
+          "numbers": [
+            "81",
+            "681",
+            "9681"
+          ],
+          "officialVerified": true,
+          "isNoDraw": false,
+          "drawNo": "0921",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isCheckedAgainstSource": true,
+          "letter": "U",
+          "officialDrawNo": "0921"
+        },
+        {
+          "lotteryId": "nlb_jaya",
+          "numbers": [
+            "4",
+            "5",
+            "2",
+            "7"
+          ],
+          "officialDrawNo": "0614",
+          "isNoDraw": false,
+          "drawNo": "0614",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "letter": "Q"
+        },
+        {
+          "isCheckedAgainstSource": true,
+          "letter": "B",
+          "officialDrawNo": "3146",
+          "drawNo": "3146",
+          "lotteryId": "ada_kotipathi",
+          "officialVerified": true,
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isNoDraw": false,
+          "numbers": [
+            "01",
+            "29",
+            "42",
+            "62"
+          ]
+        },
+        {
+          "numbers": [
+            "06",
+            "16",
+            "51",
+            "74"
+          ],
+          "officialVerified": true,
+          "drawNo": "5481",
+          "officialDrawNo": "5481",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "isNoDraw": false,
+          "letter": "J",
+          "isCheckedAgainstSource": true,
+          "lotteryId": "shanida_wasana",
+          "bonusNumber": "31710"
+        },
+        {
+          "isNoDraw": false,
+          "officialVerified": true,
+          "numbers": [
+            "16",
+            "25",
+            "44",
+            "45"
+          ],
+          "zodiac": "කටක",
+          "bonusNumber": "12308",
+          "drawNo": "5032",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "lotteryId": "lagna_wasana",
+          "isCheckedAgainstSource": true,
+          "officialDrawNo": "5032"
+        },
+        {
+          "isNoDraw": false,
+          "bonusNumber": "690 / 989",
+          "officialDrawNo": "1054",
+          "lotteryId": "dhana_sampatha",
+          "isCheckedAgainstSource": true,
+          "letter": "A",
+          "officialVerified": true,
+          "drawNo": "1054",
+          "numbers": [
+            "1",
+            "3",
+            "2",
+            "5",
+            "3",
+            "0"
+          ],
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "officialVerified": true,
+          "officialDrawNo": "3320",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "lotteryId": "super_ball",
+          "drawNo": "3320",
+          "isNoDraw": false,
+          "letter": "D",
+          "numbers": [
+            "35",
+            "48",
+            "57",
+            "69"
+          ],
+          "bonusNumber": "89005",
+          "isCheckedAgainstSource": true
+        },
+        {
+          "officialVerified": true,
+          "isNoDraw": false,
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "boxedIndex": 0,
+          "officialDrawNo": "2496",
+          "letter": "O",
+          "lotteryId": "kapruka",
+          "drawNo": "2496",
+          "isCheckedAgainstSource": true,
+          "numbers": [
+            "18",
+            "20",
+            "22",
+            "29",
+            "66"
+          ]
+        },
+        {
+          "drawNo": "20",
+          "numbers": [
+            "47",
+            "69",
+            "02"
+          ],
+          "officialVerified": true,
+          "boxedIndex": 2,
+          "isNoDraw": false,
+          "letter": "O",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "lotteryId": "vasi",
+          "isCheckedAgainstSource": true,
+          "officialDrawNo": "20"
+        },
+        {
+          "drawNo": "1150",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "officialDrawNo": "1150",
+          "officialVerified": true,
+          "numbers": [
+            "12",
+            "19",
+            "27"
+          ],
+          "isCheckedAgainstSource": true,
+          "lotteryId": "sasiri",
+          "isNoDraw": false
+        },
+        {
+          "isNoDraw": false,
+          "lotteryId": "jaya_sampatha",
+          "drawNo": "528",
+          "officialVerified": true,
+          "letter": "A",
+          "isCheckedAgainstSource": true,
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z",
+          "numbers": [
+            "30",
+            "530",
+            "2530"
+          ],
+          "officialDrawNo": "528"
+        }
+      ],
+      "dayOfWeekSi": "අඟහරුවාදා",
+      "lastCloudUpdate": "2026-10-22T07:51:11.541Z"
+    }
+  },
+  {
+    "id": "rev_1792655471532_9n3pt",
+    "sheetDate": "2026-10-20",
+    "timestamp": "2026-10-22T07:51:11.532Z",
+    "summary": "Built from Official Gov for 2026-10-20",
+    "changedFields": [],
+    "snapshot": {
+      "date": "2026-10-20",
+      "dayOfWeekSi": "අඟහරුවාදා",
+      "lotteries": [
+        {
+          "lotteryId": "suba_dawasak",
+          "drawNo": "0462",
+          "zodiac": "මීන",
+          "numbers": [
+            "15",
+            "35",
+            "37"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "0462",
+          "officialMatchedAt": "2026-10-22T07:51:11.506Z"
+        },
+        {
+          "lotteryId": "ayubo",
+          "drawNo": "0009",
+          "letter": "T",
+          "numbers": [
+            "9",
+            "6",
+            "5",
+            "5"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "0009",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "govisetha",
+          "drawNo": "4588",
+          "letter": "H",
+          "numbers": [
+            "5",
+            "36",
+            "41",
+            "57"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "4588",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "mahajana_sampatha",
+          "drawNo": "6346",
+          "letter": "U",
+          "numbers": [
+            "9",
+            "8",
+            "9",
+            "6",
+            "8",
+            "1"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "6346",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "dhana_nidhanaya",
+          "drawNo": "2376",
+          "letter": "P",
+          "numbers": [
+            "19",
+            "20",
+            "58",
+            "71"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "2376",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "mega_power",
+          "drawNo": "2694",
+          "letter": "J",
+          "numbers": [
+            "4",
+            "20",
+            "22",
+            "28",
+            "46"
+          ],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "2694",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "handahana",
+          "drawNo": "1655",
+          "zodiac": "වෘෂභ",
+          "numbers": [
+            "6",
+            "22",
+            "26",
+            "55"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "1655",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "ada_sampatha",
+          "drawNo": "0921",
+          "letter": "U",
+          "numbers": [
+            "81",
+            "681",
+            "9681"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "0921",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "nlb_jaya",
+          "drawNo": "0614",
+          "letter": "Q",
+          "numbers": [
+            "4",
+            "5",
+            "2",
+            "7"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "0614",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "ada_kotipathi",
+          "drawNo": "3146",
+          "letter": "B",
+          "numbers": [
+            "01",
+            "29",
+            "42",
+            "62"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "3146",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "shanida_wasana",
+          "drawNo": "5481",
+          "letter": "J",
+          "numbers": [
+            "06",
+            "16",
+            "51",
+            "74"
+          ],
+          "bonusNumber": "31710",
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "5481",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "lagna_wasana",
+          "drawNo": "5032",
+          "zodiac": "කටක",
+          "numbers": [
+            "16",
+            "25",
+            "44",
+            "45"
+          ],
+          "bonusNumber": "12308",
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "5032",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "dhana_sampatha",
+          "drawNo": "1054",
+          "letter": "A",
+          "numbers": [
+            "1",
+            "3",
+            "2",
+            "5",
+            "3",
+            "0"
+          ],
+          "bonusNumber": "690 / 989",
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "1054",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "super_ball",
+          "drawNo": "3320",
+          "letter": "D",
+          "numbers": [
+            "35",
+            "48",
+            "57",
+            "69"
+          ],
+          "bonusNumber": "89005",
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "3320",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "kapruka",
+          "drawNo": "2496",
+          "letter": "O",
+          "numbers": [
+            "18",
+            "20",
+            "22",
+            "29",
+            "66"
+          ],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "2496",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "vasi",
+          "drawNo": "20",
+          "letter": "O",
+          "numbers": [
+            "47",
+            "69",
+            "02"
+          ],
+          "boxedIndex": 2,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "20",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "sasiri",
+          "drawNo": "1150",
+          "numbers": [
+            "12",
+            "19",
+            "27"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "1150",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        },
+        {
+          "lotteryId": "jaya_sampatha",
+          "drawNo": "528",
+          "letter": "A",
+          "numbers": [
+            "30",
+            "530",
+            "2530"
+          ],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": true,
+          "officialVerified": true,
+          "officialDrawNo": "528",
+          "officialMatchedAt": "2026-10-22T07:51:11.507Z"
+        }
+      ],
+      "updatedAt": "2026-10-22T07:51:11.529Z"
+    }
+  }
+]
