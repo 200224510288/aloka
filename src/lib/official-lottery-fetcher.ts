@@ -1,6 +1,8 @@
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
 import { ZODIAC_PATH_MAP } from './zodiac-icons';
 import { LotteryResultItem, BoardType, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
+import { secureFormatLotteryItem } from './lottery-format-security';
+
 
 export interface OfficialFetchedLottery {
   officialName: string;
@@ -589,20 +591,45 @@ export async function fetchAllOfficialResults(): Promise<OfficialFetchResponse> 
 
 /**
  * Converts fetched official lotteries into standard LotteryResultItem rows for daily sheets
+ * with full security validation and overlap prevention.
  */
-export function convertOfficialToSheetRows(fetchedLotteries: OfficialFetchedLottery[]): Partial<LotteryResultItem>[] {
+export function convertOfficialToSheetRows(fetchedLotteries: OfficialFetchedLottery[]): LotteryResultItem[] {
   return fetchedLotteries.map(item => {
+    const matchedDef = STANDARD_LOTTERIES.find(d => d.id === item.matchedLotteryId) ||
+      findMatchingLottery(item.officialName, item.board);
+
+    if (matchedDef) {
+      return secureFormatLotteryItem({
+        lotteryId: matchedDef.id,
+        drawNo: item.drawNo,
+        letter: item.letter || undefined,
+        zodiac: item.zodiacSi || item.zodiacEn || undefined,
+        numbers: item.numbers,
+        superNumber: item.superNumber || undefined,
+        bonusNumber: matchedDef.hasBonusNumber ? (item.superNumber || undefined) : undefined,
+        isNoDraw: false,
+        isCheckedAgainstSource: true,
+        officialVerified: true,
+        officialDrawNo: item.drawNo,
+        officialMatchedAt: new Date().toISOString(),
+      }, matchedDef);
+    }
+
     return {
       lotteryId: item.matchedLotteryId || item.officialName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       drawNo: item.drawNo,
       letter: item.letter || undefined,
       zodiac: item.zodiacSi || undefined,
       numbers: item.numbers,
-      bonusNumber: item.superNumber || undefined,
+      bonusNumber: undefined,
       isNoDraw: false,
-    };
+      isCheckedAgainstSource: true,
+      officialVerified: true,
+      officialDrawNo: item.drawNo,
+    } as LotteryResultItem;
   });
 }
+
 
 /**
  * Normalizes Sinhala Zodiac signs to match canonical names
@@ -791,37 +818,25 @@ export function compareSheetWithOfficial(
       discrepancyCount++;
     }
 
-    // Prepare suggested fix from official government result
+    // Prepare suggested fix from official government result with strict security formatting
     let suggestedFix: Partial<LotteryResultItem> | undefined;
     if (!isMatch) {
-      let formattedNumbers = [...officialNums];
-      if (def.isTieredDigits) {
-        if (officialNums.length === 9) {
-          formattedNumbers = [
-            officialNums.slice(0, 2).join(''),
-            officialNums.slice(2, 5).join(''),
-            officialNums.slice(5, 9).join(''),
-          ];
-        } else if (officialNums.length === 4) {
-          const d4 = officialNums.join('');
-          formattedNumbers = [d4.slice(2), d4.slice(1), d4];
-        }
-      } else if (def.id === 'vasi' && officialItem.superNumber && formattedNumbers.length === 2) {
-        formattedNumbers = [formattedNumbers[0], formattedNumbers[1], officialItem.superNumber];
-      } else if (def.id === 'kapruka' && officialItem.superNumber && formattedNumbers.length === 4) {
-        formattedNumbers = [officialItem.superNumber, ...formattedNumbers];
-      } else if (def.id === 'mega_power' && officialItem.superNumber && formattedNumbers.length === 4) {
-        formattedNumbers = [officialItem.superNumber, ...formattedNumbers];
-      }
-
-      suggestedFix = {
+      suggestedFix = secureFormatLotteryItem({
+        lotteryId: def.id,
         drawNo: officialItem.drawNo || sheetItem.drawNo,
         letter: officialItem.letter || sheetItem.letter,
-        zodiac: officialItem.zodiacSi || sheetItem.zodiac,
-        numbers: formattedNumbers,
-        bonusNumber: officialItem.superNumber || sheetItem.bonusNumber,
-      };
+        zodiac: officialItem.zodiacSi || officialItem.zodiacEn || sheetItem.zodiac,
+        numbers: officialNums,
+        superNumber: officialItem.superNumber || undefined,
+        bonusNumber: def.hasBonusNumber ? (officialItem.superNumber || sheetItem.bonusNumber) : undefined,
+        isNoDraw: false,
+        isCheckedAgainstSource: true,
+        officialVerified: true,
+        officialDrawNo: officialItem.drawNo,
+        officialMatchedAt: new Date().toISOString(),
+      }, def);
     }
+
 
     results.push({
       lotteryId: def.id,

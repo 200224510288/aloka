@@ -1,5 +1,7 @@
 import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
 import { LotteryDefinition, LotteryResultItem, UnassignedExtractedRow } from '@/types/lottery';
+import { secureFormatLotteryItem } from './lottery-format-security';
+
 
 // Legacy font mapping table for common Sinhala lottery names (Type 2 wireframe format)
 const LEGACY_FONT_MAP: Record<string, string> = {
@@ -576,18 +578,18 @@ export function parseLotteryLine(
     boxedIndex = numbers.length - 1; // Last number is boxed/circled e.g. (11), [09]
   }
 
-  return {
+  return secureFormatLotteryItem({
     lotteryId,
     drawNo: drawNo || '',
     letter: letter || '',
     zodiac,
     numbers,
-    bonusNumber,
+    bonusNumber: def.hasBonusNumber ? bonusNumber : undefined,
     boxedIndex,
     isNoDraw: false,
     isCheckedAgainstSource: true,
     sourceFileName: fileName,
     sourcePage: pageNumber,
     extractionConfidence: 95
-  };
+  }, def);
 }

@@ -111,9 +111,9 @@ export function renderSingleSheet(sheet: DailySheet, isHighDensity = false, opti
         parts.push(...numSpans);
       }
 
-      // Bonus number in parentheses e.g. (86597)
-      if (item.bonusNumber) {
-        parts.push(`<span class="bonus-number">(${escapeHtml(item.bonusNumber)})</span>`);
+      // Bonus number in parentheses e.g. (86597) - STRICTLY only for lotteries that define hasBonusNumber!
+      if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
+        parts.push(`<span class="bonus-number">(${escapeHtml(item.bonusNumber.trim())})</span>`);
       }
 
       if (showRowTick && rowTickPosition === 'right') {

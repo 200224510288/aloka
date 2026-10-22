@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { OfficialLotteryMatchResult, OfficialVerificationSummary, LotteryResultItem } from '@/types/lottery';
 import { ZODIAC_PATH_MAP, ZODIAC_IMAGE_MAP } from '@/lib/zodiac-icons';
+import { STANDARD_LOTTERIES } from '@/lib/constants';
+
 
 interface OfficialVerificationModalProps {
   isOpen: boolean;
@@ -245,6 +247,8 @@ export const OfficialVerificationModal: React.FC<OfficialVerificationModalProps>
                   const offVals = item.officialValues;
                   const sheetVals = item.sheetValues;
 
+                  const def = STANDARD_LOTTERIES.find(d => d.id === item.lotteryId);
+
                   return (
                     <div 
                       key={item.lotteryId}
@@ -342,9 +346,9 @@ export const OfficialVerificationModal: React.FC<OfficialVerificationModalProps>
                                 {sheetVals.numbers.join('  ')}
                               </span>
                             )}
-                            {sheetVals?.bonusNumber && (
+                            {def?.hasBonusNumber && sheetVals?.bonusNumber && (
                               <span className="font-mono bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded border border-amber-300">
-                                [{sheetVals.bonusNumber}]
+                                ({sheetVals.bonusNumber})
                               </span>
                             )}
                           </div>
@@ -393,8 +397,10 @@ export const OfficialVerificationModal: React.FC<OfficialVerificationModalProps>
                               </span>
                             )}
                             {offVals?.superNumber && (
-                              <span className="font-mono bg-red-600 text-white font-bold px-1.5 py-0.5 rounded shadow-2xs">
-                                [{offVals.superNumber}]
+                              <span className={`font-mono font-bold px-1.5 py-0.5 rounded shadow-2xs text-white ${
+                                def?.hasBoxedNumber ? 'bg-emerald-700 border border-emerald-900' : 'bg-purple-700'
+                              }`}>
+                                {def?.hasBoxedNumber ? `[${offVals.superNumber}]` : `(${offVals.superNumber})`}
                               </span>
                             )}
                           </div>

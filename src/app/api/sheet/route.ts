@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSheetByDate, saveSheet, getRevisionsByDate, listAvailableDates } from '@/lib/storage';
 import { DailySheet } from '@/types/lottery';
 import { saveSheetToCloud, loadSheetFromCloud, listCloudDates } from '@/lib/cloud-service';
-import { createEmptySheet, SAMPLE_WIREFRAME_SHEET } from '@/lib/constants';
+import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES } from '@/lib/constants';
+import { secureFormatLotteryItem } from '@/lib/lottery-format-security';
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -285,6 +287,14 @@ export async function GET(req: NextRequest) {
       sheet.footerAnnouncement = '';
     }
 
+    // Per-lottery format security: sanitize on GET to prevent rogue bonus numbers (Kapruka, Mega Power, etc.)
+    if (sheet && Array.isArray(sheet.lotteries)) {
+      sheet.lotteries = sheet.lotteries.map(l => {
+        const def = STANDARD_LOTTERIES.find(d => d.id === l.lotteryId);
+        return def ? secureFormatLotteryItem(l, def) : l;
+      });
+    }
+
     return NextResponse.json({
       success: true,
       sheet,
@@ -343,13 +353,15 @@ export async function POST(req: NextRequest) {
 
     if (sheet && Array.isArray(sheet.lotteries)) {
       sheet.lotteries = sheet.lotteries.map(l => {
-        if (l.sourceFileName) {
-          const m = l.sourceFileName.match(/(\d{8})/);
+        const def = STANDARD_LOTTERIES.find(d => d.id === l.lotteryId);
+        const formatted = def ? secureFormatLotteryItem(l, def) : l;
+        if (formatted.sourceFileName) {
+          const m = formatted.sourceFileName.match(/(\d{8})/);
           if (m && m[1] !== cleanDigits) {
-            return { ...l, sourceFileName: undefined };
+            return { ...formatted, sourceFileName: undefined };
           }
         }
-        return l;
+        return formatted;
       });
     }
 

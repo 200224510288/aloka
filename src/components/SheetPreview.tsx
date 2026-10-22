@@ -774,8 +774,8 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                     });
                   }
 
-                  // Bonus number in parentheses e.g. (86597)
-                  if (item.bonusNumber) {
+                  // Bonus number in parentheses e.g. (86597) - STRICTLY only for lotteries that define hasBonusNumber!
+                  if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
                     const bonusFontSize = Math.max(10, resultFontSizePt - 4.5);
                     parts.push(
                       <span
@@ -787,7 +787,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                         }}
                         className="text-black ml-1 leading-none shrink-0"
                       >
-                        ({item.bonusNumber})
+                        ({item.bonusNumber.trim()})
                       </span>
                     );
                   }

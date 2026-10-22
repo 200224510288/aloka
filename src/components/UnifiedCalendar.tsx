@@ -54,7 +54,7 @@ export const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({
   cloudStatus = 'synced',
   className = '',
   isLoading = false,
-  defaultExpanded = true,
+  defaultExpanded = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -209,7 +209,7 @@ export const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({
       {/* ========================================================================= */}
       {/* Top Banner / Calendar Bar Header                                          */}
       {/* ========================================================================= */}
-      <div className="bg-slate-50/70 border-b border-slate-200 p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className={`bg-slate-50/70 p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 ${isExpanded ? 'border-b border-slate-200' : ''}`}>
         
         {/* Left: Active Date Pill & Live Status */}
         <div className="flex items-center gap-3">
@@ -246,7 +246,9 @@ export const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-500 mt-0.5 hidden sm:block">
-              Click any day on the calendar below to immediately load and edit that day&apos;s 18 lottery results.
+              {isExpanded 
+                ? "Click any day on the calendar below to immediately load and edit that day's 18 lottery results."
+                : "Choose date using quick buttons or click 'Show Calendar' for the full interactive monthly grid."}
             </p>
           </div>
         </div>

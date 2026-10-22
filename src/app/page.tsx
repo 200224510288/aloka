@@ -16,15 +16,7 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   Pencil,
-  ArrowRight,
-  Calendar,
-  Cloud,
-  ShieldCheck,
-  Zap,
-  RefreshCw,
-  Sparkles,
-  Loader2,
-  CheckCheck
+  Calendar
 } from 'lucide-react';
 
 function getYesterdayDateStr(): string {
@@ -431,8 +423,6 @@ export default function Home() {
   };
 
   const selectedInfo = formatDateShort(selectedDate);
-  const isReadyToPrint = automationState.step === 'ready' || 
-    (sheet.lotteries || []).some(l => l.numbers && l.numbers.length > 0);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900">
@@ -476,136 +466,8 @@ export default function Home() {
         {/* LEFT SIDEBAR */}
         <aside className="w-full lg:w-[350px] xl:w-[380px] shrink-0 flex flex-col gap-3">
           
-          {/* ─────────────────────────────────────────────────────────────
-              STAFF FULL AUTOMATION CONTROLLER CARD (When Role === 'staff')
-             ───────────────────────────────────────────────────────────── */}
-          {userRole === 'staff' ? (
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-sm text-white p-5">
-              
-              {/* Header Title */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black font-sinhala leading-tight">
-                      කාර්ය මණ්ඩල ස්වයංක්‍රීය පාලකය
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      Staff Automated Mode
-                    </p>
-                  </div>
-                </div>
-
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">
-                  Zero AI • 100% Gov
-                </span>
-              </div>
-
-              {/* Official Status Progress / Notice */}
-              <div className="bg-slate-800 rounded-xl p-3 border border-slate-700 mb-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 font-sinhala">
-                    {isAutomating ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                        <span>
-                          {automationState.step === 'fetching_raw' 
-                            ? 'අමු පත්‍රිකාව (PDF) බාගත කරමින්...' 
-                            : 'රාජ්‍ය නිල දත්ත සත්‍යාපනය වෙමින්...'}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCheck className="w-4 h-4 text-emerald-400" />
-                        <span>රාජ්‍ය නිල දත්ත සත්‍යාපනය කර ඇත</span>
-                      </>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-mono font-bold text-slate-300">
-                    {automationState.progressPercent}%
-                  </span>
-                </div>
-
-                {/* Progress Bar (Solid Emerald) */}
-                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden mb-2">
-                  <div 
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                    style={{ width: `${automationState.progressPercent}%` }}
-                  />
-                </div>
-
-                <p className="text-[11px] text-slate-300 font-sinhala leading-relaxed">
-                  {automationState.messageSi || 'අමු ලොතරැයි පත්‍රිකාව සහ රාජ්‍ය ලොතරැයි මණ්ඩලය (NLB/DLB) නිල ප්‍රතිඵල මඟින් 100% තහවුරු කර ඇත.'}
-                </p>
-
-                {/* Dual verification badges */}
-                <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex flex-wrap gap-1.5 text-[10px]">
-                  <span className={`px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 ${
-                    (automationState.rawSheetFound || (sheet.sources && sheet.sources.length > 0))
-                      ? 'bg-slate-900 text-emerald-400 border border-emerald-800/50'
-                      : 'bg-slate-900 text-slate-400 border border-slate-700'
-                  }`}>
-                    📄 {(automationState.rawSheetFound || (sheet.sources && sheet.sources.length > 0)) ? 'අමු පත්‍රිකාව (PDF) සූදානම්' : 'අමු පත්‍රිකාව පිරික්සයි'}
-                  </span>
-                  <span className="px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 bg-slate-900 text-emerald-400 border border-emerald-800/50">
-                    🏛️ NLB & DLB නිල සත්‍යාපිතයි
-                  </span>
-                </div>
-              </div>
-
-              {/* Primary 1-Click PRINT BUTTON (Solid Professional Green) */}
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handlePrint()}
-                  disabled={isAutomating}
-                  className={`w-full py-3.5 text-base font-black rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer shadow-sm active:scale-[0.98] ${
-                    isReadyToPrint
-                      ? 'bg-[#15803d] hover:bg-[#166534] text-white ring-2 ring-emerald-500/50'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700 opacity-80'
-                  }`}
-                  title="Click to print the verified A4 sheet directly"
-                >
-                  <div className="flex items-center gap-2">
-                    <Printer className="w-5 h-5" />
-                    <span className="font-sinhala text-base">මුද්‍රණය කරන්න (Print Sheet)</span>
-                  </div>
-                  <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wider">
-                    {isReadyToPrint ? '✓ සූදානම් • 1-Click Direct Print' : 'සත්‍යාපනය වෙමින් පවතී...'}
-                  </span>
-                </button>
-
-                {/* Re-verify / Refresh Button */}
-                <button
-                  type="button"
-                  onClick={() => executeStaffAutomation(sheet)}
-                  disabled={isAutomating}
-                  className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer font-sinhala"
-                  title="Re-fetch live results from NLB & DLB portals"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isAutomating ? 'animate-spin text-emerald-400' : ''}`} />
-                  <span>නැවත නිල දත්ත පිරික්සන්න (Re-check Portals)</span>
-                </button>
-              </div>
-
-              {/* Staff Guidance */}
-              <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-sinhala">
-                <span>🛡️ AI රහිතයි • 100% නිල රාජ්‍ය දත්ත</span>
-                <button
-                  type="button"
-                  onClick={() => setIsRoleModalOpen(true)}
-                  className="text-emerald-400 hover:underline text-[10px] font-bold cursor-pointer"
-                >
-                  භූමිකාව මාරු කරන්න ⇄
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* ─────────────────────────────────────────────────────────────
-                ALOKA / ADMIN CONTROLLER CARD (When Role === 'aloka' or other)
-               ───────────────────────────────────────────────────────────── */
+          {/* Aloka Admin Quick Actions (Only shown in Aloka mode) */}
+          {userRole === 'aloka' && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -625,7 +487,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setIsRoleModalOpen(true)}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 font-sinhala"
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 font-sinhala cursor-pointer"
                 >
                   මාරු ⇄
                 </button>
@@ -654,7 +516,7 @@ export default function Home() {
                   type="button"
                   onClick={() => handleExportPdf(previewStyles)}
                   disabled={isExporting}
-                  className="py-2 px-3 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition active:scale-[0.97] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                  className="py-2 px-3 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition active:scale-[0.97] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer"
                 >
                   <FileDown className="w-3.5 h-3.5" />
                   <span>PDF</span>

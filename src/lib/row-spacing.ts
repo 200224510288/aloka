@@ -174,12 +174,12 @@ export function computeRowMetrics(
     });
   }
 
-  // 5. Bonus number in parentheses
-  if (item.bonusNumber) {
+  // 5. Bonus number in parentheses - STRICTLY only for lotteries that define hasBonusNumber!
+  if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
     items.push({
       type: 'bonus',
-      text: item.bonusNumber,
-      width: estimateItemWidthMm('bonus', item.bonusNumber, resultFontSizePt, zodiacIconSizeMm)
+      text: item.bonusNumber.trim(),
+      width: estimateItemWidthMm('bonus', item.bonusNumber.trim(), resultFontSizePt, zodiacIconSizeMm)
     });
   }
 

@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { OfficialFetchResponse, OfficialFetchedLottery } from '@/lib/official-lottery-fetcher';
 import { ZODIAC_PATH_MAP, ZODIAC_IMAGE_MAP } from '@/lib/zodiac-icons';
+import { buildSheetFromOfficialData } from '@/lib/lottery-format-security';
+
 
 export default function OfficialResultsPage() {
   const router = useRouter();
@@ -115,6 +117,47 @@ export default function OfficialResultsPage() {
 
   const targetDateIso = getIsoDate(data?.drawDate);
 
+  const [isApplying, setIsApplying] = useState(false);
+
+  const handleApplyToSheet = async () => {
+    if (!data?.lotteries || data.lotteries.length === 0) return;
+    setIsApplying(true);
+    try {
+      // 1. Fetch existing sheet if available to preserve headers/settings
+      let existingSheet = null;
+      try {
+        const getRes = await fetch(`/api/sheet?date=${targetDateIso}`);
+        const getJson = await getRes.json();
+        if (getJson.success && getJson.sheet) {
+          existingSheet = getJson.sheet;
+        }
+      } catch {}
+
+      // 2. Build complete sheet from official ground truth with format security
+      const builtSheet = buildSheetFromOfficialData(targetDateIso, data.lotteries, existingSheet);
+
+      // 3. Persist to localStorage and server
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`sinhala_lottery_sheet_${targetDateIso}`, JSON.stringify(builtSheet));
+      }
+      await fetch('/api/sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet: builtSheet,
+          summary: 'Built 100% directly from Official Government Results (NLB & DLB)',
+        }),
+      });
+
+      router.push(`/editor?date=${targetDateIso}`);
+    } catch (err: any) {
+      console.error(err);
+      setError('Failed to apply official results to sheet: ' + err.message);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
   // Filter lotteries by board and search query
   const filteredLotteries = useMemo(() => {
     if (!data?.lotteries) return [];
@@ -171,6 +214,17 @@ export default function OfficialResultsPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleApplyToSheet}
+              disabled={isApplying || !data || (data.lotteries || []).length === 0}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center gap-1.5 shadow-sm transition disabled:opacity-50 cursor-pointer"
+              title="Apply these official results to the daily sheet and open editor"
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 ${isApplying ? 'animate-spin' : 'text-emerald-200'}`} />
+              <span>{isApplying ? 'Applying to Sheet...' : '⚡ Apply to Today\'s Sheet'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => fetchResults(selectedBoard)}
               disabled={isLoading}
               className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 text-slate-700 hover:text-slate-900 flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
@@ -200,6 +254,7 @@ export default function OfficialResultsPage() {
           </div>
         </div>
       </header>
+
 
       {/* Hero Stats & Info Banner */}
       <section className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-5">

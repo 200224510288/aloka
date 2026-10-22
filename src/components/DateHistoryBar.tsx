@@ -22,7 +22,7 @@ export const DateHistoryBar: React.FC<DateHistoryBarProps> = ({
   availableDates = [],
   cloudStatus = 'synced',
   className = '',
-  defaultCollapsed = false,
+  defaultCollapsed = true,
   isLoading = false,
 }) => {
   return (
