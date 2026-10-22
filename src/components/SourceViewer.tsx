@@ -32,7 +32,7 @@ interface SourceViewerProps {
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
-  sources,
+  sources = [],
   currentDate,
   onFileUpload,
   onAutoFetchSource,

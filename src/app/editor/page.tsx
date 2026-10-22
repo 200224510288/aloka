@@ -2020,7 +2020,7 @@ function EditorContent() {
               {/* Source Viewer Container */}
               <div className="h-[420px] rounded-xl overflow-hidden border border-slate-200">
                 <SourceViewer
-                  sources={sheet.sources}
+                  sources={sheet.sources || []}
                   currentDate={sheet.date}
                   onFileUpload={handleFileUpload}
                   onAutoFetchSource={handleAutoFetchSource}
@@ -2177,7 +2177,7 @@ function EditorContent() {
               {isSplitView && (
                 <div className="lg:col-span-5 h-[calc(100vh-230px)] min-h-[560px] flex flex-col">
                   <SourceViewer
-                    sources={sheet.sources}
+                    sources={sheet.sources || []}
                     currentDate={sheet.date}
                     onFileUpload={handleFileUpload}
                     onAutoFetchSource={handleAutoFetchSource}
