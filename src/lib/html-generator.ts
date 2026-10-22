@@ -111,9 +111,12 @@ export function renderSingleSheet(sheet: DailySheet, isHighDensity = false, opti
         parts.push(...numSpans);
       }
 
-      // Bonus number in parentheses e.g. (86597) - STRICTLY only for lotteries that define hasBonusNumber!
+      // Bonus number in rounded box e.g. [4 9 1 1 3] or [862 / 139] - STRICTLY only for lotteries that define hasBonusNumber!
       if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
-        parts.push(`<span class="bonus-number">(${escapeHtml(item.bonusNumber.trim())})</span>`);
+        const formattedBonus = item.bonusNumber.includes('/')
+          ? item.bonusNumber.trim()
+          : item.bonusNumber.trim().split('').join(' ');
+        parts.push(`<span class="bonus-number">${escapeHtml(formattedBonus)}</span>`);
       }
 
       if (showRowTick && rowTickPosition === 'right') {
@@ -557,8 +560,8 @@ export function generatePrintHtml(
 
     .boxed-number {
       border: ${isHighDensity ? '2px' : '1.5px'} solid #000000;
-      padding: 0.3mm 1.5mm;
-      border-radius: 1px;
+      padding: 0.3mm 1.6mm;
+      border-radius: 12px;
       font-family: ${resultFontFamily};
       font-weight: ${Math.min(900, Number(resultFontWeight) + 100)};
       line-height: 1;
@@ -573,12 +576,16 @@ export function generatePrintHtml(
     }
 
     .bonus-number {
-      font-size: 12.5pt;
+      border: ${isHighDensity ? '2px' : '1.5px'} solid #000000;
+      border-radius: 3.5px;
+      padding: 0.3mm 2mm;
+      font-size: ${Math.max(9.5, resultFontSizePt - 3.5)}pt;
       font-weight: ${resultFontWeight};
       font-family: ${resultFontFamily};
       color: #000000;
-      margin-left: 1mm;
+      margin-left: 2mm;
       line-height: 1;
+      display: inline-block;
       flex-shrink: 0;
     }
 

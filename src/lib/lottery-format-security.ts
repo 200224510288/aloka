@@ -129,16 +129,31 @@ export function secureFormatLotteryItem(
     }
   }
 
-  // 4. LOTTERIES WITH BONUS NUMBER (Shanida Wasana, Super Ball, Lagna Wasana)
+  // 4. LOTTERIES WITH BONUS NUMBER (Shanida Wasana, Super Ball, Lagna Wasana, Dhana Sampatha)
   else if (def.hasBonusNumber) {
     boxedIndex = undefined;
-    const rawBonus = rawItem.bonusNumber || rawItem.superNumber || '';
-    const cleanBonus = cleanDigitsOnly(rawBonus);
-    bonusNumber = cleanBonus ? cleanBonus : undefined;
+    const rawBonus = (rawItem.bonusNumber || rawItem.superNumber || '').trim();
+    if (rawBonus.includes('/')) {
+      const slashParts = rawBonus.split('/').map(p => p.replace(/\D/g, '').trim()).filter(Boolean);
+      if (slashParts.length >= 2) {
+        bonusNumber = `${slashParts[0]} / ${slashParts[1]}`;
+      } else {
+        const cleanBonus = cleanDigitsOnly(rawBonus);
+        bonusNumber = cleanBonus ? cleanBonus : undefined;
+      }
+    } else {
+      const cleanBonus = cleanDigitsOnly(rawBonus);
+      bonusNumber = cleanBonus ? cleanBonus : undefined;
+    }
 
     // SECURITY: Prevent overlap! Strip bonus number from regular numbers array if accidentally included
     if (bonusNumber) {
-      numbers = validNumbers.filter(n => cleanDigitsOnly(n) !== bonusNumber);
+      if (bonusNumber.includes('/')) {
+        const slashTokens = bonusNumber.split('/').map(t => t.trim());
+        numbers = validNumbers.filter(n => !slashTokens.includes(cleanDigitsOnly(n)));
+      } else {
+        numbers = validNumbers.filter(n => cleanDigitsOnly(n) !== bonusNumber);
+      }
     } else {
       numbers = validNumbers;
     }
@@ -229,9 +244,11 @@ export function auditLotteryFormatSecurity(
 
   // Check 2: Bonus number duplicated inside numbers array
   if (def.hasBonusNumber && item.bonusNumber) {
-    const cleanBonus = cleanDigitsOnly(item.bonusNumber);
-    if (item.numbers.some(n => cleanDigitsOnly(n) === cleanBonus)) {
-      issues.push(`Duplicate bonus number overlap: "${item.bonusNumber}" appeared both in numbers and bonusNumber. Cleaned.`);
+    if (!item.bonusNumber.includes('/')) {
+      const cleanBonus = cleanDigitsOnly(item.bonusNumber);
+      if (item.numbers.some(n => cleanDigitsOnly(n) === cleanBonus)) {
+        issues.push(`Duplicate bonus number overlap: "${item.bonusNumber}" appeared both in numbers and bonusNumber. Cleaned.`);
+      }
     }
   }
 

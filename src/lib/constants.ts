@@ -489,6 +489,7 @@ export const STANDARD_LOTTERIES: LotteryDefinition[] = [
     requiresLetter: true,
     requiresZodiac: false,
     numberCount: 6, // 6 individual digits: e.g. 2 6 0 6 4 9
+    hasBonusNumber: true, // Special slash bonus e.g. 862 / 139
     aliases: [
       'ධන සම්පත', 'ධනසම්පත', 'සුපිරි ධන ස.', 'සුපිරි ධන ස', 'සුපිරි ධන', 'සුපිරි ධන සම්පත', 'සුපිරි ධනසම්පත', 'ධන ස.', 'ධන ස',
       'Ok iïm;', 'Ok iï', 

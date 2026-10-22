@@ -764,7 +764,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                             fontWeight: isBoxed ? Math.min(900, Number(resultFontWeight) + 100) : resultFontWeight,
                           }}
                           className={`leading-none inline-block text-black ${isBoxed
-                              ? `${isHighDensity ? 'border-[2px]' : 'border-[1.5px]'} border-black px-[1.5mm] py-[0.3mm] rounded-[1px]`
+                              ? `${isHighDensity ? 'border-[2px]' : 'border-[1.5px]'} border-black px-[1.6mm] py-[0.35mm] rounded-full`
                               : ''
                             }`}
                         >
@@ -774,9 +774,12 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                     });
                   }
 
-                  // Bonus number in parentheses e.g. (86597) - STRICTLY only for lotteries that define hasBonusNumber!
+                  // Boxed special bonus number e.g. [4 9 1 1 3] or [862 / 139] - STRICTLY only for lotteries that define hasBonusNumber!
                   if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
-                    const bonusFontSize = Math.max(10, resultFontSizePt - 4.5);
+                    const bonusFontSize = Math.max(9.5, resultFontSizePt - 3.5);
+                    const formattedBonus = item.bonusNumber.includes('/')
+                      ? item.bonusNumber.trim()
+                      : item.bonusNumber.trim().split('').join(' ');
                     parts.push(
                       <span
                         key="bonus"
@@ -785,9 +788,9 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                           fontFamily: resultFontFamily,
                           fontWeight: resultFontWeight,
                         }}
-                        className="text-black ml-1 leading-none shrink-0"
+                        className={`text-black ml-2 leading-none shrink-0 inline-block border-[1.5px] border-black px-[2mm] py-[0.5mm] rounded-[3.5px] ${isHighDensity ? 'border-[2px]' : ''}`}
                       >
-                        ({item.bonusNumber.trim()})
+                        {formattedBonus}
                       </span>
                     );
                   }

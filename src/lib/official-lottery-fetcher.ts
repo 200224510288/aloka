@@ -2,6 +2,7 @@ import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
 import { ZODIAC_PATH_MAP } from './zodiac-icons';
 import { LotteryResultItem, BoardType, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { secureFormatLotteryItem } from './lottery-format-security';
+import { extractSpecialNumberFromDlbImage } from './dlb-special-extractor';
 
 
 export interface OfficialFetchedLottery {
@@ -472,7 +473,23 @@ export async function fetchDlbOfficialResults(): Promise<OfficialFetchResponse> 
       let superNumber: string | null = null;
       let regularNumbers = [...numbers];
 
-      // For Kapruka: 5 numbers total, 1 special boxed
+      // 1. Check for modal special draw image (Lagna Wasana, Shanida, Super Ball, Supiri Dhana Sampatha)
+      const specialImgMatch = currPart.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
+      
+      if (specialImgMatch && matchedDef?.id) {
+        const rawSrc = specialImgMatch[1];
+        const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
+        try {
+          const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
+          if (extractedBonus) {
+            superNumber = extractedBonus;
+          }
+        } catch (e) {
+          console.warn(`[DLB Fetcher] Special OCR failed for ${officialName}:`, e);
+        }
+      }
+
+      // 2. For Kapruka: 5 numbers total, 1 special boxed
       // For Waasi: 3 numbers total (last is boxed)
       if (officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
         superNumber = regularNumbers[2];
@@ -798,11 +815,11 @@ export function compareSheetWithOfficial(
       }
     }
 
-    // 5. Bonus Number check (Shanida Wasana, Super Ball, Lagna Wasana)
+    // 5. Bonus Number check (Shanida Wasana, Super Ball, Lagna Wasana, Dhana Sampatha)
     if (def.hasBonusNumber && def.id !== 'mega_power' && def.id !== 'kapruka') {
       if (officialItem.superNumber) {
-        const cleanSheetBonus = (sheetItem.bonusNumber || '').replace(/\D/g, '');
-        const cleanOfficialBonus = (officialItem.superNumber || '').replace(/\D/g, '');
+        const cleanSheetBonus = (sheetItem.bonusNumber || '').replace(/[^\d/]/g, '').trim();
+        const cleanOfficialBonus = (officialItem.superNumber || '').replace(/[^\d/]/g, '').trim();
         if (cleanSheetBonus && cleanOfficialBonus && cleanSheetBonus !== cleanOfficialBonus) {
           bonusMatch = false;
           discrepancies.push(`Bonus No: Sheet has "${sheetItem.bonusNumber}", Official has "${officialItem.superNumber}"`);
