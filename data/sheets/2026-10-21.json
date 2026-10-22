@@ -1,144 +1,356 @@
 {
-  "lastCloudUpdate": "2026-10-22T02:41:25.170Z",
+  "syncedAt": "2026-10-22T04:19:19.676Z",
+  "footerAnnouncement": "",
+  "lastCloudUpdate": "2026-10-22T04:19:19.676Z",
+  "sources": [
+    {
+      "uploadedAt": "2026-10-22T03:46:19.994Z",
+      "fileName": "lklottery_results_Sinhala_20261021_Wed.pdf",
+      "fileSize": 62950,
+      "detectedDate": "2026-10-21",
+      "id": "doc_1792640779993_8cwh1",
+      "fileType": "pdf",
+      "filePath": "/uploads/2026-10-21/doc_1792640779993_8cwh1_lklottery_results_Sinhala_20261021_Wed.pdf",
+      "pageCount": 1,
+      "extractedText": "ෙලා\tතරැයි ප්‍රති ඵල\nඅද\t ෙකා්\tටිපති\n3147\t \nH\t 46\t 52\t 56\t 67\nඅද සම්පත\n922\t \n81\t /\t 881\t /\t 4881\t /\t J\nආයු\tෙබා්\n10\t \nF\t 7\t 5\t 3\t 5\nධන නි\t ධා\tනය\n2377\t \nR\t 19\t 48\t 67\t 78\nෙගා\tවි\tෙස\tත\n4589\t \nE\t 12\t 26\t 39\t 51\nහඳහන\n1656\t \nකටක\t 01\t 04\t 10\t 25\nජය සම්පත\n529\t \n25\t /\t 725\t /\t 7725\t /\t R\nකප්රුක\n2497\t \nE\t 15\t 25\t 40\t 52\t 60\nලග්න\t වා\tස\tනා\tව\n5033\t \nෙම්\tෂ\t 02\t 11\t 35\t 40\t 4 9 1 1 3\nමහජන සම්පත\n6347\t \nJ\t 1\t 0\t 4\t 8\t 8\t 1\nෙම\tගා\t පවර්\n2695\t \nU\t 04\t 12\t 25\t 38\t 57\nNLB ජය\n615\t \nC\t 3\t 6\t 5\t 5\nසසිරි\n1151\t \n09\t 25\t 48\nශනි\tදා\t වා\tස\tනා\tව\n5482\t \nX\t 29\t 53\t 58\t 74\t 6 1 0 2 7\nසු\tබ දවසක්\n463\t \nවෘ\t\u0000\t චි\tක\t 31\t 44\t 49\nසු\tපර්\t ෙබා්\tල්\n3321\t \nF\t 12\t 26\t 31\t 74\t 1 4 5 2 5\nසුපිරි\tධන ස.\n1055\t \nR\t 4\t 2\t 7\t 7\t 2\t 5\t 8 6 2\t /\t 1 3 9\nවා\tසි\n21\t \nY\t 22\t 80\t 11\n2026-10-21\t බ\tදා\tදා\n©lklottery.com. අප ශ්‍රී\t ලං\tකා\tෙ\u0000\t ෙලා\tතරැයි මණ්ඩල\t හා\t අනුබද්ධ ආයතනයක්\t ෙනා\tවන අතර,\t ෙම\tය නි ල ප්‍රති ඵල සමග නි රව\tද\u0000\tතා\tවය තහවුරු කර\tගැ\tනී\tෙම\tන්\t පසුව පළ කිරී මට වගබ\tලා\tගන්න.",
+      "totalFilePages": 1,
+      "status": "extracted"
+    }
+  ],
+  "branch": "result-generator",
+  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+  "dayOfWeekSi": "බදාදා",
   "lotteries": [
     {
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "drawNo": "3147",
+      "letter": "H",
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "officialVerified": true,
       "lotteryId": "ada_kotipathi",
-      "drawNo": "",
-      "numbers": [],
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "extractionConfidence": 100,
+      "isCheckedAgainstSource": true,
+      "numbers": [
+        "46",
+        "52",
+        "56",
+        "67"
+      ],
+      "officialDrawNo": "3147"
     },
     {
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "isNoDraw": false,
+      "drawNo": "0922",
+      "letter": "J",
+      "isCheckedAgainstSource": true,
+      "numbers": [
+        "81",
+        "881",
+        "4881"
+      ],
+      "extractionConfidence": 100,
+      "officialVerified": true,
       "lotteryId": "ada_sampatha",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "officialDrawNo": "0922",
+      "sourceFileName": "Official NLB Portal (nlb.lk)"
     },
     {
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
       "lotteryId": "ayubo",
-      "drawNo": "",
-      "numbers": [],
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "officialDrawNo": "0010",
+      "extractionConfidence": 100,
+      "officialVerified": true,
+      "isCheckedAgainstSource": true,
+      "drawNo": "0010",
+      "numbers": [
+        "7",
+        "5",
+        "3",
+        "5"
+      ],
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "letter": "F"
     },
     {
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "extractionConfidence": 100,
+      "isCheckedAgainstSource": true,
+      "numbers": [
+        "19",
+        "48",
+        "67",
+        "78"
+      ],
+      "drawNo": "2377",
+      "isNoDraw": false,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "letter": "R",
       "lotteryId": "dhana_nidhanaya",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "officialDrawNo": "2377",
+      "officialVerified": true
     },
     {
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "drawNo": "4589",
+      "letter": "E",
       "lotteryId": "govisetha",
-      "drawNo": "",
-      "numbers": [],
+      "extractionConfidence": 100,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "numbers": [
+        "12",
+        "26",
+        "39",
+        "51"
+      ],
+      "officialDrawNo": "4589",
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "isCheckedAgainstSource": true,
+      "officialVerified": true
     },
     {
+      "isNoDraw": false,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "isCheckedAgainstSource": true,
       "lotteryId": "handahana",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "officialVerified": true,
+      "drawNo": "1656",
+      "extractionConfidence": 100,
+      "zodiac": "කටක",
+      "numbers": [
+        "01",
+        "04",
+        "10",
+        "25"
+      ],
+      "officialDrawNo": "1656",
+      "sourceFileName": "Official NLB Portal (nlb.lk)"
     },
     {
+      "isCheckedAgainstSource": true,
+      "officialDrawNo": "529",
+      "numbers": [
+        "25",
+        "725",
+        "7725"
+      ],
+      "extractionConfidence": 100,
       "lotteryId": "jaya_sampatha",
-      "drawNo": "",
-      "numbers": [],
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "letter": "R",
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "drawNo": "529",
+      "officialVerified": true,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z"
     },
     {
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "isCheckedAgainstSource": true,
       "lotteryId": "kapruka",
-      "drawNo": "",
-      "numbers": [],
+      "officialVerified": true,
+      "extractionConfidence": 100,
+      "numbers": [
+        "15",
+        "25",
+        "40",
+        "52",
+        "60"
+      ],
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
       "boxedIndex": 0,
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "drawNo": "2497",
+      "officialDrawNo": "2497",
+      "letter": "E"
     },
     {
+      "officialVerified": true,
+      "drawNo": "5033",
+      "officialDrawNo": "5033",
       "lotteryId": "lagna_wasana",
-      "drawNo": "",
-      "numbers": [],
+      "zodiac": "මේෂ",
+      "extractionConfidence": 100,
+      "isCheckedAgainstSource": true,
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "numbers": [
+        "02",
+        "11",
+        "35",
+        "40"
+      ],
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z"
     },
     {
+      "extractionConfidence": 100,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
       "lotteryId": "mahajana_sampatha",
-      "drawNo": "",
-      "numbers": [],
+      "officialDrawNo": "6347",
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "drawNo": "6347",
+      "isCheckedAgainstSource": true,
+      "numbers": [
+        "1",
+        "0",
+        "4",
+        "8",
+        "8",
+        "1"
+      ],
+      "letter": "J",
+      "officialVerified": true
     },
     {
-      "lotteryId": "mega_power",
-      "drawNo": "",
-      "numbers": [],
+      "officialDrawNo": "2695",
+      "isCheckedAgainstSource": true,
       "boxedIndex": 0,
+      "numbers": [
+        "04",
+        "12",
+        "25",
+        "38",
+        "57"
+      ],
+      "drawNo": "2695",
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "letter": "U",
+      "lotteryId": "mega_power",
+      "extractionConfidence": 100,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "officialVerified": true
     },
     {
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "extractionConfidence": 100,
+      "officialDrawNo": "0615",
       "lotteryId": "nlb_jaya",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "drawNo": "0615",
+      "numbers": [
+        "3",
+        "6",
+        "5",
+        "5"
+      ],
+      "isCheckedAgainstSource": true,
+      "letter": "C",
+      "officialVerified": true,
+      "isNoDraw": false
     },
     {
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "isCheckedAgainstSource": true,
+      "extractionConfidence": 100,
+      "drawNo": "1151",
+      "officialDrawNo": "1151",
+      "numbers": [
+        "09",
+        "25",
+        "48"
+      ],
       "lotteryId": "sasiri",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "officialVerified": true,
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "isNoDraw": false
     },
     {
-      "lotteryId": "shanida_wasana",
-      "drawNo": "",
-      "numbers": [],
+      "numbers": [
+        "29",
+        "53",
+        "58",
+        "74"
+      ],
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "isCheckedAgainstSource": true,
+      "letter": "X",
+      "officialDrawNo": "5482",
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "lotteryId": "shanida_wasana",
+      "drawNo": "5482",
+      "extractionConfidence": 100,
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "officialVerified": true
     },
     {
       "lotteryId": "suba_dawasak",
-      "drawNo": "",
-      "numbers": [],
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "extractionConfidence": 100,
+      "isCheckedAgainstSource": true,
+      "sourceFileName": "Official NLB Portal (nlb.lk)",
+      "drawNo": "0463",
+      "numbers": [
+        "31",
+        "44",
+        "49"
+      ],
+      "zodiac": "වෘශ්චික",
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "officialVerified": true,
+      "officialDrawNo": "0463"
     },
     {
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "numbers": [
+        "12",
+        "26",
+        "31",
+        "74"
+      ],
       "lotteryId": "super_ball",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "extractionConfidence": 100,
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "officialVerified": true,
+      "officialDrawNo": "3321",
+      "letter": "F",
+      "isCheckedAgainstSource": true,
+      "drawNo": "3321",
+      "isNoDraw": false
     },
     {
+      "isNoDraw": false,
+      "officialDrawNo": "1055",
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
+      "isCheckedAgainstSource": true,
+      "numbers": [
+        "4",
+        "2",
+        "7",
+        "7",
+        "2",
+        "5"
+      ],
+      "drawNo": "1055",
+      "extractionConfidence": 100,
       "lotteryId": "dhana_sampatha",
-      "drawNo": "",
-      "numbers": [],
-      "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "letter": "R",
+      "officialVerified": true
     },
     {
-      "lotteryId": "vasi",
-      "drawNo": "",
-      "numbers": [],
+      "numbers": [
+        "22",
+        "80",
+        "11"
+      ],
+      "extractionConfidence": 100,
+      "officialVerified": true,
+      "letter": "Y",
+      "officialMatchedAt": "2026-10-22T04:19:19.637Z",
       "boxedIndex": 2,
+      "sourceFileName": "Official DLB Portal (dlb.lk)",
+      "drawNo": "21",
+      "isCheckedAgainstSource": true,
+      "officialDrawNo": "21",
       "isNoDraw": false,
-      "isCheckedAgainstSource": false
+      "lotteryId": "vasi"
     }
   ],
   "isFooterReviewed": true,
-  "updatedAt": "2026-10-22T03:16:02.387Z",
-  "branch": "result-generator",
-  "syncedAt": "2026-10-22T02:41:25.170Z",
-  "headerGreeting": "ඔබට සුබ දවසක් !",
-  "dayOfWeekSi": "බදාදා",
-  "footerAnnouncement": "",
   "date": "2026-10-21",
-  "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
-  "sources": []
+  "updatedAt": "2026-10-22T04:19:24.728Z",
+  "headerGreeting": "ඔබට සුබ දවසක් !"
 }
