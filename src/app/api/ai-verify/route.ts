@@ -1,9 +1,245 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { STANDARD_LOTTERIES } from '@/lib/constants';
 import { LotteryResultItem, AiVerificationReport, AiLotteryAuditResult } from '@/types/lottery';
+import { extractLotteryDataFromText } from '@/lib/extractor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+/**
+ * Deterministic local verification engine comparing extracted sheet lotteries
+ * against the raw text of the LK lottery source document.
+ */
+export function performLocalLkSheetVerification(
+  lotteries: LotteryResultItem[],
+  rawText: string,
+  date: string,
+  sourceFileName?: string,
+  isFallback: boolean = false
+): AiVerificationReport {
+  // If rawText is completely empty
+  if (!rawText || !rawText.trim()) {
+    return {
+      timestamp: new Date().toISOString(),
+      model: isFallback ? 'LK Sheet Verifier (Deterministic Fallback)' : 'LK Sheet Verifier (Deterministic Engine)',
+      totalLotteries: STANDARD_LOTTERIES.length,
+      verifiedCount: 0,
+      mismatchCount: 0,
+      missingCount: STANDARD_LOTTERIES.length,
+      dateCheck: {
+        sheetDate: date || '',
+        detectedDateInSource: '',
+        isDateMatch: true,
+      },
+      overallStatus: 'inconclusive',
+      summary: 'No source document text was found to audit against. Please upload the raw LK lottery sheet first.',
+      results: STANDARD_LOTTERIES.map(def => {
+        const extractedItem = lotteries.find(l => l.lotteryId === def.id);
+        return {
+          lotteryId: def.id,
+          nameSi: def.nameSi,
+          nameEn: def.nameEn,
+          board: def.board,
+          status: 'unverified' as const,
+          confidence: 50,
+          extracted: {
+            drawNo: extractedItem?.drawNo || '',
+            letter: extractedItem?.letter || '',
+            zodiac: extractedItem?.zodiac || '',
+            numbers: extractedItem?.numbers || [],
+            bonusNumber: extractedItem?.bonusNumber || '',
+            isNoDraw: !!extractedItem?.isNoDraw,
+          },
+          discrepancies: ['No source text available to verify'],
+        };
+      }),
+      tokenUsage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        estimatedCostUsd: 0,
+      },
+    };
+  }
+
+  // Parse using Sinhala lottery parser (targetDate, fileName)
+  const parsed = extractLotteryDataFromText(rawText, date, sourceFileName || 'document.pdf');
+  const matchedInDoc = parsed.matchedLotteries || [];
+
+  const cleanNum = (n: string, isSingleDigit: boolean) => {
+    const d = n.replace(/[^\d]/g, '');
+    if (isSingleDigit) return d;
+    return d.length === 1 ? `0${d}` : d;
+  };
+
+  const cleanDraw = (d?: string) => (d || '').replace(/[^\d]/g, '').trim();
+  const cleanLet = (l?: string) => (l || '').replace(/[^A-Za-z]/g, '').trim().toUpperCase();
+  const cleanZod = (z?: string) => (z || '').replace(/[\s\t\u0000\u200b-\u200d]/g, '').trim();
+
+  const enrichedResults: AiLotteryAuditResult[] = STANDARD_LOTTERIES.map(def => {
+    const sheetItem = lotteries.find(l => l.lotteryId === def.id);
+    const docItem = matchedInDoc.find(m => m.lotteryId === def.id);
+
+    const extractedState = {
+      drawNo: sheetItem?.drawNo || '',
+      letter: sheetItem?.letter || '',
+      zodiac: sheetItem?.zodiac || '',
+      numbers: sheetItem?.numbers || [],
+      bonusNumber: sheetItem?.bonusNumber || '',
+      isNoDraw: !!sheetItem?.isNoDraw,
+    };
+
+    if (!docItem) {
+      if (sheetItem?.isNoDraw) {
+        return {
+          lotteryId: def.id,
+          nameSi: def.nameSi,
+          nameEn: def.nameEn,
+          board: def.board,
+          status: 'verified' as const,
+          confidence: 99,
+          extracted: extractedState,
+          notes: 'Marked as No Draw',
+          discrepancies: [],
+        };
+      }
+      return {
+        lotteryId: def.id,
+        nameSi: def.nameSi,
+        nameEn: def.nameEn,
+        board: def.board,
+        status: 'missing_in_source' as const,
+        confidence: 70,
+        extracted: extractedState,
+        discrepancies: ['Not detected in LK lottery raw sheet'],
+      };
+    }
+
+    const verifiedInSource = {
+      drawNo: docItem.drawNo || '',
+      letter: docItem.letter || '',
+      zodiac: docItem.zodiac || '',
+      numbers: docItem.numbers || [],
+      bonusNumber: docItem.bonusNumber || '',
+    };
+
+    const discrepancies: string[] = [];
+
+    // 1. Draw number comparison
+    if (cleanDraw(sheetItem?.drawNo) !== cleanDraw(docItem.drawNo)) {
+      if (sheetItem?.drawNo || docItem.drawNo) {
+        discrepancies.push(`Draw number mismatch: sheet has "${sheetItem?.drawNo || ''}" but source has "${docItem.drawNo || ''}"`);
+      }
+    }
+
+    // 2. Letter comparison
+    if (def.requiresLetter) {
+      if (cleanLet(sheetItem?.letter) !== cleanLet(docItem.letter)) {
+        discrepancies.push(`Letter mismatch: sheet has "${sheetItem?.letter || ''}" but source has "${docItem.letter || ''}"`);
+      }
+    }
+
+    // 3. Zodiac comparison
+    if (def.requiresZodiac) {
+      const sheetZod = cleanZod(sheetItem?.zodiac);
+      const docZod = cleanZod(docItem.zodiac);
+      const normZ = (z: string) => z.replace('කනා', 'කන්‍යා').replace('ක‍නා', 'කන්‍යා');
+      if (normZ(sheetZod) !== normZ(docZod)) {
+        discrepancies.push(`Zodiac mismatch: sheet has "${sheetItem?.zodiac || ''}" but source has "${docItem.zodiac || ''}"`);
+      }
+    }
+
+    // 4. Numbers comparison
+    const isSingleDigits = def.fieldType === 'letter_and_digits';
+    const sheetNumbers = (sheetItem?.numbers || []).map(n => cleanNum(n, isSingleDigits)).filter(Boolean);
+    const docNumbers = (docItem.numbers || []).map(n => cleanNum(n, isSingleDigits)).filter(Boolean);
+
+    if (isSingleDigits) {
+      if (sheetNumbers.join('') !== docNumbers.join('')) {
+        discrepancies.push(`Numbers mismatch: sheet has [${sheetNumbers.join(', ')}] but source has [${docNumbers.join(', ')}]`);
+      }
+    } else {
+      const exactMatch = sheetNumbers.join(',') === docNumbers.join(',');
+      const sortedMatch = [...sheetNumbers].sort().join(',') === [...docNumbers].sort().join(',');
+      if (!exactMatch && !sortedMatch) {
+        discrepancies.push(`Numbers mismatch: sheet has [${sheetNumbers.join(', ')}] but source has [${docNumbers.join(', ')}]`);
+      }
+    }
+
+    // 5. Bonus number comparison
+    if (def.hasBonusNumber) {
+      const sheetBonus = (sheetItem?.bonusNumber || '').replace(/[^\d]/g, '').trim();
+      const docBonus = (docItem.bonusNumber || '').replace(/[^\d]/g, '').trim();
+      if (sheetBonus && docBonus && sheetBonus !== docBonus) {
+        discrepancies.push(`Bonus number mismatch: sheet has "${sheetItem?.bonusNumber}" but source has "${docItem.bonusNumber}"`);
+      }
+    }
+
+    const hasMismatch = discrepancies.length > 0;
+
+    return {
+      lotteryId: def.id,
+      nameSi: def.nameSi,
+      nameEn: def.nameEn,
+      board: def.board,
+      status: hasMismatch ? ('mismatch' as const) : ('verified' as const),
+      confidence: hasMismatch ? 92 : 98,
+      extracted: extractedState,
+      verifiedInSource,
+      discrepancies,
+      suggestedFix: hasMismatch ? {
+        drawNo: docItem.drawNo || sheetItem?.drawNo,
+        letter: docItem.letter || sheetItem?.letter,
+        zodiac: docItem.zodiac || sheetItem?.zodiac,
+        numbers: (docItem.numbers && docItem.numbers.length > 0) ? docItem.numbers : sheetItem?.numbers,
+        bonusNumber: docItem.bonusNumber || sheetItem?.bonusNumber,
+      } : undefined,
+    };
+  });
+
+  const verifiedCount = enrichedResults.filter(r => r.status === 'verified').length;
+  const mismatchCount = enrichedResults.filter(r => r.status === 'mismatch').length;
+  const missingCount = enrichedResults.filter(r => r.status === 'missing_in_source').length;
+
+  const isDateMatch = !parsed.detectedDate || !date || parsed.detectedDate === date;
+  const dateCheck = {
+    sheetDate: date || '',
+    detectedDateInSource: parsed.detectedDate || date || '',
+    isDateMatch,
+  };
+
+  const footerAnnouncementCheck = parsed.detectedFooterAnnouncement ? {
+    current: '',
+    detectedInSource: parsed.detectedFooterAnnouncement,
+  } : undefined;
+
+  const overallStatus: 'perfect_match' | 'discrepancies_found' = mismatchCount > 0 ? 'discrepancies_found' : 'perfect_match';
+  const summary = mismatchCount > 0
+    ? `${mismatchCount} discrepancy flagged when verifying against raw LK lottery sheet.`
+    : `All ${verifiedCount} lotteries verified matching raw LK lottery sheet perfectly (100% Match).`;
+
+  return {
+    timestamp: new Date().toISOString(),
+    model: isFallback ? 'LK Sheet Verifier (Deterministic Fallback)' : 'LK Sheet Verifier (Deterministic Engine)',
+    totalLotteries: enrichedResults.length,
+    verifiedCount,
+    mismatchCount,
+    missingCount,
+    dateCheck,
+    footerAnnouncementCheck,
+    overallStatus,
+    summary,
+    results: enrichedResults,
+    tokenUsage: {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimatedCostUsd: 0,
+      remainingTokensPerMinute: null,
+      limitTokensPerMinute: null,
+    },
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,20 +253,6 @@ export async function POST(req: NextRequest) {
       filePath,
       apiKey: userApiKey,
     } = body;
-
-    const DEFAULT_FALLBACK_KEY = Buffer.from(
-      'c2stcHJvai0tUnZhM1VDWjhRU2I1cXpEX1o5X3dzZnhIcUdlamdzcEV5NkVZdEdPNk83ZzhHMFdfWFBQU21EWFQxOVh3MWk1cGtKRUdBLXM1X1QzQmxia0ZKUnh4cnRoSVBJbXo0bXZPbi02QkJ3QmE1RXNtMHBPVGhUZjdvbmtVSUNoWUVudVAzQzFXcGd0T0ptSXNiaHpWbjJJSXFwZ1lrTUE=',
-      'base64'
-    ).toString('utf-8');
-
-    const apiKey = userApiKey || process.env.OPENAI_API_KEY || DEFAULT_FALLBACK_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { success: false, error: 'OpenAI API key is missing' },
-        { status: 400 }
-      );
-    }
 
     if (!lotteries || !Array.isArray(lotteries)) {
       return NextResponse.json(
@@ -74,7 +296,50 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build lottery reference context for the AI auditor
+    // Also check filePath if provided
+    if (!finalRawText && filePath) {
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const filename = path.basename(filePath);
+        const resolvedPath = path.isAbsolute(filePath)
+          ? filePath
+          : path.join(process.cwd(), 'public', 'uploads', filename);
+        if (fs.existsSync(resolvedPath) && resolvedPath.toLowerCase().endsWith('.pdf')) {
+          const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
+          const extracted = await extractTextFromPdfBuffer(fs.readFileSync(resolvedPath));
+          if (extracted?.text) {
+            finalRawText = extracted.text;
+          }
+        }
+      } catch (diskErr) {
+        console.warn('Could not extract text from filePath:', diskErr);
+      }
+    }
+
+    const rawApiKey = (userApiKey || process.env.OPENAI_API_KEY || '').trim();
+    // Validate if the key looks like an actual OpenAI key (avoid known expired placeholder keys)
+    const hasValidOpenAiKey = 
+      rawApiKey.startsWith('sk-') && 
+      rawApiKey.length > 25 && 
+      !rawApiKey.includes('Rva3UCZ8');
+
+    // If no valid OpenAI key is configured, perform deterministic LK lottery sheet verification immediately!
+    if (!hasValidOpenAiKey) {
+      const localReport = performLocalLkSheetVerification(
+        lotteries,
+        finalRawText,
+        date,
+        sourceFileName,
+        false
+      );
+      return NextResponse.json({
+        success: true,
+        report: localReport,
+      });
+    }
+
+    // Build lottery reference context for OpenAI auditor
     const lotteryContext = STANDARD_LOTTERIES.map(def => ({
       id: def.id,
       nameSi: def.nameSi,
@@ -194,7 +459,7 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
 
     const userContent: any[] = [];
 
-    // If an image was passed (Page 1 raster image), attach it for multimodal verification!
+    // If an image was passed, attach it for multimodal verification
     if (imageBase64 && imageBase64.startsWith('data:image/')) {
       userContent.push({
         type: 'image_url',
@@ -210,14 +475,14 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
       text: userPromptText,
     });
 
-    // Trigger OpenAI verification audit against raw document
-    let openaiRes: Response;
+    // Attempt OpenAI verification audit with automatic fallback to deterministic LK sheet verification
+    let openaiRes: Response | null = null;
     try {
       openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${rawApiKey}`,
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
@@ -230,20 +495,28 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
         }),
       });
     } catch (fetchErr: any) {
-      console.error('OpenAI verification fetch rejected:', fetchErr);
-      return NextResponse.json(
-        { success: false, error: `Failed to contact OpenAI: ${fetchErr?.message || 'Network error'}` },
-        { status: 500 }
+      console.warn('OpenAI network fetch error, falling back to local LK verifier:', fetchErr?.message);
+      const fallbackReport = performLocalLkSheetVerification(
+        lotteries,
+        finalRawText,
+        date,
+        sourceFileName,
+        true
       );
+      return NextResponse.json({ success: true, report: fallbackReport });
     }
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error('OpenAI verification API error:', errText);
-      return NextResponse.json(
-        { success: false, error: `OpenAI API returned status ${openaiRes.status}: ${errText}` },
-        { status: openaiRes.status }
+    if (!openaiRes || !openaiRes.ok) {
+      const errText = openaiRes ? await openaiRes.text() : 'No response';
+      console.warn(`OpenAI API returned status ${openaiRes?.status || 'unknown'}: ${errText}. Using local LK sheet verifier fallback.`);
+      const fallbackReport = performLocalLkSheetVerification(
+        lotteries,
+        finalRawText,
+        date,
+        sourceFileName,
+        true
       );
+      return NextResponse.json({ success: true, report: fallbackReport });
     }
 
     const rateLimitRemainingTokens = openaiRes.headers.get('x-ratelimit-remaining-tokens');
@@ -259,13 +532,31 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
     const estimatedCostUsd = Number(((promptTokens * 0.00000015) + (completionTokens * 0.0000006)).toFixed(6));
 
     if (!rawContent) {
-      return NextResponse.json(
-        { success: false, error: 'Empty response received from AI auditor' },
-        { status: 500 }
+      console.warn('Empty content from OpenAI, falling back to local verifier');
+      const fallbackReport = performLocalLkSheetVerification(
+        lotteries,
+        finalRawText,
+        date,
+        sourceFileName,
+        true
       );
+      return NextResponse.json({ success: true, report: fallbackReport });
     }
 
-    const parsedReport = JSON.parse(rawContent);
+    let parsedReport: any;
+    try {
+      parsedReport = JSON.parse(rawContent);
+    } catch (parseErr) {
+      console.warn('Failed to parse OpenAI JSON output, falling back to local verifier');
+      const fallbackReport = performLocalLkSheetVerification(
+        lotteries,
+        finalRawText,
+        date,
+        sourceFileName,
+        true
+      );
+      return NextResponse.json({ success: true, report: fallbackReport });
+    }
 
     // Enrich report with standard lottery metadata if omitted by AI
     const enrichedResults: AiLotteryAuditResult[] = STANDARD_LOTTERIES.map(def => {
@@ -353,7 +644,7 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
   } catch (error: any) {
     console.error('AI Verify handler error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal AI Verification Error' },
+      { success: false, error: error.message || 'Internal Verification Error' },
       { status: 500 }
     );
   }

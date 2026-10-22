@@ -61,13 +61,13 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-black text-slate-900">
-                  AI Document Second Verification
+                  LK Sheet Second Verification
                 </h3>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-purple-600" />
-                  <span>OpenAI GPT-4o</span>
+                  <span>{report?.model || 'LK Sheet Verifier'}</span>
                 </span>
-                {report?.tokenUsage && (
+                {report?.tokenUsage && report.tokenUsage.totalTokens > 0 && (
                   <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full hidden sm:inline">
                     {report.tokenUsage.totalTokens.toLocaleString()} tokens (~${report.tokenUsage.estimatedCostUsd.toFixed(4)})
                   </span>
@@ -100,7 +100,7 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
                 </div>
               </div>
               <h4 className="text-sm font-bold text-slate-800 mb-1">
-                Auditing Document with OpenAI GPT-4o...
+                Auditing Document Against LK Lottery Sheet...
               </h4>
               <p className="text-xs text-slate-500 max-w-md">
                 Comparing winning numbers, draw numbers, letters, and zodiac signs against your uploaded dealer document.

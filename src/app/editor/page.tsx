@@ -1316,15 +1316,15 @@ function EditorContent() {
         }));
 
         if (data.report.mismatchCount === 0) {
-          showToast(`✓ AI Document Audit: 100% Match (${data.report.verifiedCount}/18) confirmed against raw source!`, 'success');
+          showToast(`✓ LK Sheet Audit: 100% Match (${data.report.verifiedCount}/18) confirmed against raw source!`, 'success');
         } else {
-          showToast(`⚠️ AI Document Audit: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
+          showToast(`⚠️ LK Sheet Audit: ${data.report.mismatchCount} discrepancy flagged. Review in audit report.`, 'info');
         }
       } else {
-        showToast(data.error || 'AI verification failed', 'error');
+        showToast(data.error || 'LK sheet verification failed', 'error');
       }
     } catch (err: any) {
-      showToast(`AI verification error: ${err.message}`, 'error');
+      showToast(`Verification error: ${err.message}`, 'error');
     } finally {
       setIsAiVerifying(false);
     }
