@@ -68,11 +68,28 @@ export function performLocalLkSheetVerification(
 
   const cleanNum = (n: string, isSingleDigit: boolean) => {
     const d = n.replace(/[^\d]/g, '');
-    if (isSingleDigit) return d;
-    return d.length === 1 ? `0${d}` : d;
+    if (!d) return '';
+    const stripped = d.replace(/^0+/, '') || '0';
+    if (isSingleDigit) return stripped;
+    return stripped.padStart(2, '0');
   };
 
-  const cleanDraw = (d?: string) => (d || '').replace(/[^\d]/g, '').trim();
+  const cleanDraw = (d?: string) => {
+    const digits = (d || '').replace(/\D/g, '').trim();
+    if (!digits) return '';
+    return digits.replace(/^0+/, '') || '0';
+  };
+
+  const cleanBonus = (b?: string) => {
+    const trimmed = (b || '').replace(/[^\d/]/g, '').trim();
+    if (!trimmed) return '';
+    return trimmed
+      .split('/')
+      .map(p => p.trim().replace(/^0+/, '') || '0')
+      .filter(Boolean)
+      .join('/');
+  };
+
   const cleanLet = (l?: string) => (l || '').replace(/[^A-Za-z]/g, '').trim().toUpperCase();
   const cleanZod = (z?: string) => (z || '').replace(/[\s\t\u0000\u200b-\u200d]/g, '').trim();
 
@@ -125,7 +142,7 @@ export function performLocalLkSheetVerification(
 
     const discrepancies: string[] = [];
 
-    // 1. Draw number comparison
+    // 1. Draw number comparison (tolerant of leading zeroes e.g. "0615" vs "615")
     if (cleanDraw(sheetItem?.drawNo) !== cleanDraw(docItem.drawNo)) {
       if (sheetItem?.drawNo || docItem.drawNo) {
         discrepancies.push(`Draw number mismatch: sheet has "${sheetItem?.drawNo || ''}" but source has "${docItem.drawNo || ''}"`);
@@ -166,10 +183,10 @@ export function performLocalLkSheetVerification(
       }
     }
 
-    // 5. Bonus number comparison
+    // 5. Bonus number comparison (tolerant of leading zeroes e.g. "04" vs "4" or "0862/0139" vs "862/139")
     if (def.hasBonusNumber) {
-      const sheetBonus = (sheetItem?.bonusNumber || '').replace(/[^\d]/g, '').trim();
-      const docBonus = (docItem.bonusNumber || '').replace(/[^\d]/g, '').trim();
+      const sheetBonus = cleanBonus(sheetItem?.bonusNumber);
+      const docBonus = cleanBonus(docItem.bonusNumber);
       if (sheetBonus && docBonus && sheetBonus !== docBonus) {
         discrepancies.push(`Bonus number mismatch: sheet has "${sheetItem?.bonusNumber}" but source has "${docItem.bonusNumber}"`);
       }
@@ -398,7 +415,7 @@ STRICT RULES FOR AUDITING:
 1. GROUND TRUTH RULE: If the sheet's extracted values (draw number, numbers, letter, zodiac, bonus) MATCH what is visible/detected in the source document, status MUST BE "verified".
    - NEVER invent a discrepancy or suggest a fix if the sheet already matches what is printed in the source document!
    - Look at your own "DETECTED IN SOURCE DOCUMENT": if it matches the sheet, it is 100% "verified".
-2. Treat leading zeros (e.g. "02" vs "2") and cosmetic whitespace ("9 2 6 8" vs "9268") as matching.
+2. Treat leading zeros (e.g. draw numbers "0615" vs "615", bonus "04" vs "4", ball numbers "02" vs "2") and cosmetic whitespace ("9 2 6 8" vs "9268") as matching. NEVER flag a mismatch for leading zeros!
 3. Treat astrological glyphs (e.g. ♎) and Sinhala names ("තුලා") as matching.
 4. ONLY mark status as "mismatch" if there is a REAL, UNAMBIGUOUS ERROR where the sheet has a completely different number/letter than what is clearly printed on the paper source.
 5. If status is "verified", discrepancies MUST be empty array [] and suggestedFix MUST be empty object {}.
@@ -581,9 +598,32 @@ ${finalRawText ? `Raw Extracted OCR Text from Document:\n${finalRawText}` : ''}
       const extractedItem = lotteries.find(l => l.lotteryId === def.id);
 
       if (found) {
-        const discrepancies = Array.isArray(found.discrepancies)
+        let discrepancies = Array.isArray(found.discrepancies)
           ? found.discrepancies.filter((d: any) => typeof d === 'string' && d.trim().length > 0)
           : [];
+
+        // Filter out false positive discrepancies where the only difference is leading zeros
+        const normDraw = (d?: string) => (d || '').replace(/\D/g, '').replace(/^0+/, '') || '0';
+        const extDraw = normDraw(found.extracted?.drawNo || extractedItem?.drawNo);
+        const srcDraw = normDraw(found.verifiedInSource?.drawNo);
+        if (extDraw && srcDraw && extDraw === srcDraw) {
+          discrepancies = discrepancies.filter((d: string) => !/draw\s*(?:no|number)?\s*mismatch/i.test(d));
+        }
+
+        const normBonus = (b?: string) => (b || '').replace(/[^\d/]/g, '').split('/').map(p => p.trim().replace(/^0+/, '') || '0').filter(Boolean).join('/');
+        const extBonus = normBonus(found.extracted?.bonusNumber || extractedItem?.bonusNumber);
+        const srcBonus = normBonus(found.verifiedInSource?.bonusNumber);
+        if (extBonus && srcBonus && extBonus === srcBonus) {
+          discrepancies = discrepancies.filter((d: string) => !/bonus\s*(?:no|number)?\s*mismatch/i.test(d));
+        }
+
+        const normNumList = (nums: string[]) => (nums || []).map(n => n.replace(/\D/g, '').replace(/^0+/, '') || '0').sort().join(',');
+        const extNums = normNumList(found.extracted?.numbers || extractedItem?.numbers || []);
+        const srcNums = normNumList(found.verifiedInSource?.numbers || []);
+        if (extNums && srcNums && extNums === srcNums) {
+          discrepancies = discrepancies.filter((d: string) => !/numbers?\s*mismatch/i.test(d));
+        }
+
         const hasActualDiscrepancy = discrepancies.length > 0;
 
         let normalizedStatus: 'verified' | 'mismatch' | 'missing_in_source' | 'unverified' = found.status;

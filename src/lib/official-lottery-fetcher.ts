@@ -1135,8 +1135,9 @@ export function compareSheetWithOfficial(
     // 5. Bonus Number check (Shanida Wasana, Super Ball, Lagna Wasana, Dhana Sampatha)
     if (def.hasBonusNumber && def.id !== 'mega_power' && def.id !== 'kapruka') {
       if (officialItem.superNumber) {
-        const cleanSheetBonus = (sheetItem.bonusNumber || '').replace(/[^\d/]/g, '').trim();
-        const cleanOfficialBonus = (officialItem.superNumber || '').replace(/[^\d/]/g, '').trim();
+        const normBonus = (b?: string) => (b || '').replace(/[^\d/]/g, '').split('/').map(p => p.trim().replace(/^0+/, '') || '0').filter(Boolean).join('/');
+        const cleanSheetBonus = normBonus(sheetItem.bonusNumber);
+        const cleanOfficialBonus = normBonus(officialItem.superNumber);
         if (cleanSheetBonus && cleanOfficialBonus && cleanSheetBonus !== cleanOfficialBonus) {
           bonusMatch = false;
           discrepancies.push(`Bonus No: Sheet has "${sheetItem.bonusNumber}", Official has "${officialItem.superNumber}"`);
