@@ -1655,31 +1655,7 @@ function EditorContent() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 flex flex-col gap-4">
         
-        {/* Staff Mode Notice Banner (Links back to Automated Print Portal) */}
-        {userRole === 'staff' && (
-          <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Printer className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-emerald-950 font-sinhala">
-                  කාර්ය මණ්ඩල ස්වයංක්‍රීය ප්‍රකාරය (Staff Mode Active)
-                </h4>
-                <p className="text-xs text-emerald-800 font-sinhala">
-                  සම්පූර්ණ ස්වයංක්‍රීය නිල සත්‍යාපනය සහ ක්ෂණික මුද්‍රණය සඳහා මුද්‍රණ අංශයට පිවිසෙන්න.
-                </p>
-              </div>
-            </div>
-            <Link
-              href={`/?date=${selectedDate}`}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2 shrink-0 font-sinhala"
-            >
-              <span>ස්වයංක්‍රීය මුද්‍රණ අංශයට</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        )}
+
 
         {/* Single Unified Big User-Friendly Draw Date Calendar */}
         <UnifiedCalendar
