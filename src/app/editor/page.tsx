@@ -253,42 +253,8 @@ function EditorContent() {
           } catch {}
         }
 
-        // Auto-reconciliation: If all lottery cards are blank but an attached document has extracted text,
-        // automatically populate the lottery cards so the user doesn't see blank inputs!
-        const allNumbersEmpty = data.sheet.lotteries.every(
-          (l: any) => !l.numbers || l.numbers.length === 0 || l.numbers.every((n: string) => !n || n.trim() === '')
-        );
-        if (allNumbersEmpty && data.sheet.sources && data.sheet.sources.length > 0) {
-          const primarySource = data.sheet.sources.find((s: any) => s.extractedText && s.extractedText.length > 50) || data.sheet.sources[0];
-          if (primarySource && primarySource.extractedText) {
-            try {
-              const { extractLotteryDataFromText } = await import('@/lib/extractor');
-              const ext = extractLotteryDataFromText(primarySource.extractedText, date, primarySource.fileName, 1);
-              if (ext.matchedLotteries && ext.matchedLotteries.length > 0) {
-                data.sheet.lotteries = data.sheet.lotteries.map((existing: any) => {
-                  const m = ext.matchedLotteries.find((x: any) => x.lotteryId === existing.lotteryId);
-                  if (m) {
-                    return {
-                      ...existing,
-                      drawNo: m.drawNo || existing.drawNo,
-                      letter: m.letter !== undefined ? m.letter : existing.letter,
-                      zodiac: m.zodiac || existing.zodiac,
-                      numbers: (m.numbers && m.numbers.length > 0) ? m.numbers : existing.numbers,
-                      bonusNumber: m.bonusNumber !== undefined ? m.bonusNumber : existing.bonusNumber,
-                      boxedIndex: m.boxedIndex !== undefined ? m.boxedIndex : existing.boxedIndex,
-                      sourceFileName: primarySource.fileName,
-                      isCheckedAgainstSource: true,
-                      isNoDraw: false,
-                    };
-                  }
-                  return existing;
-                });
-              }
-            } catch (autoExtErr) {
-              console.warn('Auto extraction on load note:', autoExtErr);
-            }
-          }
-        }
+        // NOTE: Raw sheet extractions are strictly for verification (e.g. side-by-side or Verify with LK Sheet).
+        // Editor lottery fields are NEVER auto-populated from raw sheets; they are filled exclusively from official sites results or user manual edits.
 
         const cleanSheet = sanitizeSheet(data.sheet);
         setSheet(cleanSheet);
@@ -654,11 +620,7 @@ function EditorContent() {
           }
         }
 
-        if (matchedLotteries.length > 0) {
-          showToast(`Successfully extracted ${matchedLotteries.length} lotteries from ${file.name}!`, 'success');
-        } else {
-          showToast(`Uploaded ${file.name}, but could not identify lottery results.`, 'error');
-        }
+        showToast(`📄 Document "${file.name}" uploaded. Saved for verification.`, 'info');
 
         // Render raster preview for instant visual verification
         let clientPreviewUrl: string | undefined = undefined;
@@ -695,38 +657,6 @@ function EditorContent() {
 
         const newSources = [...sheet.sources, clientSourceDoc];
         
-        const updatedLotteries = sheet.lotteries.map((existing) => {
-          const match = matchedLotteries.find(
-            (m: any) => m.lotteryId === existing.lotteryId
-          );
-          if (match) {
-            const def = STANDARD_LOTTERIES.find(d => d.id === existing.lotteryId);
-            let rawNums = (match.numbers && match.numbers.length > 0) ? match.numbers : existing.numbers;
-            const bNum = match.bonusNumber !== undefined ? match.bonusNumber : existing.bonusNumber;
-            if (def?.hasBonusNumber && bNum) {
-              rawNums = rawNums.filter((n: string) => n !== bNum);
-            }
-            if (def?.numberCount && rawNums.length > def.numberCount) {
-              rawNums = rawNums.slice(0, def.numberCount);
-            }
-
-            return {
-              ...existing,
-              drawNo: match.drawNo || existing.drawNo,
-              letter: match.letter !== undefined ? match.letter : existing.letter,
-              zodiac: match.zodiac || existing.zodiac,
-              numbers: rawNums,
-              bonusNumber: bNum,
-              boxedIndex: match.boxedIndex !== undefined ? match.boxedIndex : existing.boxedIndex,
-              sourceFileName: file.name,
-              sourcePage: match.sourcePage || 1,
-              extractionConfidence: match.extractionConfidence,
-              isCheckedAgainstSource: true,
-            };
-          }
-          return existing;
-        });
-
         if (dateMismatchWarning) {
           setDateMismatchWarning(dateMismatchWarning);
         }
@@ -734,22 +664,23 @@ function EditorContent() {
           setUnassignedRows(prev => [...prev, ...unassignedRows]);
         }
 
+        // IMPORTANT: Extracted raw sheets are strictly for verification (e.g. side-by-side or Verify with LK Sheet).
+        // Editor lottery fields are NEVER overwritten by raw sheets; they are filled exclusively by official sites or manual input.
         const newSheet: DailySheet = {
           ...sheet,
           sources: newSources,
-          lotteries: updatedLotteries,
+          lotteries: sheet.lotteries,
           footerAnnouncement: detectedFooterAnnouncement || sheet.footerAnnouncement,
         };
 
         setSheet(newSheet);
-        await handleSave(newSheet, `Uploaded source document: ${file.name}`);
+        await handleSave(newSheet, `Uploaded verification document: ${file.name}`);
         // Advance to verify step if currently on setup
         if (currentStep === 'setup') {
           setCurrentStep('verify');
         }
 
-        // Document extracted - verification is optional and available on demand
-        showToast('📄 Document extracted successfully! You can run AI or Official verification when ready.', 'success');
+        showToast(`📄 Document "${file.name}" attached for verification. Editor fields remain filled with official/manual results.`, 'success');
       } else {
         showToast(`Extraction failed: ${data.error}`, 'error');
       }
@@ -844,52 +775,6 @@ function EditorContent() {
       );
       const newSources = [clientSourceDoc, ...existingSources];
 
-      const updatedLotteries = sheet.lotteries.map((existing) => {
-        const match = matchedLotteries.find((m: any) => m.lotteryId === existing.lotteryId);
-        if (match) {
-          const def = STANDARD_LOTTERIES.find(d => d.id === existing.lotteryId);
-          let rawNums = (match.numbers && match.numbers.length > 0) ? match.numbers : existing.numbers;
-          const bNum = match.bonusNumber !== undefined ? match.bonusNumber : existing.bonusNumber;
-          if (def?.hasBonusNumber && bNum) {
-            rawNums = rawNums.filter((n: string) => n !== bNum);
-          }
-          if (def?.numberCount && rawNums.length > def.numberCount) {
-            rawNums = rawNums.slice(0, def.numberCount);
-          }
-
-          return {
-            ...existing,
-            drawNo: match.drawNo || existing.drawNo,
-            letter: match.letter !== undefined ? match.letter : existing.letter,
-            zodiac: match.zodiac || existing.zodiac,
-            numbers: rawNums,
-            bonusNumber: bNum,
-            boxedIndex: match.boxedIndex !== undefined ? match.boxedIndex : existing.boxedIndex,
-            sourceFileName: sourceDoc.fileName,
-            sourcePage: match.sourcePage || 1,
-            extractionConfidence: match.extractionConfidence,
-            isCheckedAgainstSource: true,
-            isNoDraw: false,
-          };
-        } else {
-          // If this lottery is not in today's sheet and had source from another auto-fetched file, clear stale numbers
-          if (existing.sourceFileName && existing.sourceFileName.startsWith('lklottery_results_') && existing.sourceFileName !== sourceDoc.fileName) {
-            return {
-              ...existing,
-              numbers: [],
-              drawNo: '',
-              letter: '',
-              zodiac: '',
-              bonusNumber: '',
-              boxedIndex: undefined,
-              sourceFileName: undefined,
-              isCheckedAgainstSource: false,
-            };
-          }
-        }
-        return existing;
-      });
-
       if (dateMismatchWarning) {
         setDateMismatchWarning(dateMismatchWarning);
       }
@@ -897,22 +782,24 @@ function EditorContent() {
         setUnassignedRows(prev => [...prev, ...unassignedRows]);
       }
 
+      // IMPORTANT: Raw sheets from lklottery are strictly for verification.
+      // Editor lottery fields are NEVER overwritten by raw sheets; they are filled exclusively by official sites or manual input.
       const newSheet: DailySheet = {
         ...sheet,
         date: activeDate,
         sources: newSources,
-        lotteries: updatedLotteries,
+        lotteries: sheet.lotteries,
         footerAnnouncement: detectedFooterAnnouncement || sheet.footerAnnouncement,
       };
 
       setSheet(newSheet);
-      await handleSave(newSheet, `Auto-fetched source from lklottery.com: ${sourceDoc.fileName}`);
+      await handleSave(newSheet, `Auto-fetched verification source from lklottery.com: ${sourceDoc.fileName}`);
 
       if (currentStep === 'setup') {
         setCurrentStep('verify');
       }
 
-      showToast(`🎉 Auto-fetched & extracted ${matchedCount} lotteries from lklottery.com for ${activeDate}!`, 'success');
+      showToast(`✓ Raw lottery sheet fetched for verification. Click "Verify with LK Sheet" to cross-check.`, 'success');
     } catch (err: any) {
       showToast(`Auto-fetch error: ${err.message}`, 'error');
     } finally {
@@ -1988,11 +1875,11 @@ function EditorContent() {
                   onClick={handleBuildFromOfficial}
                   disabled={isBuildingFromOfficial}
                   className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                  title="Directly fetch & build all 18 lottery rows from live official government portals (NLB & DLB)"
+                  title="Fill all 18 lottery editor cards directly with live official government results from NLB & DLB portals"
                 >
                   <ShieldCheck className={`w-3.5 h-3.5 ${isBuildingFromOfficial ? 'animate-spin' : 'text-emerald-200'}`} />
                   <span>
-                    {isBuildingFromOfficial ? 'Building from Gov...' : '⚡ Build from Official (NLB/DLB)'}
+                    {isBuildingFromOfficial ? 'Connecting to Gov Portals...' : '⚡ Fill Editor with Official (NLB/DLB)'}
                   </span>
                 </button>
 
@@ -2161,6 +2048,20 @@ function EditorContent() {
                   </span>
                 </button>
 
+                {/* 0. Fill Editor with Official Results Button */}
+                <button
+                  type="button"
+                  onClick={handleBuildFromOfficial}
+                  disabled={isBuildingFromOfficial}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs hover:shadow-xs flex items-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  title="Connect to NLB & DLB official government portals and fill all 18 lottery cards with official winning numbers"
+                >
+                  <ShieldCheck className={`w-3.5 h-3.5 ${isBuildingFromOfficial ? 'animate-spin' : 'text-emerald-200'}`} />
+                  <span>
+                    {isBuildingFromOfficial ? 'Fetching Official...' : '⚡ Fill Editor with Official'}
+                  </span>
+                </button>
+
                 {/* 1. AI Verification Button */}
                 <button
                   type="button"
@@ -2285,6 +2186,41 @@ function EditorContent() {
                       </span>
                     </div>
                   )}
+
+                  {/* Official Results Fill Banner & Action */}
+                  <div className="flex items-center justify-between gap-3 p-3 mb-2.5 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-slate-50 border border-emerald-200/90 rounded-xl shadow-2xs flex-wrap">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center shadow-2xs shrink-0">
+                        <ShieldCheck className="w-4 h-4 text-emerald-100" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900">
+                            Official Government Results (NLB &amp; DLB)
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-full">
+                            Primary Source
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600">
+                          Editor cards are filled from official government portals or your manual edits. Raw sheets are strictly for verification.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleBuildFromOfficial}
+                        disabled={isBuildingFromOfficial}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs hover:shadow flex items-center gap-2 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                        title="Fetch official winning numbers from NLB and DLB government sites and fill all 18 lottery cards"
+                      >
+                        <ShieldCheck className={`w-4 h-4 ${isBuildingFromOfficial ? 'animate-spin text-emerald-200' : 'text-emerald-100'}`} />
+                        <span>{isBuildingFromOfficial ? 'Connecting to Gov Portals...' : '⚡ Fill Editors with Official'}</span>
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Scrollable Lottery Row Cards */}
                   <div className={`flex-1 overflow-y-auto space-y-2.5 py-1 pr-1 transition-opacity duration-150 ${isLoadingDate ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>

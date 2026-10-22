@@ -423,10 +423,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             </div>
 
             <h3 className="text-sm font-bold text-slate-800 mb-1">
-              Upload Lottery Document
+              Upload Sheet for Verification
             </h3>
             <p className="text-xs text-slate-500 max-w-xs mb-3.5">
-              Drag &amp; drop Sinhala result PDF or image here, or browse files
+              Drag &amp; drop Sinhala result PDF or image to cross-check &amp; verify against official results
             </p>
 
             <button
@@ -436,7 +436,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-2 mb-4 disabled:opacity-50"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>{isUploading ? 'Extracting...' : 'Browse File'}</span>
+              <span>{isUploading ? 'Uploading...' : 'Browse Verification File'}</span>
             </button>
 
             {/* Optional 2nd Verification Section */}
