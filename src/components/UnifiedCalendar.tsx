@@ -305,8 +305,13 @@ export const UnifiedCalendar: React.FC<UnifiedCalendarProps> = ({
             <button
               type="button"
               onClick={() => onQuickPrint(selectedDate)}
-              className="px-2.5 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition active:scale-95 cursor-pointer flex items-center gap-1"
-              title={`Direct 1-click print for ${selectedDate}`}
+              disabled={!selectedDateDetails.hasData}
+              className={`px-2.5 py-1.5 text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1 ${
+                !selectedDateDetails.hasData
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer'
+              }`}
+              title={selectedDateDetails.hasData ? `Direct 1-click print for ${selectedDate}` : 'No results to print for this date'}
             >
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Quick Print</span>

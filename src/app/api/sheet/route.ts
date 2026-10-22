@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetByDate, saveSheet, getRevisionsByDate, listAvailableDates } from '@/lib/storage';
+import { getSheetByDate, saveSheet, deleteSheet, getRevisionsByDate, listAvailableDates } from '@/lib/storage';
 import { DailySheet } from '@/types/lottery';
-import { saveSheetToCloud, loadSheetFromCloud, listCloudDates } from '@/lib/cloud-service';
+import { saveSheetToCloud, loadSheetFromCloud, deleteSheetFromCloud, listCloudDates } from '@/lib/cloud-service';
 import { createEmptySheet, SAMPLE_WIREFRAME_SHEET, STANDARD_LOTTERIES } from '@/lib/constants';
 import { secureFormatLotteryItem } from '@/lib/lottery-format-security';
 
@@ -415,5 +415,67 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    let date = searchParams.get('date');
+
+    // Also accept body JSON if query param is not supplied
+    if (!date) {
+      try {
+        const body = await req.json();
+        date = body.date;
+      } catch {}
+    }
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json(
+        { success: false, error: 'A valid date parameter (YYYY-MM-DD) is required to delete results' },
+        { status: 400 }
+      );
+    }
+
+    // 1. Delete local disk sheet, revisions, and public/uploads/${date} directory
+    const localDeleted = deleteSheet(date);
+
+    // 2. Delete cloud document from Cloud Firestore
+    let cloudDeleted = false;
+    let cloudError: string | undefined;
+    try {
+      const cloudRes = await deleteSheetFromCloud(date);
+      cloudDeleted = cloudRes.success;
+      if (!cloudRes.success) {
+        cloudError = cloudRes.error;
+      }
+    } catch (cErr: any) {
+      console.warn('Cloud delete warning in /api/sheet:', cErr);
+      cloudError = cErr?.message;
+    }
+
+    // 3. Fetch refreshed list of available dates
+    const localDates = listAvailableDates().filter(d => d !== date);
+    let cloudDates: string[] = [];
+    try {
+      cloudDates = (await listCloudDates()).filter(d => d !== date);
+    } catch {}
+    const availableDates = Array.from(new Set([...localDates, ...cloudDates])).sort().reverse();
+
+    return NextResponse.json({
+      success: true,
+      message: `Results and uploads for ${date} deleted successfully`,
+      date,
+      localDeleted,
+      cloudDeleted,
+      cloudError,
+      availableDates,
+      sheet: createEmptySheet(date),
+    });
+  } catch (error: any) {
+    console.error('Error deleting sheet in /api/sheet:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 
 

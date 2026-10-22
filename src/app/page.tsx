@@ -105,6 +105,9 @@ export default function Home() {
       const data = await res.json();
       if (data.success && data.sheet) {
         const clean = sanitizeSheet(data.sheet);
+        const hasData = (clean.lotteries || []).some(
+          l => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
+        );
         setSheet(clean);
         if (data.fromCloud) {
           setCloudStatus('synced');
@@ -112,19 +115,21 @@ export default function Home() {
         if (data.availableDates && Array.isArray(data.availableDates)) {
           setAvailableDates(data.availableDates);
         }
-        try {
-          localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(clean));
-        } catch {}
+        if (hasData) {
+          try {
+            localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(clean));
+          } catch {}
+        } else {
+          try {
+            localStorage.removeItem(`sinhala_lottery_sheet_${date}`);
+          } catch {}
+        }
       } else {
         if (data.availableDates && Array.isArray(data.availableDates)) {
           setAvailableDates(data.availableDates);
         }
         try {
-          const cached = localStorage.getItem(`sinhala_lottery_sheet_${date}`);
-          if (cached) {
-            setSheet(sanitizeSheet(JSON.parse(cached)));
-            return;
-          }
+          localStorage.removeItem(`sinhala_lottery_sheet_${date}`);
         } catch {}
         setSheet(sanitizeSheet(createEmptySheet(date)));
       }
@@ -193,16 +198,28 @@ export default function Home() {
             }
             return prev;
           });
+        } else if (cloudSheet === null) {
+          // Document was deleted from Firestore
+          try {
+            localStorage.removeItem(`sinhala_lottery_sheet_${selectedDate}`);
+          } catch {}
+          setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
+          setAvailableDates((prev) => prev.filter((d) => d !== selectedDate));
+          setCloudStatus('synced');
         }
       });
     });
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === `sinhala_lottery_sheet_${selectedDate}` && e.newValue) {
-        try {
-          const updated = JSON.parse(e.newValue);
-          setSheet(updated);
-        } catch {}
+      if (e.key === `sinhala_lottery_sheet_${selectedDate}`) {
+        if (e.newValue) {
+          try {
+            const updated = JSON.parse(e.newValue);
+            setSheet(updated);
+          } catch {}
+        } else {
+          setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
+        }
       }
     };
 
@@ -211,7 +228,22 @@ export default function Home() {
         try {
           const cached = localStorage.getItem(`sinhala_lottery_sheet_${selectedDate}`);
           if (cached) setSheet(JSON.parse(cached));
+          else setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
         } catch {}
+      }
+    };
+
+    const handleSheetDeleted = (e: any) => {
+      const deletedDate = e.detail?.date;
+      if (deletedDate) {
+        setAvailableDates((prev) => prev.filter((d) => d !== deletedDate));
+        try {
+          localStorage.removeItem(`sinhala_lottery_sheet_${deletedDate}`);
+        } catch {}
+        if (deletedDate === selectedDate) {
+          setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
+          showToast(`මෙම දිනයේ ප්‍රතිඵල පරිපාලක විසින් මකා දමා ඇත (Results for this date deleted by manager)`, 'info');
+        }
       }
     };
 
@@ -223,6 +255,7 @@ export default function Home() {
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('lottery_sheet_updated', handleCustomUpdate);
+    window.addEventListener('lottery_sheet_deleted', handleSheetDeleted);
     window.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleVisibility);
 
@@ -230,6 +263,7 @@ export default function Home() {
       if (unsubscribeCloud) unsubscribeCloud();
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('lottery_sheet_updated', handleCustomUpdate);
+      window.removeEventListener('lottery_sheet_deleted', handleSheetDeleted);
       window.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
     };
@@ -257,8 +291,23 @@ export default function Home() {
     loadCloudDesign();
   }, []);
 
+  // Check if current sheet has any valid numbers or results
+  const hasSheetData = useMemo(() => {
+    return (sheet.lotteries || []).some(
+      l => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
+    );
+  }, [sheet]);
+
   // Direct Native Print (Zero Popups)
   const handlePrint = (targetSheet: DailySheet = sheet) => {
+    const hasAnyData = (targetSheet.lotteries || []).some(
+      l => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
+    );
+    if (!hasAnyData) {
+      showToast('⚠️ මෙම දිනය සඳහා ලොතරැයි ප්‍රතිඵල නොමැත හෝ මකා දමා ඇත. මුද්‍රණය කළ නොහැක! (No results available. Printing blocked!)', 'error');
+      return;
+    }
+
     directPrintSheet(targetSheet, {
       styleOptions: previewStyles,
       onSuccess: () => showToast('මුද්‍රණ කවුළුව විවෘත විය (Print dialog opened)', 'success'),
@@ -367,6 +416,13 @@ export default function Home() {
       const res = await fetch(`/api/sheet?date=${targetDate}`);
       const data = await res.json();
       if (data.success && data.sheet) {
+        const hasAnyData = (data.sheet.lotteries || []).some(
+          (l: any) => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some((n: string) => n && n.trim() !== '')
+        );
+        if (!hasAnyData) {
+          showToast(`⚠️ ${targetDate} සඳහා ලොතරැයි ප්‍රතිඵල නොමැත හෝ මකා දමා ඇත (No results for ${targetDate})`, 'error');
+          return;
+        }
         setSheet(data.sheet);
         handlePrint(data.sheet);
         return;
@@ -457,6 +513,7 @@ export default function Home() {
         onExportPdf={handleExportPdf}
         exportBlockedErrors={[]}
         onPrint={() => handlePrint()}
+        isPrintDisabled={!hasSheetData}
         isExporting={isExporting}
       />
 
@@ -465,6 +522,26 @@ export default function Home() {
         
         {/* LEFT SIDEBAR */}
         <aside className="w-full lg:w-[350px] xl:w-[380px] shrink-0 flex flex-col gap-3">
+
+          {/* Warning banner if sheet has no data or was deleted */}
+          {!hasSheetData && (
+            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-black text-amber-900 font-sinhala">
+                    ප්‍රතිඵල ඇතුළත් කර නැත / මකා දමා ඇත
+                  </h4>
+                  <p className="text-[11px] font-bold text-amber-800 font-sinhala leading-tight mt-1">
+                    මෙම දිනය ({selectedDate}) සඳහා ලොතරැයි ප්‍රතිඵල නොමැත හෝ මකා දමා ඇත. මුද්‍රණය කිරීමට නොහැක.
+                  </p>
+                  <p className="text-[10px] text-amber-700 mt-1 font-medium">
+                    No results available for this date. Staff printing is disabled.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Aloka Admin Quick Actions (Only shown in Aloka mode) */}
           {userRole === 'aloka' && (
@@ -497,7 +574,12 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => handlePrint()}
-                className="w-full py-3 text-[15px] font-black rounded-xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.97] cursor-pointer bg-[#15803d] hover:bg-[#166534] text-white shadow-sm mb-2"
+                disabled={!hasSheetData}
+                className={`w-full py-3 text-[15px] font-black rounded-xl flex items-center justify-center gap-2.5 transition-all mb-2 ${
+                  !hasSheetData
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                    : 'bg-[#15803d] hover:bg-[#166534] text-white shadow-sm active:scale-[0.97] cursor-pointer'
+                }`}
               >
                 <Printer className="w-5 h-5" />
                 <span className="font-sinhala">මුද්‍රණය කරන්න</span>
@@ -627,7 +709,7 @@ export default function Home() {
             onExportPdf={handleExportPdf}
             onRequestPrint={() => handlePrint()}
             isExporting={isExporting}
-            canExport={true}
+            canExport={hasSheetData}
             printDensity={printDensity}
             onDensityChange={setPrintDensity}
             currentStyles={previewStyles}

@@ -28,6 +28,7 @@ interface SourceViewerProps {
   onRunOfficialVerify?: () => void;
   isOfficialVerifying?: boolean;
   officialStatusSummary?: { matched: number; total: number; hasDiscrepancy: boolean };
+  onDeleteSheet?: () => void;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -38,6 +39,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   onVerifyWithLkSheet,
   onRemoveSource,
   onClearValues,
+  onDeleteSheet,
   onExtractFromSource,
   isUploading,
   isAutoFetching,
@@ -534,8 +536,17 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               {/* Action buttons & Zoom controls */}
               <div className="flex items-center gap-1.5">
 
-
-
+                {onDeleteSheet && (
+                  <button
+                    type="button"
+                    onClick={onDeleteSheet}
+                    className="px-2 py-1 text-[11px] font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md flex items-center gap-1 transition active:scale-95 cursor-pointer"
+                    title="Permanently delete results and uploaded files for this date"
+                  >
+                    <Trash2 className="w-3 h-3 text-red-600" />
+                    <span>Delete Results (මකන්න)</span>
+                  </button>
+                )}
 
                 {/* Zoom controls (only for image preview mode) */}
                 {viewMode === 'preview' && previewUrl && !hasImgError && (

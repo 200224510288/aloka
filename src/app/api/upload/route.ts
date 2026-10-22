@@ -257,6 +257,17 @@ export async function DELETE(req: NextRequest) {
       } catch (e) {
         console.warn('Could not unlink preview file:', e);
       }
+
+      // If the date upload directory is now empty, remove it so it doesn't linger as a ghost available date
+      try {
+        const parentDir = path.dirname(fullPath);
+        if (fs.existsSync(parentDir)) {
+          const remaining = fs.readdirSync(parentDir).filter(f => !f.startsWith('.'));
+          if (remaining.length === 0) {
+            fs.rmSync(parentDir, { recursive: true, force: true });
+          }
+        }
+      } catch {}
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {

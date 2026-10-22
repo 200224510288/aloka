@@ -140,6 +140,56 @@ export function addRevision(date: string, snapshot: DailySheet, summary: string)
   return newRevision;
 }
 
+export function deleteSheet(date: string): boolean {
+  try {
+    ensureDirectories();
+    const { SHEETS_DIR, REVISIONS_DIR } = getDirectories();
+
+    // 1. Delete local JSON sheet file
+    const sheetFile = path.join(SHEETS_DIR, `${date}.json`);
+    if (fs.existsSync(sheetFile)) {
+      try {
+        fs.unlinkSync(sheetFile);
+      } catch (err) {
+        console.warn(`Could not unlink sheet file for ${date}:`, err);
+      }
+    }
+
+    // 2. Delete local revisions record
+    const revFile = path.join(REVISIONS_DIR, `${date}.json`);
+    if (fs.existsSync(revFile)) {
+      try {
+        fs.unlinkSync(revFile);
+      } catch (err) {
+        console.warn(`Could not unlink revision file for ${date}:`, err);
+      }
+    }
+
+    // 3. Delete physical uploaded files in public/uploads/${date}
+    const pubUploadDir = path.join(process.cwd(), 'public', 'uploads', date);
+    if (fs.existsSync(pubUploadDir)) {
+      try {
+        fs.rmSync(pubUploadDir, { recursive: true, force: true });
+      } catch (err) {
+        console.warn(`Could not remove public upload dir for ${date}:`, err);
+      }
+    }
+
+    // 4. Delete temporary uploads dir if any
+    const tmpUploadDir = path.join(os.tmpdir(), 'lottery_uploads', date);
+    if (fs.existsSync(tmpUploadDir)) {
+      try {
+        fs.rmSync(tmpUploadDir, { recursive: true, force: true });
+      } catch {}
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`Error deleting sheet for ${date}:`, err);
+    return false;
+  }
+}
+
 export function listAvailableDates(): string[] {
   const dates = new Set<string>();
   dates.add('2026-10-05');
@@ -151,7 +201,10 @@ export function listAvailableDates(): string[] {
       const files = fs.readdirSync(/*turbopackIgnore: true*/ SHEETS_DIR);
       for (const f of files) {
         if (f.endsWith('.json')) {
-          dates.add(f.replace('.json', ''));
+          const dateStr = f.replace('.json', '');
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            dates.add(dateStr);
+          }
         }
       }
     }
@@ -160,7 +213,13 @@ export function listAvailableDates(): string[] {
       const dirs = fs.readdirSync(pubUploads);
       for (const d of dirs) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-          dates.add(d);
+          const dirPath = path.join(pubUploads, d);
+          try {
+            const files = fs.readdirSync(dirPath).filter(f => !f.startsWith('.'));
+            if (files.length > 0) {
+              dates.add(d);
+            }
+          } catch {}
         }
       }
     }

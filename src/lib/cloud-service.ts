@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION, CLOUD_SETTINGS_COLLECTION } from './firebase';
 import { DailySheet, SourceDocument, SavedCustomDesign } from '@/types/lottery';
 
@@ -85,16 +85,33 @@ export async function loadSheetFromCloud(date: string): Promise<DailySheet | nul
 }
 
 /**
- * Subscribes to real-time changes for a specific DailySheet in Firestore.
- * Allows staff pages to immediately reflect edits with zero page refresh.
+ * Deletes a DailySheet and its record from Cloud Firestore
  */
-export function subscribeToCloudSheet(date: string, onUpdate: (sheet: DailySheet) => void): () => void {
+export async function deleteSheetFromCloud(date: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!date) return { success: false, error: 'Missing sheet date' };
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, date);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (err: any) {
+    console.warn(`Could not delete sheet ${date} from cloud:`, err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Subscribes to real-time changes for a specific DailySheet in Firestore.
+ * Allows staff pages to immediately reflect edits or sheet deletions with zero page refresh.
+ */
+export function subscribeToCloudSheet(date: string, onUpdate: (sheet: DailySheet | null) => void): () => void {
   try {
     const docRef = doc(db, CLOUD_BRANCH_COLLECTION, date);
     const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         const cloudData = snap.data() as DailySheet;
         onUpdate(cloudData);
+      } else {
+        onUpdate(null);
       }
     }, (err) => {
       console.warn('Real-time cloud sheet subscription error:', err?.message || err);

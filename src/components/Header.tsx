@@ -25,6 +25,7 @@ interface HeaderProps {
   isExporting: boolean;
   exportBlockedErrors: string[];
   onPrint?: () => void;
+  isPrintDisabled?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   isExporting,
   exportBlockedErrors,
   onPrint,
+  isPrintDisabled = false,
 }) => {
   const [isEditingDealer, setIsEditingDealer] = useState(false);
   const [dealerInput, setDealerInput] = useState(sheet.headerDealerName);
@@ -232,8 +234,13 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={onPrint}
-                  className="px-4 py-2 text-xs font-black rounded-xl flex items-center gap-2 shadow-sm transition cursor-pointer bg-[#15803d] text-white hover:bg-[#166534] active:scale-95"
-                  title="Open Print Dialog to select copies and print"
+                  disabled={isPrintDisabled}
+                  className={`px-4 py-2 text-xs font-black rounded-xl flex items-center gap-2 shadow-sm transition ${
+                    isPrintDisabled
+                      ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60'
+                      : 'bg-[#15803d] text-white hover:bg-[#166534] active:scale-95 cursor-pointer'
+                  }`}
+                  title={isPrintDisabled ? 'No lottery results available to print for this date' : 'Open Print Dialog to select copies and print'}
                 >
                   <Printer className="w-4 h-4" />
                   <span>Print Sheet (මුද්‍රණය)</span>

@@ -38,7 +38,8 @@ import {
   FileDown,
   RotateCcw,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 
 
@@ -937,6 +938,100 @@ function EditorContent() {
     await handleSave(newSheet, 'Cleared all lottery values');
     showToast('🧹 Cleared all lottery values and reset sheet to blank!', 'info');
   };
+
+  // Permanently delete sheet, all results, and uploaded files for the active date
+  const handleDeleteSheet = async (targetDateParam?: string) => {
+    const targetDate = targetDateParam || sheet.date || selectedDate;
+    if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      showToast('Invalid date to delete', 'error');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `⚠️ ඔබ සැබවින්ම ${targetDate} දින ප්‍රතිඵල සහ අප්ලෝඩ් කරන ලද සියලුම ගොනු සම්පූර්ණයෙන්ම මැකීමට කැමතිද?\n\n` +
+      `Are you sure you want to PERMANENTLY DELETE all results and uploaded files for ${targetDate}?\n\n` +
+      `• Local Server & Cloud Firestore වෙතින් මෙම දිනයේ ප්‍රතිඵල සම්පූර්ණයෙන්ම මැකී යයි.\n` +
+      `• කාර්ය මණ්ඩලයට (Staff) මෙම දිනයේ ප්‍රතිඵල මුද්‍රණය කිරීමට නොහැකි වේ.\n` +
+      `• අප්ලෝඩ් කළ PDF/පින්තූර සියල්ල මැකී යයි.\n` +
+      `• දිනය හිස් (Blank) තත්ත්වයට පත් වේ.`
+    );
+
+    if (!confirmed) return;
+
+    // Immediately cancel any pending auto-save timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    isInitialLoadedRef.current = false;
+    setIsLoadingDate(true);
+
+    try {
+      showToast(`🗑️ Deleting results and files for ${targetDate}...`, 'info');
+
+      // 1. Call DELETE on /api/sheet
+      const res = await fetch(`/api/sheet?date=${targetDate}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      // 2. Delete from Cloud Firestore directly as well for instant real-time synchronization
+      try {
+        const { deleteSheetFromCloud } = await import('@/lib/cloud-service');
+        await deleteSheetFromCloud(targetDate);
+      } catch (cloudErr) {
+        console.warn('Direct cloud delete error:', cloudErr);
+      }
+
+      // 3. Clear IndexedDB cache for any sources associated with this sheet
+      try {
+        const { deleteCachedFile } = await import('@/lib/source-file-cache');
+        if (Array.isArray(sheet.sources)) {
+          for (const s of sheet.sources) {
+            if (s.id) await deleteCachedFile(s.id);
+          }
+        }
+      } catch (idbErr) {
+        console.warn('IndexedDB source clean error:', idbErr);
+      }
+
+      // 4. Remove browser localStorage cache
+      try {
+        localStorage.removeItem(`sinhala_lottery_sheet_${targetDate}`);
+      } catch {}
+
+      // 5. Notify all open tabs & staff view
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('lottery_sheet_deleted', { detail: { date: targetDate } }));
+      }
+
+      // 6. Reset local editor state to empty template
+      const emptySheet = sanitizeSheet(createEmptySheet(targetDate));
+      setSheet(emptySheet);
+      setRevisions([]);
+      setUnassignedRows([]);
+      setAiVerificationReport(null);
+      setOfficialVerificationSummary(null);
+      setDateMismatchWarning(undefined);
+      lastSavedHashRef.current = getSheetContentHash(emptySheet);
+      isInitialLoadedRef.current = true;
+
+      // 7. Update available dates (remove deleted date)
+      if (data.availableDates && Array.isArray(data.availableDates)) {
+        setAvailableDates(data.availableDates);
+      } else {
+        setAvailableDates(prev => prev.filter(d => d !== targetDate));
+      }
+
+      showToast(`✓ ${targetDate} ප්‍රතිඵල සහ ගොනු සාර්ථකව මකා දැමුණි (Deleted permanently)!`, 'success');
+    } catch (err: any) {
+      console.error('Error deleting sheet:', err);
+      showToast(`Failed to delete sheet: ${err.message || err}`, 'error');
+    } finally {
+      setIsLoadingDate(false);
+    }
+  };
+
 
   // Extract lottery results directly from an attached source document into the cards
   const handleExtractFromSource = async (sourceId: string) => {
@@ -1923,6 +2018,7 @@ function EditorContent() {
                   onVerifyWithLkSheet={handleVerifyWithLkSheet}
                   onRemoveSource={handleRemoveSource}
                   onClearValues={handleClearAllValues}
+                  onDeleteSheet={() => handleDeleteSheet()}
                   onExtractFromSource={handleExtractFromSource}
                   isUploading={isUploading}
                   isAutoFetching={isAutoFetchingSource}
@@ -2050,6 +2146,17 @@ function EditorContent() {
                   <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
                   <span>Clear Values</span>
                 </button>
+
+                {/* 4. Delete Sheet & Uploads Button */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSheet()}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer"
+                  title="Permanently delete all results, uploaded files, and reset sheet for this date so staff cannot print it"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                  <span>Delete Results (මකන්න)</span>
+                </button>
               </div>
 
             </div>
@@ -2068,6 +2175,7 @@ function EditorContent() {
                     onVerifyWithLkSheet={handleVerifyWithLkSheet}
                     onRemoveSource={handleRemoveSource}
                     onClearValues={handleClearAllValues}
+                    onDeleteSheet={() => handleDeleteSheet()}
                     onExtractFromSource={handleExtractFromSource}
                     isUploading={isUploading}
                     isAutoFetching={isAutoFetchingSource}
