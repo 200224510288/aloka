@@ -2062,67 +2062,7 @@ function EditorContent() {
                   </span>
                 </button>
 
-                {/* 1. AI Verification Button */}
-                <button
-                  type="button"
-                  onClick={handleVerifyWithLkSheet}
-                  disabled={isAiVerifying || isAutoFetchingSource}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                    isAiVerifying || isAutoFetchingSource
-                      ? 'bg-emerald-100 text-emerald-800 cursor-wait animate-pulse border border-emerald-300'
-                      : aiStatusSummary?.hasDiscrepancy
-                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200'
-                      : aiStatusSummary?.verified
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
-                      : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs'
-                  }`}
-                  title="Verify lottery numbers against official LK lottery raw sheet (Optional 2nd check)"
-                >
-                  <Zap className={`w-3.5 h-3.5 ${isAiVerifying || isAutoFetchingSource ? 'animate-bounce text-emerald-700' : aiStatusSummary ? 'text-amber-300' : 'text-emerald-600'}`} />
-                  <span>
-                    {isAiVerifying || isAutoFetchingSource
-                      ? 'Verifying with LK...'
-                      : aiStatusSummary
-                      ? aiStatusSummary.hasDiscrepancy
-                        ? `LK Flagged (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                        : `LK Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                      : 'Verify with LK Sheet (Optional)'}
-                  </span>
-                </button>
 
-                {/* 2. Official Government Verification Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (officialVerificationSummary) {
-                      setIsOfficialVerifyModalOpen(true);
-                    } else {
-                      handleRunOfficialVerify();
-                    }
-                  }}
-                  disabled={isOfficialVerifying}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                    isOfficialVerifying
-                      ? 'bg-blue-100 text-blue-700 cursor-wait animate-pulse border border-blue-300'
-                      : officialStatusSummary?.hasDiscrepancy
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
-                      : officialStatusSummary?.matched
-                      ? 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200'
-                      : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
-                  }`}
-                  title="Cross-check extracted results against live NLB & DLB official government results"
-                >
-                  <Building2 className={`w-3.5 h-3.5 ${isOfficialVerifying ? 'animate-spin text-blue-700' : officialStatusSummary ? 'text-white' : 'text-blue-600'}`} />
-                  <span>
-                    {isOfficialVerifying
-                      ? 'Checking Official...'
-                      : officialStatusSummary
-                      ? officialStatusSummary.hasDiscrepancy
-                        ? `Official Discrepancy (${officialStatusSummary.matched}/${officialStatusSummary.total})`
-                        : `Official Match (${officialStatusSummary.matched}/${officialStatusSummary.total})`
-                      : 'Official Verify'}
-                  </span>
-                </button>
 
                 {/* 3. Clear All Values Button */}
                 <button
@@ -2187,40 +2127,7 @@ function EditorContent() {
                     </div>
                   )}
 
-                  {/* Official Results Fill Banner & Action */}
-                  <div className="flex items-center justify-between gap-3 p-3 mb-2.5 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-slate-50 border border-emerald-200/90 rounded-xl shadow-2xs flex-wrap">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center shadow-2xs shrink-0">
-                        <ShieldCheck className="w-4 h-4 text-emerald-100" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-900">
-                            Official Government Results (NLB &amp; DLB)
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-full">
-                            Primary Source
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600">
-                          Editor cards are filled from official government portals or your manual edits. Raw sheets are strictly for verification.
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleBuildFromOfficial}
-                        disabled={isBuildingFromOfficial}
-                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs hover:shadow flex items-center gap-2 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                        title="Fetch official winning numbers from NLB and DLB government sites and fill all 18 lottery cards"
-                      >
-                        <ShieldCheck className={`w-4 h-4 ${isBuildingFromOfficial ? 'animate-spin text-emerald-200' : 'text-emerald-100'}`} />
-                        <span>{isBuildingFromOfficial ? 'Connecting to Gov Portals...' : '⚡ Fill Editors with Official'}</span>
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Scrollable Lottery Row Cards */}
                   <div className={`flex-1 overflow-y-auto space-y-2.5 py-1 pr-1 transition-opacity duration-150 ${isLoadingDate ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
