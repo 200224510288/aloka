@@ -774,12 +774,9 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                     });
                   }
 
-                  // Boxed special bonus number e.g. [4 9 1 1 3] or [862 / 139] - STRICTLY only for lotteries that define hasBonusNumber!
+                  // Bonus number in parentheses e.g. (49113), (61027), (14525), (862 / 139) - STRICTLY only for lotteries that define hasBonusNumber!
                   if (def.hasBonusNumber && item.bonusNumber && item.bonusNumber.trim() !== '') {
-                    const bonusFontSize = Math.max(9.5, resultFontSizePt - 3.5);
-                    const formattedBonus = item.bonusNumber.includes('/')
-                      ? item.bonusNumber.trim()
-                      : item.bonusNumber.trim().split('').join(' ');
+                    const bonusFontSize = Math.max(10, resultFontSizePt - 4.5);
                     parts.push(
                       <span
                         key="bonus"
@@ -788,9 +785,9 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
                           fontFamily: resultFontFamily,
                           fontWeight: resultFontWeight,
                         }}
-                        className={`text-black ml-2 leading-none shrink-0 inline-block border-[1.5px] border-black px-[2mm] py-[0.5mm] rounded-[3.5px] ${isHighDensity ? 'border-[2px]' : ''}`}
+                        className="text-black ml-1 leading-none shrink-0"
                       >
-                        {formattedBonus}
+                        ({item.bonusNumber.trim()})
                       </span>
                     );
                   }
