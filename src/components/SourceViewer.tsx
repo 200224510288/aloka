@@ -12,11 +12,13 @@ interface SourceViewerProps {
   currentDate: string;
   onFileUpload: (file: File) => Promise<void>;
   onAutoFetchSource?: () => Promise<void> | void;
+  onVerifyWithLkSheet?: () => Promise<void> | void;
   onRemoveSource?: (sourceId: string) => void;
   onClearValues?: () => void;
   onExtractFromSource?: (sourceId: string) => void | Promise<void>;
   isUploading: boolean;
   isAutoFetching?: boolean;
+  isVerifyingWithLkSheet?: boolean;
   unassignedRows: UnassignedExtractedRow[];
   onAssignRow: (row: UnassignedExtractedRow, targetLotteryId: string) => void;
   dateMismatchWarning?: string;
@@ -33,11 +35,13 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   currentDate,
   onFileUpload,
   onAutoFetchSource,
+  onVerifyWithLkSheet,
   onRemoveSource,
   onClearValues,
   onExtractFromSource,
   isUploading,
   isAutoFetching,
+  isVerifyingWithLkSheet,
   unassignedRows,
   onAssignRow,
   dateMismatchWarning,
@@ -315,45 +319,33 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             className="hidden"
           />
 
-          {/* When files are already attached, provide quick action buttons in header */}
-          {sources.length > 0 && (
-            <>
-              {onAutoFetchSource && (
-                <button
-                  type="button"
-                  onClick={onAutoFetchSource}
-                  disabled={isAutoFetching || isUploading}
-                  title={`Download raw Sinhala PDF from lklottery.com for ${currentDate} (Optional 2nd verification)`}
-                  className="px-2.5 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-2xs"
-                >
-                  <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetching ? 'animate-bounce' : ''}`} />
-                  <span>{isAutoFetching ? 'Checking LK...' : 'LK PDF (Optional)'}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading || isAutoFetching}
-                className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>{isUploading ? 'Extracting...' : 'Upload File'}</span>
-              </button>
-            </>
-          )}
-
-          {onClearValues && (
+          {/* Action button to verify with LK lottery sheet */}
+          {(onVerifyWithLkSheet || onAutoFetchSource) && (
             <button
               type="button"
-              onClick={onClearValues}
-              className="px-2 py-1 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md flex items-center gap-1 transition cursor-pointer"
-              title="Clear all extracted numbers and reset table to blank"
+              onClick={onVerifyWithLkSheet || onAutoFetchSource}
+              disabled={isAutoFetching || isUploading || isAiVerifying || isVerifyingWithLkSheet}
+              title={`Verify numbers against official Sinhala raw sheet from lklottery.com for ${currentDate} (Optional 2nd check)`}
+              className="px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-2xs"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-              <span>Clear</span>
+              <Zap className={`w-3.5 h-3.5 text-amber-300 ${isAutoFetching || isAiVerifying || isVerifyingWithLkSheet ? 'animate-bounce' : ''}`} />
+              <span>
+                {isAutoFetching || isAiVerifying || isVerifyingWithLkSheet
+                  ? 'Verifying with LK...'
+                  : 'Verify with LK Sheet (Optional)'}
+              </span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isAutoFetching}
+            className="px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>{isUploading ? 'Extracting...' : 'Upload File'}</span>
+          </button>
         </div>
       </div>
 
@@ -448,7 +440,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             </button>
 
             {/* Optional 2nd Verification Section */}
-            {onAutoFetchSource && (
+            {(onVerifyWithLkSheet || onAutoFetchSource) && (
               <div className="pt-3 border-t border-slate-100 w-full max-w-xs flex flex-col items-center gap-1.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Optional 2nd Verification
@@ -457,13 +449,17 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={onAutoFetchSource}
-                    disabled={isAutoFetching || isUploading}
+                    onClick={onVerifyWithLkSheet || onAutoFetchSource}
+                    disabled={isAutoFetching || isUploading || isAiVerifying || isVerifyingWithLkSheet}
                     className="px-3 py-1.5 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
-                    title={`Download raw Sinhala PDF from lklottery.com for ${currentDate} as optional check`}
+                    title={`Verify against raw Sinhala PDF from lklottery.com for ${currentDate}`}
                   >
-                    <Zap className={`w-3.5 h-3.5 text-amber-500 ${isAutoFetching ? 'animate-bounce' : ''}`} />
-                    <span>{isAutoFetching ? 'Checking LK...' : 'Fetch LK PDF (Optional)'}</span>
+                    <Zap className={`w-3.5 h-3.5 text-amber-500 ${isAutoFetching || isAiVerifying || isVerifyingWithLkSheet ? 'animate-bounce' : ''}`} />
+                    <span>
+                      {isAutoFetching || isAiVerifying || isVerifyingWithLkSheet
+                        ? 'Verifying with LK...'
+                        : 'Verify with LK Sheet (Optional)'}
+                    </span>
                   </button>
 
                   {directPdfUrl && (
@@ -537,44 +533,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
               {/* Action buttons & Zoom controls */}
               <div className="flex items-center gap-1.5">
-                {/* Extract to Cards button */}
-                {activeDoc && onExtractFromSource && (
-                  <button
-                    type="button"
-                    onClick={() => onExtractFromSource(activeDoc.id)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded transition cursor-pointer shadow-2xs"
-                    title={`Extract all winning numbers and results from "${activeDoc.fileName}" into the lottery cards`}
-                  >
-                    <Zap className="w-3 h-3 text-amber-500" />
-                    <span>Extract to Cards</span>
-                  </button>
-                )}
 
-                {/* Remove active file button */}
-                {activeDoc && onRemoveSource && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveSource(activeDoc.id)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition cursor-pointer"
-                    title={`Remove file "${activeDoc.fileName}"`}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Remove</span>
-                  </button>
-                )}
 
-                {/* Clear values button */}
-                {onClearValues && (
-                  <button
-                    type="button"
-                    onClick={onClearValues}
-                    className="flex items-center gap-1 text-[11px] font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded transition cursor-pointer"
-                    title="Clear all extracted lottery numbers and reset sheet back to blank"
-                  >
-                    <RotateCcw className="w-3 h-3 text-rose-600" />
-                    <span>Clear Values</span>
-                  </button>
-                )}
+
 
                 {/* Zoom controls (only for image preview mode) */}
                 {viewMode === 'preview' && previewUrl && !hasImgError && (

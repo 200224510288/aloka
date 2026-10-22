@@ -1330,6 +1330,52 @@ function EditorContent() {
     }
   };
 
+  // Verify with LK Lottery Sheet (Optional 2nd verification)
+  const handleVerifyWithLkSheet = async () => {
+    // 1. Check if we already have an LK Lottery Sheet or any source document attached
+    let lkSource = (sheet.sources || []).find(s => 
+      s.fileName?.startsWith('lklottery_results_') || 
+      s.detectedDate === sheet.date
+    ) || (sheet.sources || [])[0];
+
+    // 2. If no source attached yet, auto-fetch from lklottery.com first
+    if (!lkSource) {
+      showToast('⚡ Fetching official LK lottery sheet for verification...', 'info');
+      setIsAutoFetchingSource(true);
+      try {
+        const res = await fetch(`/api/auto-fetch-source?date=${sheet.date}`);
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          const is403 = res.status === 403 || data.error?.includes('403');
+          if (is403) {
+            showToast('⚠️ lklottery.com cloud blocked (403). Official Gov (NLB & DLB) results are active!', 'info');
+          } else {
+            showToast('ℹ️ LK lottery sheet is not uploaded yet for this date. (Gov NLB & DLB is primary)', 'info');
+          }
+          return;
+        }
+
+        if (data.sourceDoc) {
+          lkSource = data.sourceDoc;
+          setSheet(prev => ({
+            ...prev,
+            sources: [data.sourceDoc, ...(prev.sources || [])]
+          }));
+        }
+      } catch (err: any) {
+        showToast(`Could not fetch LK sheet: ${err.message}`, 'error');
+        return;
+      } finally {
+        setIsAutoFetchingSource(false);
+      }
+    }
+
+    // 3. Now run the verification audit against this LK lottery sheet!
+    if (lkSource) {
+      await handleRunAiVerify(sheet, lkSource);
+    }
+  };
+
   const handleApplySingleFix = (result: AiLotteryAuditResult) => {
     if (!result.suggestedFix) return;
 
@@ -1952,24 +1998,18 @@ function EditorContent() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (aiVerificationReport) {
-                      setIsAiVerifyModalOpen(true);
-                    } else {
-                      handleRunAiVerify();
-                    }
-                  }}
-                  disabled={isAiVerifying || sheet.sources.length === 0}
-                  className="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                  title={sheet.sources.length === 0 ? 'Upload a source document to verify with AI' : 'Audit extracted results against raw document with AI'}
+                  onClick={handleVerifyWithLkSheet}
+                  disabled={isAiVerifying || isAutoFetchingSource}
+                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  title="Audit winning numbers against official LK lottery raw sheet (Optional 2nd check)"
                 >
-                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin' : 'text-amber-300'}`} />
+                  <Zap className={`w-3.5 h-3.5 ${isAiVerifying || isAutoFetchingSource ? 'animate-bounce text-amber-300' : 'text-amber-300'}`} />
                   <span>
-                    {isAiVerifying
-                      ? 'AI Auditing...'
+                    {isAiVerifying || isAutoFetchingSource
+                      ? 'Verifying with LK...'
                       : aiStatusSummary
-                      ? `AI Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                      : 'AI Verify'}
+                      ? `LK Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'Verify with LK Sheet (Optional)'}
                   </span>
                 </button>
 
@@ -2017,11 +2057,13 @@ function EditorContent() {
                   currentDate={sheet.date}
                   onFileUpload={handleFileUpload}
                   onAutoFetchSource={handleAutoFetchSource}
+                  onVerifyWithLkSheet={handleVerifyWithLkSheet}
                   onRemoveSource={handleRemoveSource}
                   onClearValues={handleClearAllValues}
                   onExtractFromSource={handleExtractFromSource}
                   isUploading={isUploading}
                   isAutoFetching={isAutoFetchingSource}
+                  isVerifyingWithLkSheet={isAiVerifying || isAutoFetchingSource}
                   unassignedRows={unassignedRows}
                   onAssignRow={handleAssignRow}
                   dateMismatchWarning={dateMismatchWarning}
@@ -2122,34 +2164,28 @@ function EditorContent() {
                 {/* 1. AI Verification Button */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (aiVerificationReport) {
-                      setIsAiVerifyModalOpen(true);
-                    } else {
-                      handleRunAiVerify();
-                    }
-                  }}
-                  disabled={isAiVerifying || sheet.sources.length === 0}
+                  onClick={handleVerifyWithLkSheet}
+                  disabled={isAiVerifying || isAutoFetchingSource}
                   className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                    isAiVerifying
-                      ? 'bg-purple-100 text-purple-700 cursor-wait animate-pulse border border-purple-300'
+                    isAiVerifying || isAutoFetchingSource
+                      ? 'bg-emerald-100 text-emerald-800 cursor-wait animate-pulse border border-emerald-300'
                       : aiStatusSummary?.hasDiscrepancy
                       ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200'
                       : aiStatusSummary?.verified
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
-                      : 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs'
+                      : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs'
                   }`}
-                  title={sheet.sources.length === 0 ? 'Upload a source document to verify with AI' : 'Audit extracted results against raw document with AI'}
+                  title="Verify lottery numbers against official LK lottery raw sheet (Optional 2nd check)"
                 >
-                  <Sparkles className={`w-3.5 h-3.5 ${isAiVerifying ? 'animate-spin text-purple-700' : aiStatusSummary ? 'text-amber-300' : 'text-purple-600'}`} />
+                  <Zap className={`w-3.5 h-3.5 ${isAiVerifying || isAutoFetchingSource ? 'animate-bounce text-emerald-700' : aiStatusSummary ? 'text-amber-300' : 'text-emerald-600'}`} />
                   <span>
-                    {isAiVerifying
-                      ? 'AI Auditing...'
+                    {isAiVerifying || isAutoFetchingSource
+                      ? 'Verifying with LK...'
                       : aiStatusSummary
                       ? aiStatusSummary.hasDiscrepancy
-                        ? `AI Flagged (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                        : `AI Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
-                      : 'AI Verify'}
+                        ? `LK Flagged (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                        : `LK Verified (${aiStatusSummary.verified}/${aiStatusSummary.total})`
+                      : 'Verify with LK Sheet (Optional)'}
                   </span>
                 </button>
 
@@ -2212,11 +2248,13 @@ function EditorContent() {
                     currentDate={sheet.date}
                     onFileUpload={handleFileUpload}
                     onAutoFetchSource={handleAutoFetchSource}
+                    onVerifyWithLkSheet={handleVerifyWithLkSheet}
                     onRemoveSource={handleRemoveSource}
                     onClearValues={handleClearAllValues}
                     onExtractFromSource={handleExtractFromSource}
                     isUploading={isUploading}
                     isAutoFetching={isAutoFetchingSource}
+                    isVerifyingWithLkSheet={isAiVerifying || isAutoFetchingSource}
                     unassignedRows={unassignedRows}
                     onAssignRow={handleAssignRow}
                     dateMismatchWarning={dateMismatchWarning}
