@@ -147,6 +147,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Image OCR Extraction for JPG, JPEG, and PNG files
+    if (!extractedText && fileType !== 'pdf') {
+      try {
+        const { extractTextFromImageBuffer } = await import('@/lib/image-ocr-extractor');
+        const ocrResult = await extractTextFromImageBuffer(fileBuffer);
+        if (ocrResult.text) {
+          extractedText = ocrResult.text;
+        }
+      } catch (ocrErr: any) {
+        extractionError = ocrErr?.message || String(ocrErr);
+        console.warn('Image OCR extraction error:', extractionError);
+      }
+    }
+
     // Run lottery extraction
     const extraction = extractLotteryDataFromText(
       extractedText || '',

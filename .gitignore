@@ -34,3 +34,6 @@ next-env.d.ts
 
 # test outputs
 test_print*
+
+# OCR traineddata models
+*.traineddata

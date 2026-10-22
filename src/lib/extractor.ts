@@ -452,11 +452,11 @@ export function parseLotteryLine(
     zodiac = detectZodiacInText(normalized) || detectZodiacInText(line);
   }
 
-  // 3. Extract bonus number in parentheses e.g. (86597)
+  // 3. Extract bonus number in parentheses e.g. (86597) or slash bonus e.g. (862 / 139)
   let bonusNumber: string | undefined;
-  const bonusMatch = normalized.match(/\((\d{4,6})\)/);
+  const bonusMatch = normalized.match(/\((\d{2,4}\s*\/\s*\d{2,4}|\d{4,6})\)/);
   if (bonusMatch) {
-    bonusNumber = bonusMatch[1];
+    bonusNumber = bonusMatch[1].replace(/\s+/g, ' ').trim();
   }
 
   // 4. Extract tiered numbers if applicable (e.g. 83 / 583 / 1583 / D or 32 / 432 / 2432 / O)
@@ -493,7 +493,9 @@ export function parseLotteryLine(
   }
 
   // 5. Extract all digit tokens preserving leading zeros
-  const digitTokens = normalized.match(/\b\d+\b/g) || [];
+  // Strip extracted bonus in parentheses so its digits don't pollute winning numbers
+  const lineForDigits = bonusNumber ? normalized.replace(`(${bonusNumber})`, ' ') : normalized;
+  const digitTokens = lineForDigits.match(/\b\d+\b/g) || [];
   if (digitTokens.length === 0) return null;
 
   const firstToken = digitTokens[0];
@@ -502,11 +504,11 @@ export function parseLotteryLine(
   let drawNo = firstToken;
   let rawNumbers = digitTokens.slice(1);
 
-  // Special slash bonus for Dhana Sampatha e.g. 593 / 784 or 5 9 3 / 7 8 4
+  // Special slash bonus for Dhana Sampatha (when not already in parentheses) e.g. 593 / 784
   let isDhanaSampathaSlashBonus = false;
   let dhanaSampathaWinningDigits: string[] = [];
 
-  if (def.id === 'dhana_sampatha' && normalized.includes('/')) {
+  if (def.id === 'dhana_sampatha' && !bonusNumber && normalized.includes('/')) {
     const slashIdx = normalized.indexOf('/');
     const beforeSlash = normalized.substring(0, slashIdx);
     const afterSlash = normalized.substring(slashIdx + 1);

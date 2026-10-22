@@ -167,6 +167,14 @@ export async function GET(req: NextRequest) {
                 } catch (e) {
                   console.warn('Could not extract text during auto-reconciliation:', e);
                 }
+              } else if (!extractedText && (ext === '.jpg' || ext === '.jpeg' || ext === '.png')) {
+                try {
+                  const { extractTextFromImageBuffer } = await import('@/lib/image-ocr-extractor');
+                  const res = await extractTextFromImageBuffer(fs.readFileSync(fullFp));
+                  extractedText = res.text;
+                } catch (e) {
+                  console.warn('Could not extract image OCR text during auto-reconciliation:', e);
+                }
               }
               return {
                 id: `doc_disk_${idx}_${fname}`,

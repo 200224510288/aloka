@@ -1,5 +1,307 @@
 [
   {
+    "id": "rev_1792638962390_m20dm",
+    "sheetDate": "2026-10-21",
+    "timestamp": "2026-10-22T03:16:02.390Z",
+    "summary": "Auto-saved edit",
+    "changedFields": [],
+    "snapshot": {
+      "lastCloudUpdate": "2026-10-22T02:41:25.170Z",
+      "lotteries": [
+        {
+          "lotteryId": "ada_kotipathi",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "ada_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "ayubo",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "dhana_nidhanaya",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "govisetha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "handahana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "jaya_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "kapruka",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "lagna_wasana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "mahajana_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "mega_power",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "nlb_jaya",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "sasiri",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "shanida_wasana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "suba_dawasak",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "super_ball",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "dhana_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "vasi",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 2,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        }
+      ],
+      "isFooterReviewed": true,
+      "updatedAt": "2026-10-22T03:16:02.387Z",
+      "branch": "result-generator",
+      "syncedAt": "2026-10-22T02:41:25.170Z",
+      "headerGreeting": "ඔබට සුබ දවසක් !",
+      "dayOfWeekSi": "බදාදා",
+      "footerAnnouncement": "",
+      "date": "2026-10-21",
+      "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+      "sources": []
+    }
+  },
+  {
+    "id": "rev_1792638961514_90kvh",
+    "sheetDate": "2026-10-21",
+    "timestamp": "2026-10-22T03:16:01.514Z",
+    "summary": "Removed source file: WhatsApp_Image_2026-10-22_at_05.41.24.jpeg",
+    "changedFields": [],
+    "snapshot": {
+      "lastCloudUpdate": "2026-10-22T02:41:25.170Z",
+      "lotteries": [
+        {
+          "lotteryId": "ada_kotipathi",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "ada_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "ayubo",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "dhana_nidhanaya",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "govisetha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "handahana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "jaya_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "kapruka",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "lagna_wasana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "mahajana_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "mega_power",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 0,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "nlb_jaya",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "sasiri",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "shanida_wasana",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "suba_dawasak",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "super_ball",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "dhana_sampatha",
+          "drawNo": "",
+          "numbers": [],
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        },
+        {
+          "lotteryId": "vasi",
+          "drawNo": "",
+          "numbers": [],
+          "boxedIndex": 2,
+          "isNoDraw": false,
+          "isCheckedAgainstSource": false
+        }
+      ],
+      "isFooterReviewed": true,
+      "updatedAt": "2026-10-22T03:16:01.511Z",
+      "branch": "result-generator",
+      "syncedAt": "2026-10-22T02:41:25.170Z",
+      "headerGreeting": "ඔබට සුබ දවසක් !",
+      "dayOfWeekSi": "බදාදා",
+      "footerAnnouncement": "",
+      "date": "2026-10-21",
+      "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+      "sources": []
+    }
+  },
+  {
     "id": "rev_1792638052897_pjvcw",
     "sheetDate": "2026-10-21",
     "timestamp": "2026-10-22T03:00:52.897Z",

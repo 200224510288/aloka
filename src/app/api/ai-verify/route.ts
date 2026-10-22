@@ -288,6 +288,15 @@ export async function POST(req: NextRequest) {
               if (extracted?.text) {
                 finalRawText = extracted.text;
               }
+            } else {
+              const images = fs.readdirSync(uploadDir).filter(f => /\.(jpe?g|png)$/i.test(f));
+              if (images.length > 0) {
+                const { extractTextFromImageBuffer } = await import('@/lib/image-ocr-extractor');
+                const extracted = await extractTextFromImageBuffer(fs.readFileSync(path.join(uploadDir, images[0])));
+                if (extracted?.text) {
+                  finalRawText = extracted.text;
+                }
+              }
             }
           }
         }
@@ -305,11 +314,19 @@ export async function POST(req: NextRequest) {
         const resolvedPath = path.isAbsolute(filePath)
           ? filePath
           : path.join(process.cwd(), 'public', 'uploads', filename);
-        if (fs.existsSync(resolvedPath) && resolvedPath.toLowerCase().endsWith('.pdf')) {
-          const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
-          const extracted = await extractTextFromPdfBuffer(fs.readFileSync(resolvedPath));
-          if (extracted?.text) {
-            finalRawText = extracted.text;
+        if (fs.existsSync(resolvedPath)) {
+          if (resolvedPath.toLowerCase().endsWith('.pdf')) {
+            const { extractTextFromPdfBuffer } = await import('@/lib/pdf-text-extractor');
+            const extracted = await extractTextFromPdfBuffer(fs.readFileSync(resolvedPath));
+            if (extracted?.text) {
+              finalRawText = extracted.text;
+            }
+          } else if (/\.(jpe?g|png)$/i.test(resolvedPath)) {
+            const { extractTextFromImageBuffer } = await import('@/lib/image-ocr-extractor');
+            const extracted = await extractTextFromImageBuffer(fs.readFileSync(resolvedPath));
+            if (extracted?.text) {
+              finalRawText = extracted.text;
+            }
           }
         }
       } catch (diskErr) {
