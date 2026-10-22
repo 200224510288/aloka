@@ -50,6 +50,20 @@ export async function runStaffOfficialAutomation(
     if (onProgress) onProgress(state);
   };
 
+  // CRITICAL SAFEGUARD: Never auto-build or save results for empty or deleted sheets!
+  const hasExistingData = (sheet?.lotteries || []).some(
+    (l) => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some((n) => n && n.trim() !== '')
+  );
+  if (!hasExistingData) {
+    return {
+      success: false,
+      sheet,
+      error: 'මෙම දිනය සඳහා ලොතරැයි ප්‍රතිඵල නොමැත හෝ මකා දමා ඇත. (Sheet is empty or has been deleted)',
+      matchedCount: 0,
+      rawSheetAttached: false,
+    };
+  }
+
   let currentSources: SourceDocument[] = Array.isArray(sheet.sources) ? [...sheet.sources] : [];
   let rawSheetAttached = currentSources.some(
     (s) => s.detectedDate === sheet.date || s.fileName?.includes(sheet.date.replace(/-/g, ''))

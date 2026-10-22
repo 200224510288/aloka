@@ -347,9 +347,9 @@ export default function Home() {
   useEffect(() => {
     if (userRole === 'staff' && sheet && sheet.date === selectedDate && !isAutomating) {
       const hasData = (sheet.lotteries || []).some(
-        l => l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
+        l => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
       );
-      const isFullyVerified = (sheet.lotteries || []).length > 0 &&
+      const isFullyVerified = hasData && (sheet.lotteries || []).length > 0 &&
         (sheet.lotteries || []).every(l => l.officialVerified || l.isNoDraw);
 
       if (isFullyVerified && hasData) {
@@ -361,12 +361,23 @@ export default function Home() {
           officialCount: (sheet.lotteries || []).filter(l => l.officialVerified).length,
           totalLotteries: sheet.lotteries.length,
         });
-      } else if (!hasAutoRunForDateRef.current[selectedDate]) {
+      } else if (hasData && availableDates.includes(selectedDate) && !hasAutoRunForDateRef.current[selectedDate]) {
+        // ONLY verify if sheet already has data uploaded by manager!
         hasAutoRunForDateRef.current[selectedDate] = true;
         executeStaffAutomation(sheet);
+      } else if (!hasData || !availableDates.includes(selectedDate)) {
+        // Sheet has NO data or was deleted: NEVER auto-build or auto-save!
+        setAutomationState({
+          step: 'idle',
+          progressPercent: 0,
+          messageSi: 'මෙම දිනය සඳහා ලොතරැයි ප්‍රතිඵල නොමැත හෝ මකා දමා ඇත. මුද්‍රණය කළ නොහැක.',
+          messageEn: 'No results available or sheet was deleted for this date. Printing disabled.',
+          officialCount: 0,
+          totalLotteries: 0,
+        });
       }
     }
-  }, [userRole, sheet, selectedDate, executeStaffAutomation, isAutomating]);
+  }, [userRole, sheet, selectedDate, availableDates, executeStaffAutomation, isAutomating]);
 
   // Handle Role Selection from Modal
   const handleRoleSelect = (role: UserRole) => {
@@ -376,8 +387,13 @@ export default function Home() {
 
     if (role === 'staff') {
       showToast('කාර්ය මණ්ඩල ස්වයංක්‍රීය ප්‍රකාරය සක්‍රියයි (Staff Mode)', 'success');
-      // Kick off automation immediately
-      executeStaffAutomation(sheet);
+      // Kick off automation only if sheet actually has existing data
+      const hasData = (sheet.lotteries || []).some(
+        l => !l.isNoDraw && l.numbers && l.numbers.length > 0 && l.numbers.some(n => n && n.trim() !== '')
+      );
+      if (hasData && availableDates.includes(selectedDate)) {
+        executeStaffAutomation(sheet);
+      }
     } else {
       showToast('අලෝක පරිපාලක ප්‍රකාරය සක්‍රියයි (Aloka Admin Mode)', 'info');
     }
