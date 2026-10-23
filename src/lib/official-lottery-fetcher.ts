@@ -698,24 +698,26 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
         });
       }
 
-      // Fast non-blocking OCR for special draw bonus numbers with 3.5s total ceiling
-      const ocrTasks = lotteries
-        .filter(l => Boolean(l.rawSpecialImgUrl && l.matchedLotteryId))
-        .map(async (l) => {
-          try {
-            const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl!, l.matchedLotteryId!);
-            if (bonus) {
-              l.superNumber = bonus;
+      // Sequential OCR for special draw bonus numbers to avoid worker concurrency lock
+      const runSequentialOcr = async () => {
+        for (const l of lotteries) {
+          if (l.rawSpecialImgUrl && l.matchedLotteryId) {
+            try {
+              const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl, l.matchedLotteryId);
+              if (bonus) {
+                l.superNumber = bonus;
+              }
+            } catch (err) {
+              console.warn(`[DLB Special OCR] Error for ${l.matchedLotteryId}:`, err);
             }
-          } catch {}
-        });
+          }
+        }
+      };
 
-      if (ocrTasks.length > 0) {
-        await Promise.race([
-          Promise.allSettled(ocrTasks),
-          new Promise((resolve) => setTimeout(resolve, 3500)),
-        ]);
-      }
+      await Promise.race([
+        runSequentialOcr(),
+        new Promise((resolve) => setTimeout(resolve, 12000)),
+      ]);
 
       return {
         success: true,
@@ -858,24 +860,26 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
     const settled = await Promise.all(historicalPromises);
     const lotteries: OfficialFetchedLottery[] = settled.filter((item): item is OfficialFetchedLottery => item !== null);
 
-    // Run non-blocking OCR for historical matches with 3.5s total ceiling
-    const ocrTasksHistorical = lotteries
-      .filter(l => Boolean(l.rawSpecialImgUrl && l.matchedLotteryId))
-      .map(async (l) => {
-        try {
-          const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl!, l.matchedLotteryId!);
-          if (bonus) {
-            l.superNumber = bonus;
+    // Sequential OCR for historical matches to avoid worker concurrency lock
+    const runSequentialOcrHistorical = async () => {
+      for (const l of lotteries) {
+        if (l.rawSpecialImgUrl && l.matchedLotteryId) {
+          try {
+            const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl, l.matchedLotteryId);
+            if (bonus) {
+              l.superNumber = bonus;
+            }
+          } catch (err) {
+            console.warn(`[DLB Special OCR Historical] Error for ${l.matchedLotteryId}:`, err);
           }
-        } catch {}
-      });
+        }
+      }
+    };
 
-    if (ocrTasksHistorical.length > 0) {
-      await Promise.race([
-        Promise.allSettled(ocrTasksHistorical),
-        new Promise((resolve) => setTimeout(resolve, 3500)),
-      ]);
-    }
+    await Promise.race([
+      runSequentialOcrHistorical(),
+      new Promise((resolve) => setTimeout(resolve, 12000)),
+    ]);
 
     return {
       success: lotteries.length > 0,
@@ -920,7 +924,7 @@ export async function fetchAllOfficialResults(targetDate?: string): Promise<Offi
       fetcher(),
       new Promise<OfficialFetchResponse>((resolve) =>
         setTimeout(() => {
-          console.warn(`[Official Lottery Fetcher] ${boardName} exceeded 12s safety limit, continuing with available data.`);
+          console.warn(`[Official Lottery Fetcher] ${boardName} exceeded 25s safety limit, continuing with available data.`);
           resolve({
             success: false,
             sourceUrl: boardName === 'NLB' ? 'https://www.nlb.lk/results' : 'https://www.dlb.lk/result/2/',
@@ -930,9 +934,9 @@ export async function fetchAllOfficialResults(targetDate?: string): Promise<Offi
             matchedCount: 0,
             lotteries: [],
             boards: [boardName],
-            error: `${boardName} portal response timed out after 12s`,
+            error: `${boardName} portal response timed out after 25s`,
           });
-        }, 12000)
+        }, 25000)
       )
     ]);
   };

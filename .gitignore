@@ -37,4 +37,4 @@ test_print*
 
 # OCR traineddata models
 *.traineddata
-!public/tessdata/eng.traineddata
+!public/tessdata/**

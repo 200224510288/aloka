@@ -5,24 +5,49 @@ import fs from 'fs';
 
 let globalWorkerPromise: Promise<Worker | null> | null = null;
 
+export const ocrDiagnosticInfo: {
+  lastError: string | null;
+  hasLocalModel: boolean;
+  selectedLangPath: string;
+  workerState: string;
+  attempts: Record<string, any>;
+} = {
+  lastError: null,
+  hasLocalModel: false,
+  selectedLangPath: '',
+  workerState: 'uninitialized',
+  attempts: {},
+};
+
 async function getSharedWorker(): Promise<Worker | null> {
   if (!globalWorkerPromise) {
     globalWorkerPromise = (async () => {
       try {
         const localTessPath = path.join(process.cwd(), 'public', 'tessdata');
-        const hasLocalModel = fs.existsSync(path.join(localTessPath, 'eng.traineddata'));
+        const rootTessPath = process.cwd();
+        let langPath: string = 'https://aloka-alpha.vercel.app/tessdata';
+        let foundLocal = false;
+
+        if (fs.existsSync(path.join(localTessPath, 'eng.traineddata'))) {
+          langPath = localTessPath;
+          foundLocal = true;
+        } else if (fs.existsSync(path.join(rootTessPath, 'eng.traineddata'))) {
+          langPath = rootTessPath;
+          foundLocal = true;
+        }
+
+        ocrDiagnosticInfo.hasLocalModel = foundLocal;
+        ocrDiagnosticInfo.selectedLangPath = langPath;
 
         const options: any = {
           cachePath: '/tmp',
+          langPath,
         };
-        if (hasLocalModel) {
-          options.langPath = localTessPath;
-        }
 
-        // 7s ceiling for worker initialization
+        // 12s ceiling for worker initialization
         let timer: NodeJS.Timeout;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 7000);
+          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 12000);
         });
 
         const workerPromise = createWorker('eng', 1, options);
@@ -33,8 +58,11 @@ async function getSharedWorker(): Promise<Worker | null> {
           tessedit_char_whitelist: '0123456789',
           tessedit_pageseg_mode: '8' as any, // Single word mode for high accuracy on spaced lottery numbers
         });
+        ocrDiagnosticInfo.workerState = 'ready';
         return worker;
-      } catch (err) {
+      } catch (err: any) {
+        ocrDiagnosticInfo.lastError = err?.message || String(err);
+        ocrDiagnosticInfo.workerState = 'error';
         console.warn('[DLB Special OCR] Could not initialize Tesseract worker, skipping OCR:', err);
         return null;
       }

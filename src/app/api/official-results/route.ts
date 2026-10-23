@@ -6,6 +6,7 @@ import {
   convertOfficialToSheetRows,
   compareSheetWithOfficial
 } from '@/lib/official-lottery-fetcher';
+import { ocrDiagnosticInfo } from '@/lib/dlb-special-extractor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -54,6 +55,12 @@ export async function GET(req: NextRequest) {
     const refresh = searchParams.get('refresh') === 'true' || searchParams.get('force') === 'true';
 
     const data = await getOfficialResultsByBoard(board, date, refresh);
+    if (searchParams.get('debug') === 'true') {
+      return NextResponse.json({
+        ...data,
+        ocrDiagnostic: ocrDiagnosticInfo,
+      });
+    }
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
