@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["playwright-core", "pdf-parse", "tesseract.js", "pdfjs-dist"],
+  serverExternalPackages: ["sharp", "playwright-core", "pdf-parse", "tesseract.js", "pdfjs-dist"],
   outputFileTracingIncludes: {
     '/api/**/*': ['./public/tessdata/**/*', './eng.traineddata'],
   },
