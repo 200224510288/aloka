@@ -142,28 +142,47 @@ export async function extractSpecialNumberFromDlbImage(
   imageUrl: string,
   lotteryId: string
 ): Promise<string | null> {
+  const fullUrl = imageUrl.startsWith('http') ? imageUrl : `https://www.dlb.lk/${imageUrl.replace(/^\//, '')}`;
+  ocrDiagnosticInfo.attempts[lotteryId] = {
+    fullUrl,
+    startedAt: new Date().toISOString(),
+    status: 'starting',
+  };
+
   try {
-    const fullUrl = imageUrl.startsWith('http') ? imageUrl : `https://www.dlb.lk/${imageUrl.replace(/^\//, '')}`;
     const res = await fetch(fullUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Referer': 'https://www.dlb.lk/result/2/',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
       },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(6000),
     });
 
+    ocrDiagnosticInfo.attempts[lotteryId].httpStatus = res.status;
+
     if (!res.ok) {
+      ocrDiagnosticInfo.attempts[lotteryId].status = `http_error_${res.status}`;
       console.warn(`[DLB Special OCR] Failed to fetch image ${fullUrl}: HTTP ${res.status}`);
       return null;
     }
 
     const imageBuffer = Buffer.from(await res.arrayBuffer());
+    ocrDiagnosticInfo.attempts[lotteryId].bufferLength = imageBuffer.length;
+
     const meta = await sharp(imageBuffer).metadata();
     const w = meta.width;
     const h = meta.height;
-    if (!w || !h) return null;
+    if (!w || !h) {
+      ocrDiagnosticInfo.attempts[lotteryId].status = 'invalid_image_meta';
+      return null;
+    }
+
+    ocrDiagnosticInfo.attempts[lotteryId].dimensions = { w, h };
 
     const worker = await getSharedWorker();
     if (!worker) {
+      ocrDiagnosticInfo.attempts[lotteryId].status = 'worker_unavailable';
       return null;
     }
 
@@ -178,9 +197,13 @@ export async function extractSpecialNumberFromDlbImage(
       const processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
       const text = await recognizeWithTimeout(worker, processed, 2500);
       const digits = text.replace(/\D/g, '');
-      if (digits.length === 5) return digits;
-      if (digits.length > 5) return digits.slice(0, 5);
-      return digits || null;
+      const finalDigits = digits.length >= 5 ? digits.slice(0, 5) : (digits || null);
+      if (ocrDiagnosticInfo.attempts[lotteryId]) {
+        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
+        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
+        ocrDiagnosticInfo.attempts[lotteryId].rawText = text;
+      }
+      return finalDigits;
     }
 
     // 2. Shanida Wasana & Super Ball: White rectangular 5-box grid at bottom right
@@ -200,9 +223,13 @@ export async function extractSpecialNumberFromDlbImage(
 
       const text = await recognizeWithTimeout(worker, processed, 2500);
       const digits = text.replace(/\D/g, '');
-      if (digits.length === 5) return digits;
-      if (digits.length > 5) return digits.slice(-5);
-      return digits || null;
+      const finalDigits = digits.length >= 5 ? digits.slice(-5) : (digits || null);
+      if (ocrDiagnosticInfo.attempts[lotteryId]) {
+        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
+        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
+        ocrDiagnosticInfo.attempts[lotteryId].rawText = text;
+      }
+      return finalDigits;
     }
 
     // 3. Supiri Dhana Sampatha: Top box (3 digits) + Bottom box (3 digits) -> e.g. 707 / 941
@@ -241,16 +268,28 @@ export async function extractSpecialNumberFromDlbImage(
       const topDigits = topText.replace(/\D/g, '').slice(-3);
       const botDigits = botText.replace(/\D/g, '').slice(-3);
 
+      let finalDigits: string | null = null;
       if (topDigits && botDigits) {
-        return `${topDigits} / ${botDigits}`;
+        finalDigits = `${topDigits} / ${botDigits}`;
       } else if (topDigits) {
-        return topDigits;
+        finalDigits = topDigits;
       }
-      return null;
+
+      if (ocrDiagnosticInfo.attempts[lotteryId]) {
+        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
+        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
+        ocrDiagnosticInfo.attempts[lotteryId].topText = topText;
+        ocrDiagnosticInfo.attempts[lotteryId].botText = botText;
+      }
+      return finalDigits;
     }
 
     return null;
-  } catch (err) {
+  } catch (err: any) {
+    if (ocrDiagnosticInfo.attempts[lotteryId]) {
+      ocrDiagnosticInfo.attempts[lotteryId].status = 'exception';
+      ocrDiagnosticInfo.attempts[lotteryId].error = err?.message || String(err);
+    }
     console.warn(`[DLB Special OCR] Safe fallback for ${lotteryId}:`, err);
     return null;
   }
