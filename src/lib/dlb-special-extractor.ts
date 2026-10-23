@@ -11,24 +11,30 @@ interface TessCoreEngine {
 
 let globalEnginePromise: Promise<TessCoreEngine | null> | null = null;
 
+// Immutable in-memory cache: a draw's special image result never changes once extracted
+const extractedNumberCache = new Map<string, string>();
+
 export const ocrDiagnosticInfo: {
   lastError: string | null;
   hasLocalModel: boolean;
   selectedLangPath: string;
   workerState: string;
+  cacheSize: number;
   attempts: Record<string, any>;
 } = {
   lastError: null,
   hasLocalModel: false,
   selectedLangPath: '',
   workerState: 'uninitialized',
+  cacheSize: 0,
   attempts: {},
 };
 
 /**
  * Direct In-Process WebAssembly OCR Engine:
- * Completely avoids worker_threads, IPC channels, and subprocesses.
- * Runs 100% synchronously and deterministically inside Vercel Lambda / Node.js.
+ * - Completely avoids worker_threads, IPC channels, and child processes.
+ * - Runs 100% synchronously and deterministically inside Vercel Lambda / Node.js.
+ * - Cleans up memory buffers after each recognition call to prevent memory accumulation.
  */
 export async function getSharedWorker(): Promise<TessCoreEngine | null> {
   if (!globalEnginePromise) {
@@ -93,9 +99,14 @@ export async function getSharedWorker(): Promise<TessCoreEngine | null> {
             core.FS.writeFile('/input', buffer);
             api.SetImageFile(1, 0);
             api.Recognize();
-            return api.GetUTF8Text() || '';
+            const text = api.GetUTF8Text() || '';
+            try { api.Clear(); } catch {}
+            try { core.FS.unlink('/input'); } catch {}
+            return text;
           } catch (e) {
             console.warn('[Direct WASM OCR] Single recognize error:', e);
+            try { api.Clear(); } catch {}
+            try { core.FS.unlink('/input'); } catch {}
             return '';
           }
         };
@@ -170,12 +181,25 @@ async function binarizeRegion(
  * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 707 / 941)
  *
  * Guarantees zero blocking: never throws and never delays the response beyond timeout.
+ * Employs multi-layer defenses: in-memory result caching, network retry, dual-pass thresholding.
  */
 export async function extractSpecialNumberFromDlbImage(
   imageUrl: string,
   lotteryId: string
 ): Promise<string | null> {
   const fullUrl = imageUrl.startsWith('http') ? imageUrl : `https://www.dlb.lk/${imageUrl.replace(/^\//, '')}`;
+  
+  // Layer 1: In-memory result cache check (Instant 0ms response)
+  if (extractedNumberCache.has(fullUrl)) {
+    const cached = extractedNumberCache.get(fullUrl)!;
+    ocrDiagnosticInfo.attempts[lotteryId] = {
+      fullUrl,
+      status: 'cache_hit',
+      result: cached,
+    };
+    return cached;
+  }
+
   ocrDiagnosticInfo.attempts[lotteryId] = {
     fullUrl,
     startedAt: new Date().toISOString(),
@@ -183,22 +207,32 @@ export async function extractSpecialNumberFromDlbImage(
   };
 
   try {
-    const res = await fetch(fullUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Referer': 'https://www.dlb.lk/result/2/',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      },
-      signal: AbortSignal.timeout(6000),
-    });
+    // Layer 2: Network fetch with automatic retry on transient socket errors
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await fetch(fullUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://www.dlb.lk/result/2/',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (res.ok) break;
+      } catch (fetchErr) {
+        if (attempt === 1) throw fetchErr;
+        await new Promise(r => setTimeout(r, 250));
+      }
+    }
 
-    ocrDiagnosticInfo.attempts[lotteryId].httpStatus = res.status;
-
-    if (!res.ok) {
-      ocrDiagnosticInfo.attempts[lotteryId].status = `http_error_${res.status}`;
-      console.warn(`[DLB Special OCR] Failed to fetch image ${fullUrl}: HTTP ${res.status}`);
+    if (!res || !res.ok) {
+      ocrDiagnosticInfo.attempts[lotteryId].status = `http_error_${res?.status || 'network'}`;
+      console.warn(`[DLB Special OCR] Failed to fetch image ${fullUrl}`);
       return null;
     }
+
+    ocrDiagnosticInfo.attempts[lotteryId].httpStatus = res.status;
 
     const imageBuffer = Buffer.from(await res.arrayBuffer());
     ocrDiagnosticInfo.attempts[lotteryId].bufferLength = imageBuffer.length;
@@ -213,6 +247,7 @@ export async function extractSpecialNumberFromDlbImage(
 
     ocrDiagnosticInfo.attempts[lotteryId].dimensions = { w, h };
 
+    // Layer 3: Direct WebAssembly In-Process Engine
     const engine = await getSharedWorker();
     if (!engine) {
       ocrDiagnosticInfo.attempts[lotteryId].status = 'worker_unavailable';
@@ -227,10 +262,25 @@ export async function extractSpecialNumberFromDlbImage(
         width: Math.round(0.66 * w),
         height: Math.round(0.18 * h)
       };
-      const processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
-      const text = engine.recognize(processed);
-      const digits = text.replace(/\D/g, '');
+
+      // Pass 1: standard contrast
+      let processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
+      let text = engine.recognize(processed);
+      let digits = text.replace(/\D/g, '');
+
+      // Pass 2 fallback: slightly deeper threshold if digits missed
+      if (digits.length < 5) {
+        processed = await binarizeRegion(imageBuffer, crop, 75, 1.4);
+        text = engine.recognize(processed);
+        digits = text.replace(/\D/g, '');
+      }
+
       const finalDigits = digits.length >= 5 ? digits.slice(0, 5) : (digits || null);
+      if (finalDigits) {
+        extractedNumberCache.set(fullUrl, finalDigits);
+        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
+      }
+
       if (ocrDiagnosticInfo.attempts[lotteryId]) {
         ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
         ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
@@ -257,6 +307,11 @@ export async function extractSpecialNumberFromDlbImage(
       const text = engine.recognize(processed);
       const digits = text.replace(/\D/g, '');
       const finalDigits = digits.length >= 5 ? digits.slice(-5) : (digits || null);
+      if (finalDigits) {
+        extractedNumberCache.set(fullUrl, finalDigits);
+        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
+      }
+
       if (ocrDiagnosticInfo.attempts[lotteryId]) {
         ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
         ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
@@ -305,6 +360,11 @@ export async function extractSpecialNumberFromDlbImage(
         finalDigits = `${topDigits} / ${botDigits}`;
       } else if (topDigits) {
         finalDigits = topDigits;
+      }
+
+      if (finalDigits) {
+        extractedNumberCache.set(fullUrl, finalDigits);
+        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
       }
 
       if (ocrDiagnosticInfo.attempts[lotteryId]) {
