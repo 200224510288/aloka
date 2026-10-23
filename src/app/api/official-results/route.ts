@@ -8,16 +8,42 @@ import {
 } from '@/lib/official-lottery-fetcher';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-async function getOfficialResultsByBoard(board?: string | null, targetDate?: string | null) {
-  if (board === 'dlb') {
-    return await fetchDlbOfficialResults(targetDate || undefined);
-  } else if (board === 'nlb') {
-    return await fetchNlbOfficialResults(targetDate || undefined);
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes cache
+
+async function getOfficialResultsByBoard(board?: string | null, targetDate?: string | null, forceRefresh = false) {
+  const normBoard = board?.toLowerCase() || 'all';
+  const normDate = targetDate?.trim() || 'latest';
+  const cacheKey = `${normBoard}:${normDate}`;
+
+  if (!forceRefresh) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && cached.data?.success) {
+      return cached.data;
+    }
   }
-  // default: all (NLB + DLB combined 18 lotteries)
-  return await fetchAllOfficialResults(targetDate || undefined);
+
+  let result;
+  if (normBoard === 'dlb') {
+    result = await fetchDlbOfficialResults(targetDate || undefined);
+  } else if (normBoard === 'nlb') {
+    result = await fetchNlbOfficialResults(targetDate || undefined);
+  } else {
+    // default: all (NLB + DLB combined 18 lotteries)
+    result = await fetchAllOfficialResults(targetDate || undefined);
+  }
+
+  if (result.success) {
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+  }
+
+  return result;
 }
 
 export async function GET(req: NextRequest) {
@@ -25,8 +51,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const board = searchParams.get('board')?.toLowerCase();
     const date = searchParams.get('date');
+    const refresh = searchParams.get('refresh') === 'true' || searchParams.get('force') === 'true';
 
-    const data = await getOfficialResultsByBoard(board, date);
+    const data = await getOfficialResultsByBoard(board, date, refresh);
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json(
@@ -42,16 +69,18 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const board = body.board || searchParams.get('board')?.toLowerCase();
     const date = body.date || searchParams.get('date');
+    const refresh = body.refresh === true || searchParams.get('refresh') === 'true' || searchParams.get('force') === 'true';
 
-    const data = await getOfficialResultsByBoard(board, date);
+    const data = await getOfficialResultsByBoard(board, date, refresh);
 
-    if (!data.success) {
-      return NextResponse.json(data, { status: 502 });
+    // If no lotteries could be fetched at all
+    if (!data.success && (!data.lotteries || data.lotteries.length === 0)) {
+      return NextResponse.json(data, { status: 200 });
     }
 
-    const sheetRows = convertOfficialToSheetRows(data.lotteries);
+    const sheetRows = convertOfficialToSheetRows(data.lotteries || []);
     const comparison = Array.isArray(body.lotteries) 
-      ? compareSheetWithOfficial(body.lotteries, data.lotteries)
+      ? compareSheetWithOfficial(body.lotteries, data.lotteries || [])
       : undefined;
 
     return NextResponse.json({
@@ -66,3 +95,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

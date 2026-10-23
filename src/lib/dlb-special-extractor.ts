@@ -1,20 +1,46 @@
 import sharp from 'sharp';
 import { createWorker, Worker } from 'tesseract.js';
 
-let globalWorkerPromise: Promise<Worker> | null = null;
+let globalWorkerPromise: Promise<Worker | null> | null = null;
 
-async function getSharedWorker(): Promise<Worker> {
+async function getSharedWorker(): Promise<Worker | null> {
   if (!globalWorkerPromise) {
     globalWorkerPromise = (async () => {
-      const worker = await createWorker('eng');
-      await worker.setParameters({
-        tessedit_char_whitelist: '0123456789',
-        tessedit_pageseg_mode: '7' as any, // Single line mode
-      });
-      return worker;
+      try {
+        const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+        const options: any = isServerless ? { cachePath: '/tmp' } : {};
+
+        // Strict 3.5s timeout on worker initialization to prevent Lambda hangs
+        let timer: NodeJS.Timeout;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 3500);
+        });
+
+        const workerPromise = createWorker('eng', 1, options);
+        const worker = await Promise.race([workerPromise, timeoutPromise]);
+        clearTimeout(timer!);
+
+        await worker.setParameters({
+          tessedit_char_whitelist: '0123456789',
+          tessedit_pageseg_mode: '7' as any, // Single line mode
+        });
+        return worker;
+      } catch (err) {
+        console.warn('[DLB Special OCR] Could not initialize Tesseract worker, skipping OCR:', err);
+        return null;
+      }
     })();
   }
   return globalWorkerPromise;
+}
+
+async function recognizeWithTimeout(worker: Worker, buffer: Buffer, timeoutMs = 2500): Promise<string> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<string>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('OCR recognition timeout')), timeoutMs);
+  });
+  const recPromise = worker.recognize(buffer).then(r => r.data.text);
+  return Promise.race([recPromise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -70,6 +96,8 @@ async function binarizeRegion(
  * - Shanida Wasana: 5 digits (e.g. 61027)
  * - Super Ball: 5 digits (e.g. 14525)
  * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 862 / 139)
+ *
+ * Guarantees zero blocking: never throws and never delays the response beyond timeout.
  */
 export async function extractSpecialNumberFromDlbImage(
   imageUrl: string,
@@ -81,7 +109,7 @@ export async function extractSpecialNumberFromDlbImage(
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
 
     if (!res.ok) {
@@ -96,6 +124,9 @@ export async function extractSpecialNumberFromDlbImage(
     if (!w || !h) return null;
 
     const worker = await getSharedWorker();
+    if (!worker) {
+      return null;
+    }
 
     // 1. Lagna Wasana: 5 separate white squares horizontally centered
     if (lotteryId === 'lagna_wasana') {
@@ -106,8 +137,8 @@ export async function extractSpecialNumberFromDlbImage(
         height: Math.round(0.18 * h)
       };
       const processed = await binarizeRegion(imageBuffer, crop, 70);
-      const ret = await worker.recognize(processed);
-      const digits = ret.data.text.replace(/\D/g, '');
+      const text = await recognizeWithTimeout(worker, processed, 2500);
+      const digits = text.replace(/\D/g, '');
       if (digits.length === 5) return digits;
       if (digits.length > 5) return digits.slice(0, 5);
       return digits || null;
@@ -122,15 +153,15 @@ export async function extractSpecialNumberFromDlbImage(
         height: Math.round(0.26 * h)
       };
       const processed = await binarizeRegion(imageBuffer, crop, 70);
-      const ret = await worker.recognize(processed);
-      const digits = ret.data.text.replace(/\D/g, '');
+      const text = await recognizeWithTimeout(worker, processed, 2500);
+      const digits = text.replace(/\D/g, '');
       if (digits.length === 5) return digits;
       if (digits.length > 5) return digits.slice(0, 5);
       return digits || null;
     }
 
     // 3. Supiri Dhana Sampatha: Top box (3 digits) + Bottom box (3 digits) -> e.g. 862 / 139
-    if (lotteryId === 'dhana_sampatha') {
+    if (lotteryId === 'supiri_dhana_sampatha' || lotteryId === 'dhana_sampatha') {
       const cropTop = {
         left: Math.round(0.50 * w),
         top: Math.round(0.39 * h),
@@ -144,18 +175,15 @@ export async function extractSpecialNumberFromDlbImage(
         height: Math.round(0.17 * h)
       };
 
-      const [topBuf, botBuf] = await Promise.all([
-        binarizeRegion(imageBuffer, cropTop, 50),
-        binarizeRegion(imageBuffer, cropBottom, 50)
-      ]);
+      const topBuf = await binarizeRegion(imageBuffer, cropTop, 50);
+      const botBuf = await binarizeRegion(imageBuffer, cropBottom, 50);
 
-      const [topRet, botRet] = await Promise.all([
-        worker.recognize(topBuf),
-        worker.recognize(botBuf)
-      ]);
+      // Sequentially recognize to avoid worker concurrency collision
+      const topText = await recognizeWithTimeout(worker, topBuf, 2000);
+      const botText = await recognizeWithTimeout(worker, botBuf, 2000);
 
-      const topDigits = topRet.data.text.replace(/\D/g, '').slice(0, 3);
-      const botDigits = botRet.data.text.replace(/\D/g, '').slice(0, 3);
+      const topDigits = topText.replace(/\D/g, '').slice(0, 3);
+      const botDigits = botText.replace(/\D/g, '').slice(0, 3);
 
       if (topDigits && botDigits) {
         return `${topDigits} / ${botDigits}`;
@@ -167,7 +195,7 @@ export async function extractSpecialNumberFromDlbImage(
 
     return null;
   } catch (err) {
-    console.error(`[DLB Special OCR] Error extracting special number for ${lotteryId}:`, err);
+    console.warn(`[DLB Special OCR] Safe fallback for ${lotteryId}:`, err);
     return null;
   }
 }

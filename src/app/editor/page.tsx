@@ -1572,7 +1572,18 @@ function EditorContent() {
           lotteries: validSheet.lotteries 
         }),
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned HTTP ${res.status}: ${rawText.slice(0, 100) || res.statusText}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Request failed with status ${res.status}`);
+      }
+
       if (data.success && data.comparison) {
         setOfficialVerificationSummary(data.comparison);
         setAiVerificationReport(prev => {
@@ -1638,7 +1649,14 @@ function EditorContent() {
         }),
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned HTTP ${res.status}: ${rawText.slice(0, 100) || res.statusText}`);
+      }
+
       if (!res.ok || !data.success || !Array.isArray(data.lotteries)) {
         throw new Error(data.error || 'Failed to fetch live official results from NLB & DLB.');
       }

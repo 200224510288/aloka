@@ -23,6 +23,7 @@ export interface OfficialFetchedLottery {
   logoUrl: string | null;
   board: BoardType;
   rawBlockPreview?: string;
+  rawSpecialImgUrl?: string | null;
 }
 
 export interface OfficialFetchResponse {
@@ -564,7 +565,7 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
         'Accept-Language': 'en-US,en;q=0.9',
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -646,18 +647,12 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
         let superNumber: string | null = null;
         let regularNumbers = [...numbers];
 
+        // Track special promotional draw image without blocking synchronous HTML parse
+        let rawSpecialImgUrl: string | null = null;
         const specialImgMatch = currPart.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
         if (specialImgMatch && matchedDef?.id) {
           const rawSrc = specialImgMatch[1];
-          const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
-          try {
-            const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
-            if (extractedBonus) {
-              superNumber = extractedBonus;
-            }
-          } catch (e) {
-            console.warn(`[DLB Fetcher] Special OCR failed for ${officialName}:`, e);
-          }
+          rawSpecialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
         }
 
         if (officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
@@ -699,7 +694,27 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
           logoUrl: null,
           board: 'DLB',
           rawBlockPreview: ulContent.replace(/\s+/g, ' ').slice(0, 250),
+          rawSpecialImgUrl,
         });
+      }
+
+      // Fast non-blocking OCR for special draw bonus numbers with 3.5s total ceiling
+      const ocrTasks = lotteries
+        .filter(l => Boolean(l.rawSpecialImgUrl && l.matchedLotteryId))
+        .map(async (l) => {
+          try {
+            const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl!, l.matchedLotteryId!);
+            if (bonus) {
+              l.superNumber = bonus;
+            }
+          } catch {}
+        });
+
+      if (ocrTasks.length > 0) {
+        await Promise.race([
+          Promise.allSettled(ocrTasks),
+          new Promise((resolve) => setTimeout(resolve, 3500)),
+        ]);
       }
 
       return {
@@ -744,7 +759,7 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
           },
           body: `pageId=0&resultID=&lotteryID=${lot.dlbId}&lastsegment=2`,
           cache: 'no-store',
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(8000),
         });
         if (!pagRes.ok) return null;
         const pagHtml = await pagRes.text();
@@ -782,18 +797,11 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
               let superNumber: string | null = null;
               let regularNumbers = [...numbers];
 
+              let rawSpecialImgUrl: string | null = null;
               const specialImgMatch = r.match(/<img[^>]+src=["']([^"']*SPECIAL_DRAW[^"']*)["']/i);
               if (specialImgMatch && matchedDef?.id) {
                 const rawSrc = specialImgMatch[1];
-                const specialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
-                try {
-                  const extractedBonus = await extractSpecialNumberFromDlbImage(specialImgUrl, matchedDef.id);
-                  if (extractedBonus) {
-                    superNumber = extractedBonus;
-                  }
-                } catch (e) {
-                  console.warn(`[DLB Fetcher] Special OCR failed for ${lot.officialName}:`, e);
-                }
+                rawSpecialImgUrl = rawSrc.startsWith('http') ? rawSrc : `https://www.dlb.lk/${rawSrc.replace(/^\//, '')}`;
               }
 
               if (lot.officialName.toLowerCase().includes('waasi') && regularNumbers.length === 3) {
@@ -835,6 +843,7 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
                 logoUrl: null,
                 board: 'DLB' as BoardType,
                 rawBlockPreview: r.slice(0, 200),
+                rawSpecialImgUrl,
               };
             }
           }
@@ -848,6 +857,25 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
 
     const settled = await Promise.all(historicalPromises);
     const lotteries: OfficialFetchedLottery[] = settled.filter((item): item is OfficialFetchedLottery => item !== null);
+
+    // Run non-blocking OCR for historical matches with 3.5s total ceiling
+    const ocrTasksHistorical = lotteries
+      .filter(l => Boolean(l.rawSpecialImgUrl && l.matchedLotteryId))
+      .map(async (l) => {
+        try {
+          const bonus = await extractSpecialNumberFromDlbImage(l.rawSpecialImgUrl!, l.matchedLotteryId!);
+          if (bonus) {
+            l.superNumber = bonus;
+          }
+        } catch {}
+      });
+
+    if (ocrTasksHistorical.length > 0) {
+      await Promise.race([
+        Promise.allSettled(ocrTasksHistorical),
+        new Promise((resolve) => setTimeout(resolve, 3500)),
+      ]);
+    }
 
     return {
       success: lotteries.length > 0,
@@ -882,12 +910,36 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
 /**
  * Fetch both NLB and DLB concurrently to provide 100% full coverage (18 lotteries)
  * Supports targeting a specific date (live or archive).
+ * Enforces resilient 12s per-board cutoff so one slow board never blocks the other.
  */
 export async function fetchAllOfficialResults(targetDate?: string): Promise<OfficialFetchResponse> {
   const startTime = Date.now();
+
+  const safeBoardFetch = (fetcher: () => Promise<OfficialFetchResponse>, boardName: BoardType) => {
+    return Promise.race([
+      fetcher(),
+      new Promise<OfficialFetchResponse>((resolve) =>
+        setTimeout(() => {
+          console.warn(`[Official Lottery Fetcher] ${boardName} exceeded 12s safety limit, continuing with available data.`);
+          resolve({
+            success: false,
+            sourceUrl: boardName === 'NLB' ? 'https://www.nlb.lk/results' : 'https://www.dlb.lk/result/2/',
+            fetchedAt: new Date().toISOString(),
+            drawDate: null,
+            totalLotteries: 0,
+            matchedCount: 0,
+            lotteries: [],
+            boards: [boardName],
+            error: `${boardName} portal response timed out after 12s`,
+          });
+        }, 12000)
+      )
+    ]);
+  };
+
   const [nlbResult, dlbResult] = await Promise.allSettled([
-    fetchNlbOfficialResults(targetDate),
-    fetchDlbOfficialResults(targetDate),
+    safeBoardFetch(() => fetchNlbOfficialResults(targetDate), 'NLB'),
+    safeBoardFetch(() => fetchDlbOfficialResults(targetDate), 'DLB'),
   ]);
 
   const nlb = nlbResult.status === 'fulfilled' ? nlbResult.value : null;

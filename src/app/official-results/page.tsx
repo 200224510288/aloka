@@ -44,12 +44,15 @@ export default function OfficialResultsPage() {
     setError(null);
     try {
       const res = await fetch(`/api/official-results?board=${board}`);
-      if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
+      const rawText = await res.text();
+      let json: OfficialFetchResponse;
+      try {
+        json = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server returned HTTP ${res.status}: ${rawText.slice(0, 100) || res.statusText}`);
       }
-      const json: OfficialFetchResponse = await res.json();
-      if (!json.success) {
-        throw new Error(json.error || 'Failed to fetch official results');
+      if (!res.ok || !json.success) {
+        throw new Error(json?.error || `Failed with HTTP status ${res.status}`);
       }
       setData(json);
     } catch (err: any) {
