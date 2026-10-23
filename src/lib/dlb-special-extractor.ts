@@ -1,10 +1,15 @@
 import sharp from 'sharp';
-import { createWorker, Worker } from 'tesseract.js';
-import 'tesseract.js-core';
 import path from 'path';
 import fs from 'fs';
 
-let globalWorkerPromise: Promise<Worker | null> | null = null;
+// Type definitions for direct WebAssembly TesseractCore
+interface TessCoreEngine {
+  core: any;
+  api: any;
+  recognize: (buffer: Buffer) => string;
+}
+
+let globalEnginePromise: Promise<TessCoreEngine | null> | null = null;
 
 export const ocrDiagnosticInfo: {
   lastError: string | null;
@@ -20,78 +25,92 @@ export const ocrDiagnosticInfo: {
   attempts: {},
 };
 
-export async function getSharedWorker(): Promise<Worker | null> {
-  if (!globalWorkerPromise) {
-    globalWorkerPromise = (async () => {
+/**
+ * Direct In-Process WebAssembly OCR Engine:
+ * Completely avoids worker_threads, IPC channels, and subprocesses.
+ * Runs 100% synchronously and deterministically inside Vercel Lambda / Node.js.
+ */
+export async function getSharedWorker(): Promise<TessCoreEngine | null> {
+  if (!globalEnginePromise) {
+    globalEnginePromise = (async () => {
       try {
-        const localTessPath = path.join(process.cwd(), 'public', 'tessdata');
-        const rootTessPath = process.cwd();
-        let langPath: string = 'https://aloka-alpha.vercel.app/tessdata';
-        let foundLocal = false;
+        ocrDiagnosticInfo.workerState = 'loading_core';
 
-        if (fs.existsSync(path.join(localTessPath, 'eng.traineddata'))) {
-          langPath = localTessPath;
-          foundLocal = true;
-        } else if (fs.existsSync(path.join(rootTessPath, 'eng.traineddata'))) {
-          langPath = rootTessPath;
-          foundLocal = true;
+        // Load WebAssembly module directly into main thread
+        // @ts-ignore
+        const coreModule = await import('tesseract.js-core');
+        const createCore = typeof coreModule.default === 'function' ? coreModule.default : (coreModule as any);
+        const core = await createCore();
+
+        // Prepare virtual FS
+        try {
+          core.FS.mkdir('/tessdata');
+        } catch {
+          // Already exists
         }
 
-        ocrDiagnosticInfo.hasLocalModel = foundLocal;
-        ocrDiagnosticInfo.selectedLangPath = langPath;
+        // Obtain eng.traineddata
+        const localPath = path.join(process.cwd(), 'public', 'tessdata', 'eng.traineddata');
+        const rootPath = path.join(process.cwd(), 'eng.traineddata');
+        let trainedDataBuf: Buffer | null = null;
 
-        const options: any = {
-          cachePath: '/tmp',
-          langPath,
-          logger: (m: any) => {
-            if (m && m.status) {
-              ocrDiagnosticInfo.workerState = `${m.status} (${Math.round((m.progress || 0) * 100)}%)`;
-            }
-          },
-          errorHandler: (err: any) => {
-            ocrDiagnosticInfo.lastError = 'Worker error: ' + (err?.message || String(err));
-          },
+        if (fs.existsSync(localPath)) {
+          trainedDataBuf = fs.readFileSync(localPath);
+          ocrDiagnosticInfo.hasLocalModel = true;
+          ocrDiagnosticInfo.selectedLangPath = localPath;
+        } else if (fs.existsSync(rootPath)) {
+          trainedDataBuf = fs.readFileSync(rootPath);
+          ocrDiagnosticInfo.hasLocalModel = true;
+          ocrDiagnosticInfo.selectedLangPath = rootPath;
+        } else {
+          // Fallback: fetch from public CDN URL
+          ocrDiagnosticInfo.hasLocalModel = false;
+          ocrDiagnosticInfo.selectedLangPath = 'https://aloka-alpha.vercel.app/tessdata/eng.traineddata';
+          const res = await fetch(ocrDiagnosticInfo.selectedLangPath);
+          if (res.ok) {
+            trainedDataBuf = Buffer.from(await res.arrayBuffer());
+          }
+        }
+
+        if (!trainedDataBuf) {
+          throw new Error('Failed to load eng.traineddata model from disk or CDN');
+        }
+
+        core.FS.writeFile('/tessdata/eng.traineddata', trainedDataBuf);
+
+        // Initialize Base API
+        const api = new core.TessBaseAPI();
+        const initCode = api.Init('/tessdata', 'eng');
+        if (initCode !== 0) {
+          throw new Error(`TessBaseAPI.Init failed with code ${initCode}`);
+        }
+
+        api.SetVariable('tessedit_char_whitelist', '0123456789');
+        api.SetPageSegMode(8); // PSM.SINGLE_WORD
+
+        const recognize = (buffer: Buffer): string => {
+          try {
+            core.FS.writeFile('/input', buffer);
+            api.SetImageFile(1, 0);
+            api.Recognize();
+            return api.GetUTF8Text() || '';
+          } catch (e) {
+            console.warn('[Direct WASM OCR] Single recognize error:', e);
+            return '';
+          }
         };
 
-        const explicitWorkerPath = path.join(process.cwd(), 'node_modules', 'tesseract.js', 'src', 'worker-script', 'node', 'index.js');
-        if (fs.existsSync(explicitWorkerPath)) {
-          options.workerPath = explicitWorkerPath;
-        }
-
-        // 25s ceiling for worker initialization on cold start
-        let timer: NodeJS.Timeout;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 25000);
-        });
-
-        const workerPromise = createWorker('eng', 1, options);
-        const worker = await Promise.race([workerPromise, timeoutPromise]);
-        clearTimeout(timer!);
-
-        await worker.setParameters({
-          tessedit_char_whitelist: '0123456789',
-          tessedit_pageseg_mode: '8' as any, // Single word mode for high accuracy on spaced lottery numbers
-        });
         ocrDiagnosticInfo.workerState = 'ready';
-        return worker;
+        return { core, api, recognize };
       } catch (err: any) {
         ocrDiagnosticInfo.lastError = err?.message || String(err);
         ocrDiagnosticInfo.workerState = 'error';
-        console.warn('[DLB Special OCR] Could not initialize Tesseract worker, skipping OCR:', err);
+        console.warn('[DLB Special OCR] Could not initialize in-process WebAssembly OCR:', err);
         return null;
       }
     })();
   }
-  return globalWorkerPromise;
-}
-
-async function recognizeWithTimeout(worker: Worker, buffer: Buffer, timeoutMs = 2500): Promise<string> {
-  let timer: NodeJS.Timeout;
-  const timeoutPromise = new Promise<string>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('OCR recognition timeout')), timeoutMs);
-  });
-  const recPromise = worker.recognize(buffer).then(r => r.data.text);
-  return Promise.race([recPromise, timeoutPromise]).finally(() => clearTimeout(timer));
+  return globalEnginePromise;
 }
 
 /**
@@ -194,8 +213,8 @@ export async function extractSpecialNumberFromDlbImage(
 
     ocrDiagnosticInfo.attempts[lotteryId].dimensions = { w, h };
 
-    const worker = await getSharedWorker();
-    if (!worker) {
+    const engine = await getSharedWorker();
+    if (!engine) {
       ocrDiagnosticInfo.attempts[lotteryId].status = 'worker_unavailable';
       return null;
     }
@@ -209,7 +228,7 @@ export async function extractSpecialNumberFromDlbImage(
         height: Math.round(0.18 * h)
       };
       const processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
-      const text = await recognizeWithTimeout(worker, processed, 2500);
+      const text = engine.recognize(processed);
       const digits = text.replace(/\D/g, '');
       const finalDigits = digits.length >= 5 ? digits.slice(0, 5) : (digits || null);
       if (ocrDiagnosticInfo.attempts[lotteryId]) {
@@ -235,7 +254,7 @@ export async function extractSpecialNumberFromDlbImage(
         .png()
         .toBuffer();
 
-      const text = await recognizeWithTimeout(worker, processed, 2500);
+      const text = engine.recognize(processed);
       const digits = text.replace(/\D/g, '');
       const finalDigits = digits.length >= 5 ? digits.slice(-5) : (digits || null);
       if (ocrDiagnosticInfo.attempts[lotteryId]) {
@@ -275,9 +294,8 @@ export async function extractSpecialNumberFromDlbImage(
         .png()
         .toBuffer();
 
-      // Sequentially recognize to avoid worker concurrency collision
-      const topText = await recognizeWithTimeout(worker, topBuf, 2000);
-      const botText = await recognizeWithTimeout(worker, botBuf, 2000);
+      const topText = engine.recognize(topBuf);
+      const botText = engine.recognize(botBuf);
 
       const topDigits = topText.replace(/\D/g, '').slice(-3);
       const botDigits = botText.replace(/\D/g, '').slice(-3);
