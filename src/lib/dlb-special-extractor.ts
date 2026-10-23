@@ -22,7 +22,7 @@ async function getSharedWorker(): Promise<Worker | null> {
 
         await worker.setParameters({
           tessedit_char_whitelist: '0123456789',
-          tessedit_pageseg_mode: '7' as any, // Single line mode
+          tessedit_pageseg_mode: '8' as any, // Single word mode for high accuracy on spaced lottery numbers
         });
         return worker;
       } catch (err) {
@@ -50,7 +50,8 @@ async function recognizeWithTimeout(worker: Worker, buffer: Buffer, timeoutMs = 
 async function binarizeRegion(
   imageBuffer: Buffer,
   cropBox: { left: number; top: number; width: number; height: number },
-  thresh = 55
+  thresh = 55,
+  scaleX = 1
 ): Promise<Buffer> {
   const { data, info } = await sharp(imageBuffer)
     .extract(cropBox)
@@ -72,10 +73,10 @@ async function binarizeRegion(
     }
   }
 
-  // Clear thin edge border artifacts (outer 3 pixels)
+  // Clear thin edge border artifacts (outer 6 pixels)
   for (let y = 0; y < info.height; y++) {
     for (let x = 0; x < info.width; x++) {
-      if (x < 3 || x >= info.width - 3 || y < 3 || y >= info.height - 3) {
+      if (x < 6 || x >= info.width - 6 || y < 6 || y >= info.height - 6) {
         outData[y * info.width + x] = 255;
       }
     }
@@ -84,7 +85,8 @@ async function binarizeRegion(
   return await sharp(outData, {
     raw: { width: info.width, height: info.height, channels: 1 }
   })
-    .resize({ width: info.width * 2, height: info.height * 2, kernel: 'nearest' })
+    .resize({ width: Math.round(info.width * scaleX), height: 250, fit: 'fill' })
+    .withMetadata({ density: 300 })
     .extend({ top: 30, bottom: 30, left: 30, right: 30, background: { r: 255, g: 255, b: 255 } })
     .png()
     .toBuffer();
@@ -92,10 +94,10 @@ async function binarizeRegion(
 
 /**
  * Robust OCR extraction for DLB Special Draw Images:
- * - Lagna Wasana: 5 digits (e.g. 49113)
- * - Shanida Wasana: 5 digits (e.g. 61027)
- * - Super Ball: 5 digits (e.g. 14525)
- * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 862 / 139)
+ * - Lagna Wasana: 5 digits (e.g. 46517)
+ * - Shanida Wasana: 5 digits (e.g. 96427)
+ * - Super Ball: 5 digits (e.g. 66574)
+ * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 707 / 941)
  *
  * Guarantees zero blocking: never throws and never delays the response beyond timeout.
  */
@@ -131,12 +133,12 @@ export async function extractSpecialNumberFromDlbImage(
     // 1. Lagna Wasana: 5 separate white squares horizontally centered
     if (lotteryId === 'lagna_wasana') {
       const crop = {
-        left: Math.round(0.16 * w),
+        left: Math.round(0.165 * w),
         top: Math.round(0.53 * h),
-        width: Math.round(0.68 * w),
+        width: Math.round(0.66 * w),
         height: Math.round(0.18 * h)
       };
-      const processed = await binarizeRegion(imageBuffer, crop, 70);
+      const processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
       const text = await recognizeWithTimeout(worker, processed, 2500);
       const digits = text.replace(/\D/g, '');
       if (digits.length === 5) return digits;
@@ -147,43 +149,60 @@ export async function extractSpecialNumberFromDlbImage(
     // 2. Shanida Wasana & Super Ball: White rectangular 5-box grid at bottom right
     if (lotteryId === 'shanida_wasana' || lotteryId === 'super_ball') {
       const crop = {
-        left: Math.round(0.38 * w),
-        top: Math.round(0.56 * h),
-        width: Math.round(0.52 * w),
-        height: Math.round(0.26 * h)
+        left: Math.round(0.40 * w),
+        top: Math.round(0.57 * h),
+        width: Math.round(0.48 * w),
+        height: Math.round(0.24 * h)
       };
-      const processed = await binarizeRegion(imageBuffer, crop, 70);
+      const processed = await sharp(imageBuffer)
+        .extract(crop)
+        .resize({ height: 250 })
+        .withMetadata({ density: 300 })
+        .png()
+        .toBuffer();
+
       const text = await recognizeWithTimeout(worker, processed, 2500);
       const digits = text.replace(/\D/g, '');
       if (digits.length === 5) return digits;
-      if (digits.length > 5) return digits.slice(0, 5);
+      if (digits.length > 5) return digits.slice(-5);
       return digits || null;
     }
 
-    // 3. Supiri Dhana Sampatha: Top box (3 digits) + Bottom box (3 digits) -> e.g. 862 / 139
+    // 3. Supiri Dhana Sampatha: Top box (3 digits) + Bottom box (3 digits) -> e.g. 707 / 941
     if (lotteryId === 'supiri_dhana_sampatha' || lotteryId === 'dhana_sampatha') {
       const cropTop = {
-        left: Math.round(0.50 * w),
-        top: Math.round(0.39 * h),
+        left: Math.round(0.505 * w),
+        top: Math.round(0.405 * h),
         width: Math.round(0.25 * w),
-        height: Math.round(0.17 * h)
+        height: Math.round(0.145 * h)
       };
       const cropBottom = {
-        left: Math.round(0.50 * w),
-        top: Math.round(0.73 * h),
+        left: Math.round(0.505 * w),
+        top: Math.round(0.745 * h),
         width: Math.round(0.25 * w),
-        height: Math.round(0.17 * h)
+        height: Math.round(0.145 * h)
       };
 
-      const topBuf = await binarizeRegion(imageBuffer, cropTop, 50);
-      const botBuf = await binarizeRegion(imageBuffer, cropBottom, 50);
+      const topBuf = await sharp(imageBuffer)
+        .extract(cropTop)
+        .resize({ height: 200 })
+        .withMetadata({ density: 300 })
+        .png()
+        .toBuffer();
+
+      const botBuf = await sharp(imageBuffer)
+        .extract(cropBottom)
+        .resize({ height: 200 })
+        .withMetadata({ density: 300 })
+        .png()
+        .toBuffer();
 
       // Sequentially recognize to avoid worker concurrency collision
       const topText = await recognizeWithTimeout(worker, topBuf, 2000);
       const botText = await recognizeWithTimeout(worker, botBuf, 2000);
 
-      const topDigits = topText.replace(/\D/g, '').slice(0, 3);
-      const botDigits = botText.replace(/\D/g, '').slice(0, 3);
+      const topDigits = topText.replace(/\D/g, '').slice(-3);
+      const botDigits = botText.replace(/\D/g, '').slice(-3);
 
       if (topDigits && botDigits) {
         return `${topDigits} / ${botDigits}`;
