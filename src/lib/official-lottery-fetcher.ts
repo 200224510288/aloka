@@ -2,7 +2,7 @@ import { STANDARD_LOTTERIES, ZODIAC_SIGNS } from './constants';
 import { ZODIAC_PATH_MAP } from './zodiac-icons';
 import { LotteryResultItem, BoardType, OfficialLotteryMatchResult, OfficialVerificationSummary } from '@/types/lottery';
 import { secureFormatLotteryItem } from './lottery-format-security';
-import { extractSpecialNumberFromDlbImage } from './dlb-special-extractor';
+import { extractSpecialNumberFromDlbImage, getSharedWorker } from './dlb-special-extractor';
 
 
 export interface OfficialFetchedLottery {
@@ -557,6 +557,9 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
   const targetUrl = 'https://www.dlb.lk/result/2/';
   const targetIso = targetDate ? parseToIsoDate(targetDate) : null;
 
+  // Pre-warm Tesseract worker asynchronously in parallel with HTML fetch
+  getSharedWorker().catch(() => {});
+
   try {
     const res = await fetch(targetUrl, {
       headers: {
@@ -716,7 +719,7 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
 
       await Promise.race([
         runSequentialOcr(),
-        new Promise((resolve) => setTimeout(resolve, 12000)),
+        new Promise((resolve) => setTimeout(resolve, 28000)),
       ]);
 
       return {
@@ -878,7 +881,7 @@ export async function fetchDlbOfficialResults(targetDate?: string): Promise<Offi
 
     await Promise.race([
       runSequentialOcrHistorical(),
-      new Promise((resolve) => setTimeout(resolve, 12000)),
+      new Promise((resolve) => setTimeout(resolve, 28000)),
     ]);
 
     return {

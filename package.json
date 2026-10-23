@@ -25,7 +25,8 @@
     "sharp": "^0.33.5",
     "sinhala-unicode": "^2.0.0",
     "tailwind-merge": "^3.7.0",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "tesseract.js-core": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

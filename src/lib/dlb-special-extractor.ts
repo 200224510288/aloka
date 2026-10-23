@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { createWorker, Worker } from 'tesseract.js';
+import 'tesseract.js-core';
 import path from 'path';
 import fs from 'fs';
 
@@ -19,7 +20,7 @@ export const ocrDiagnosticInfo: {
   attempts: {},
 };
 
-async function getSharedWorker(): Promise<Worker | null> {
+export async function getSharedWorker(): Promise<Worker | null> {
   if (!globalWorkerPromise) {
     globalWorkerPromise = (async () => {
       try {
@@ -42,12 +43,25 @@ async function getSharedWorker(): Promise<Worker | null> {
         const options: any = {
           cachePath: '/tmp',
           langPath,
+          logger: (m: any) => {
+            if (m && m.status) {
+              ocrDiagnosticInfo.workerState = `${m.status} (${Math.round((m.progress || 0) * 100)}%)`;
+            }
+          },
+          errorHandler: (err: any) => {
+            ocrDiagnosticInfo.lastError = 'Worker error: ' + (err?.message || String(err));
+          },
         };
 
-        // 12s ceiling for worker initialization
+        const explicitWorkerPath = path.join(process.cwd(), 'node_modules', 'tesseract.js', 'src', 'worker-script', 'node', 'index.js');
+        if (fs.existsSync(explicitWorkerPath)) {
+          options.workerPath = explicitWorkerPath;
+        }
+
+        // 25s ceiling for worker initialization on cold start
         let timer: NodeJS.Timeout;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 12000);
+          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 25000);
         });
 
         const workerPromise = createWorker('eng', 1, options);
