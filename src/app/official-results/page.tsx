@@ -564,10 +564,10 @@ export default function OfficialResultsPage() {
                               </div>
                             )}
 
-                            {/* Super / Special Number Ball (Red) e.g. Mega Power, Kapruka */}
+                            {/* Super / Special Number Box (Red) e.g. Mega Power, Kapruka, Shanida, Lagna, Dhana Sampatha */}
                             {item.superNumber && (
                               <div
-                                className="w-9 h-9 rounded-full bg-red-600 text-white font-extrabold text-sm flex items-center justify-center shadow-xs shrink-0"
+                                className="h-10 min-w-10 px-3.5 rounded-xl bg-red-600 border-2 border-red-700 text-white font-mono font-black text-sm sm:text-base flex items-center justify-center shadow-md shrink-0 whitespace-nowrap tracking-wide ring-2 ring-red-400/30"
                                 title={`Super / Special Boxed Number: [${item.superNumber}]`}
                               >
                                 {item.superNumber}
@@ -694,7 +694,7 @@ export default function OfficialResultsPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {item.superNumber && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-100 border border-rose-300 text-rose-800 font-bold">
+                            <span className="px-2.5 py-1 rounded-lg bg-red-600 border border-red-700 text-white font-mono font-black text-xs shadow-2xs whitespace-nowrap">
                               [{item.superNumber}]
                             </span>
                           )}
