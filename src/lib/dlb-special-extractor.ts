@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 import { createWorker, Worker } from 'tesseract.js';
+import path from 'path';
+import fs from 'fs';
 
 let globalWorkerPromise: Promise<Worker | null> | null = null;
 
@@ -7,13 +9,20 @@ async function getSharedWorker(): Promise<Worker | null> {
   if (!globalWorkerPromise) {
     globalWorkerPromise = (async () => {
       try {
-        const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-        const options: any = isServerless ? { cachePath: '/tmp' } : {};
+        const localTessPath = path.join(process.cwd(), 'public', 'tessdata');
+        const hasLocalModel = fs.existsSync(path.join(localTessPath, 'eng.traineddata'));
 
-        // Strict 3.5s timeout on worker initialization to prevent Lambda hangs
+        const options: any = {
+          cachePath: '/tmp',
+        };
+        if (hasLocalModel) {
+          options.langPath = localTessPath;
+        }
+
+        // 7s ceiling for worker initialization
         let timer: NodeJS.Timeout;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 3500);
+          timer = setTimeout(() => reject(new Error('Tesseract worker initialization timeout')), 7000);
         });
 
         const workerPromise = createWorker('eng', 1, options);
