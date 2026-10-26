@@ -1,6 +1,7 @@
 import { doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, CLOUD_BRANCH_COLLECTION, CLOUD_SOURCES_COLLECTION, CLOUD_SETTINGS_COLLECTION } from './firebase';
 import { DailySheet, SourceDocument, SavedCustomDesign } from '@/types/lottery';
+import { AgentRecord, SenderSettings, LabelFontSettings } from '@/types/agent';
 
 function cleanFirestoreData(data: any): any {
   if (data === null || data === undefined) return null;
@@ -228,5 +229,101 @@ export async function loadCustomDesignsFromCloud(): Promise<CloudCustomDesignsDa
     return null;
   }
 }
+
+export interface CloudParcelAgentsData {
+  agents: AgentRecord[];
+  senderSettings: SenderSettings | null;
+  fontSettings: LabelFontSettings | null;
+  updatedAt: string;
+}
+
+/**
+ * Automatically persists parcel agents, sender details & font sizes to Cloud Firestore
+ * so they are instantly accessible and reusable across all devices and deployments.
+ */
+export async function saveParcelAgentsToCloud(data: {
+  agents?: AgentRecord[];
+  senderSettings?: SenderSettings;
+  fontSettings?: LabelFontSettings;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, '_parcel_agents');
+    const payload: any = {
+      branch: 'result-generator',
+      updatedAt: new Date().toISOString(),
+    };
+    if (data.agents !== undefined) {
+      payload.agents = JSON.parse(JSON.stringify(data.agents));
+    }
+    if (data.senderSettings !== undefined) {
+      payload.senderSettings = JSON.parse(JSON.stringify(data.senderSettings));
+    }
+    if (data.fontSettings !== undefined) {
+      payload.fontSettings = JSON.parse(JSON.stringify(data.fontSettings));
+    }
+
+    await setDoc(docRef, cleanFirestoreData(payload), { merge: true });
+    return { success: true };
+  } catch (err: any) {
+    console.warn('Cloud parcel agents save warning:', err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Loads parcel agents, sender details & font sizes from Cloud Firestore
+ */
+export async function loadParcelAgentsFromCloud(): Promise<CloudParcelAgentsData | null> {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, '_parcel_agents');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        agents: Array.isArray(data.agents) ? data.agents : [],
+        senderSettings: data.senderSettings || null,
+        fontSettings: data.fontSettings || null,
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+    }
+    return null;
+  } catch (err: any) {
+    console.warn('Could not load parcel agents from cloud:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Real-time listener for parcel agents across all browser tabs / devices.
+ */
+export function subscribeToCloudParcelAgents(
+  onUpdate: (data: CloudParcelAgentsData) => void
+): () => void {
+  try {
+    const docRef = doc(db, CLOUD_BRANCH_COLLECTION, '_parcel_agents');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          onUpdate({
+            agents: Array.isArray(data.agents) ? data.agents : [],
+            senderSettings: data.senderSettings || null,
+            fontSettings: data.fontSettings || null,
+            updatedAt: data.updatedAt || new Date().toISOString(),
+          });
+        }
+      },
+      (err) => {
+        console.warn('Real-time parcel agents cloud subscription error:', err?.message || err);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Could not set up real-time subscription for parcel agents:', err);
+    return () => {};
+  }
+}
+
 
 

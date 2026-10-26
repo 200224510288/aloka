@@ -16,7 +16,9 @@ import {
   Building, 
   Check,
   Scissors,
-  Type
+  Type,
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 import { 
   AgentRecord, 
@@ -32,6 +34,11 @@ import { SenderSettingsModal } from '@/components/SenderSettingsModal';
 import { FontSettingsModal } from '@/components/FontSettingsModal';
 import { toPng } from 'html-to-image';
 import { directPrintParcelLabels } from '@/lib/parcel-print';
+import { 
+  saveParcelAgentsToCloud, 
+  loadParcelAgentsFromCloud, 
+  subscribeToCloudParcelAgents 
+} from '@/lib/cloud-service';
 
 const LOCAL_STORAGE_AGENTS_KEY = 'parcel_agents_list_v2';
 const LOCAL_STORAGE_SENDER_KEY = 'parcel_sender_settings_v2';
@@ -44,6 +51,7 @@ export default function AgentLabelsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
   // Print slots (exactly 4 quadrants for 1 A4 sheet)
   const [slots, setSlots] = useState<(AgentRecord | null)[]>([
@@ -69,9 +77,9 @@ export default function AgentLabelsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // 1. Initial Load: Read from LocalStorage immediately, then fetch from API
+  // 1. Initial Load: Read from LocalStorage immediately, then fetch from API, then sync with Cloud Firestore
   useEffect(() => {
-    // Check localStorage cache
+    // Check localStorage cache for instant UI rendering
     try {
       const cachedAgents = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
       const cachedSender = localStorage.getItem(LOCAL_STORAGE_SENDER_KEY);
@@ -100,9 +108,11 @@ export default function AgentLabelsPage() {
       console.warn('LocalStorage read error:', e);
     }
 
-    // Fetch from API
+    // Load from local API and Cloud Firestore
     async function loadData() {
       setIsLoading(true);
+      
+      // 1. Fetch from server API
       try {
         const res = await fetch('/api/agents');
         if (res.ok) {
@@ -135,38 +145,118 @@ export default function AgentLabelsPage() {
       } finally {
         setIsLoading(false);
       }
+
+      // 2. Load from Firebase Cloud Firestore
+      try {
+        setCloudStatus('syncing');
+        const cloudData = await loadParcelAgentsFromCloud();
+        if (cloudData && Array.isArray(cloudData.agents) && cloudData.agents.length > 0) {
+          setAgents(cloudData.agents);
+          const first = cloudData.agents[0];
+          setSlots([first, first, first, first]);
+          if (cloudData.senderSettings) {
+            setSenderSettings(cloudData.senderSettings);
+          }
+          if (cloudData.fontSettings) {
+            setFontSettings(cloudData.fontSettings);
+          }
+          try {
+            localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(cloudData.agents));
+            if (cloudData.senderSettings) {
+              localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(cloudData.senderSettings));
+            }
+            if (cloudData.fontSettings) {
+              localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(cloudData.fontSettings));
+            }
+          } catch (e) {}
+          setCloudStatus('synced');
+        } else {
+          // Cloud has no parcel agents yet, initialize cloud with current local agents!
+          const localAgents = JSON.parse(localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY) || 'null') || INITIAL_AGENTS;
+          const localSender = JSON.parse(localStorage.getItem(LOCAL_STORAGE_SENDER_KEY) || 'null') || DEFAULT_SENDER_SETTINGS;
+          const localFonts = JSON.parse(localStorage.getItem(LOCAL_STORAGE_FONT_KEY) || 'null') || DEFAULT_FONT_SETTINGS;
+          await saveParcelAgentsToCloud({
+            agents: localAgents,
+            senderSettings: localSender,
+            fontSettings: localFonts,
+          });
+          setCloudStatus('synced');
+        }
+      } catch (cloudErr) {
+        console.warn('Could not sync agents from Firebase Cloud:', cloudErr);
+        setCloudStatus('error');
+      }
     }
+
     loadData();
+
+    // 3. Real-time Firebase listener: sync across browser tabs and devices live
+    const unsubscribe = subscribeToCloudParcelAgents((cloudData) => {
+      if (cloudData && Array.isArray(cloudData.agents) && cloudData.agents.length > 0) {
+        setAgents(cloudData.agents);
+        if (cloudData.senderSettings) setSenderSettings(cloudData.senderSettings);
+        if (cloudData.fontSettings) setFontSettings(cloudData.fontSettings);
+        setCloudStatus('synced');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
-  // Save changes to both LocalStorage and server API
-  const persistChanges = async (newAgents?: AgentRecord[], newSender?: SenderSettings) => {
+  // Save changes to LocalStorage, server API, and Firebase Cloud Firestore
+  const persistChanges = async (
+    newAgents?: AgentRecord[], 
+    newSender?: SenderSettings,
+    newFonts?: LabelFontSettings
+  ) => {
     const toSaveAgents = newAgents !== undefined ? newAgents : agents;
     const toSaveSender = newSender !== undefined ? newSender : senderSettings;
+    const toSaveFonts = newFonts !== undefined ? newFonts : fontSettings;
 
-    // Immediately save to localStorage
+    // 1. Immediately save to localStorage
     try {
       localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(toSaveAgents));
       localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(toSaveSender));
+      if (newFonts !== undefined) {
+        localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(toSaveFonts));
+      }
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
 
-    // Save to server API
+    // 2. Save to local server API
     try {
-      const res = await fetch('/api/agents', {
+      fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agents: toSaveAgents,
           senderSettings: toSaveSender,
+          fontSettings: toSaveFonts,
         }),
+      }).catch(console.error);
+    } catch (err) {}
+
+    // 3. Auto-save to Firebase Cloud Firestore
+    setCloudStatus('syncing');
+    try {
+      const cloudRes = await saveParcelAgentsToCloud({
+        agents: toSaveAgents,
+        senderSettings: toSaveSender,
+        fontSettings: toSaveFonts,
       });
-      if (res.ok) {
-        showToast('නියෝජිත තොරතුරු සාර්ථකව සුරකින ලදී (Saved successfully)');
+      if (cloudRes.success) {
+        setCloudStatus('synced');
+        showToast('නියෝජිත තොරතුරු Cloud හි සුරකින ලදී (Auto-saved to Cloud)');
+      } else {
+        setCloudStatus('error');
+        showToast('නියෝජිත තොරතුරු සුරකින ලදී (Saved locally)');
       }
     } catch (err) {
-      console.error('Error persisting agents to server:', err);
+      console.error('Error saving parcel agents to Cloud Firestore:', err);
+      setCloudStatus('error');
     }
   };
 
@@ -270,23 +360,7 @@ export default function AgentLabelsPage() {
 
   const handleSaveFontSettings = async (newSettings: LabelFontSettings) => {
     setFontSettings(newSettings);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(newSettings));
-    } catch (e) {
-      console.warn('LocalStorage font save error:', e);
-    }
-    try {
-      const res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fontSettings: newSettings }),
-      });
-      if (res.ok) {
-        showToast('අකුරු ප්‍රමාණය සාර්ථකව සුරකින ලදී (Font sizes saved successfully)');
-      }
-    } catch (err) {
-      console.error('Error persisting font settings to server:', err);
-    }
+    await persistChanges(undefined, undefined, newSettings);
   };
 
   // Direct Browser Print using dedicated isolated print iframe (100% A4 utilization, 0 margin)
@@ -346,17 +420,9 @@ export default function AgentLabelsPage() {
         if (Array.isArray(parsed.agents)) {
           setAgents(parsed.agents);
           if (parsed.senderSettings) setSenderSettings(parsed.senderSettings);
-          if (parsed.fontSettings) {
-            setFontSettings(parsed.fontSettings);
-            try {
-              localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(parsed.fontSettings));
-            } catch (e) {}
-          }
-          persistChanges(parsed.agents, parsed.senderSettings);
-          if (parsed.fontSettings) {
-            handleSaveFontSettings(parsed.fontSettings);
-          }
-          alert('නියෝජිත තොරතුරු සාර්ථකව ආයාත කරන ලදී! (Backup imported successfully)');
+          if (parsed.fontSettings) setFontSettings(parsed.fontSettings);
+          persistChanges(parsed.agents, parsed.senderSettings, parsed.fontSettings);
+          alert('නියෝජිත තොරතුරු සාර්ථකව ආයාත කර Cloud වෙත සුරකින ලදී! (Backup imported and synced to Cloud)');
         }
       } catch (err) {
         alert('ගොනුව කියවීමට නොහැකි විය. කරුණාකර වලංගු JSON ගොනුවක් තෝරන්න.');
@@ -463,6 +529,38 @@ export default function AgentLabelsPage() {
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-2">
+            
+            {/* Cloud Sync Status Badge */}
+            {cloudStatus === 'synced' && (
+              <div 
+                className="px-2.5 py-1 text-xs rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-1.5 shadow-2xs font-sinhala select-none"
+                title="Firebase Cloud Firestore වෙත සජීවීව සම්බන්ධ වී ඇත. සංස්කරණයන් සියල්ල ස්වයංක්‍රීයව Cloud හි සුරැකේ."
+              >
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden md:inline">Cloud සුරැකිණි</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+            )}
+            {cloudStatus === 'syncing' && (
+              <div 
+                className="px-2.5 py-1 text-xs rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-1.5 shadow-2xs font-sinhala select-none"
+                title="Cloud වෙත සුරකිමින් පවතී..."
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <span className="hidden md:inline">Cloud Syncing...</span>
+              </div>
+            )}
+            {cloudStatus === 'error' && (
+              <button
+                type="button"
+                onClick={() => persistChanges()}
+                className="px-2.5 py-1 text-xs rounded-xl bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100 flex items-center gap-1.5 shadow-2xs transition font-sinhala cursor-pointer"
+                title="Cloud Sync අසාර්ථක විය. නැවත Cloud වෙත සුරැකීමට ක්ලික් කරන්න."
+              >
+                <Cloud className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden md:inline">නැවත Sync</span>
+              </button>
+            )}
             
             {/* Font Settings Button */}
             <button
