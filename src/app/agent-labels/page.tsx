@@ -15,21 +15,32 @@ import {
   Upload, 
   Building, 
   Check,
-  Scissors
+  Scissors,
+  Type
 } from 'lucide-react';
-import { AgentRecord, SenderSettings, DEFAULT_SENDER_SETTINGS, INITIAL_AGENTS } from '@/types/agent';
+import { 
+  AgentRecord, 
+  SenderSettings, 
+  LabelFontSettings, 
+  DEFAULT_SENDER_SETTINGS, 
+  DEFAULT_FONT_SETTINGS, 
+  INITIAL_AGENTS 
+} from '@/types/agent';
 import { ParcelSheetPrintView } from '@/components/ParcelSheetPrintView';
 import { AgentModal } from '@/components/AgentModal';
 import { SenderSettingsModal } from '@/components/SenderSettingsModal';
+import { FontSettingsModal } from '@/components/FontSettingsModal';
 import { toPng } from 'html-to-image';
 import { directPrintParcelLabels } from '@/lib/parcel-print';
 
 const LOCAL_STORAGE_AGENTS_KEY = 'parcel_agents_list_v2';
 const LOCAL_STORAGE_SENDER_KEY = 'parcel_sender_settings_v2';
+const LOCAL_STORAGE_FONT_KEY = 'parcel_font_settings_v2';
 
 export default function AgentLabelsPage() {
   const [agents, setAgents] = useState<AgentRecord[]>(INITIAL_AGENTS);
   const [senderSettings, setSenderSettings] = useState<SenderSettings>(DEFAULT_SENDER_SETTINGS);
+  const [fontSettings, setFontSettings] = useState<LabelFontSettings>(DEFAULT_FONT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -46,6 +57,7 @@ export default function AgentLabelsPage() {
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentRecord | null>(null);
   const [isSenderModalOpen, setIsSenderModalOpen] = useState(false);
+  const [isFontModalOpen, setIsFontModalOpen] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [activeSlotPicker, setActiveSlotPicker] = useState<number | null>(null);
 
@@ -63,6 +75,7 @@ export default function AgentLabelsPage() {
     try {
       const cachedAgents = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
       const cachedSender = localStorage.getItem(LOCAL_STORAGE_SENDER_KEY);
+      const cachedFonts = localStorage.getItem(LOCAL_STORAGE_FONT_KEY);
       if (cachedAgents) {
         const parsed = JSON.parse(cachedAgents);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -75,6 +88,12 @@ export default function AgentLabelsPage() {
         const parsedSender = JSON.parse(cachedSender);
         if (parsedSender && parsedSender.name) {
           setSenderSettings(parsedSender);
+        }
+      }
+      if (cachedFonts) {
+        const parsedFonts = JSON.parse(cachedFonts);
+        if (parsedFonts && parsedFonts.agentNameSize) {
+          setFontSettings(parsedFonts);
         }
       }
     } catch (e) {
@@ -101,6 +120,12 @@ export default function AgentLabelsPage() {
               setSenderSettings(json.senderSettings);
               try {
                 localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(json.senderSettings));
+              } catch (e) {}
+            }
+            if (json.fontSettings) {
+              setFontSettings(json.fontSettings);
+              try {
+                localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(json.fontSettings));
               } catch (e) {}
             }
           }
@@ -243,9 +268,30 @@ export default function AgentLabelsPage() {
     persistChanges(undefined, newSettings);
   };
 
+  const handleSaveFontSettings = async (newSettings: LabelFontSettings) => {
+    setFontSettings(newSettings);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(newSettings));
+    } catch (e) {
+      console.warn('LocalStorage font save error:', e);
+    }
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fontSettings: newSettings }),
+      });
+      if (res.ok) {
+        showToast('අකුරු ප්‍රමාණය සාර්ථකව සුරකින ලදී (Font sizes saved successfully)');
+      }
+    } catch (err) {
+      console.error('Error persisting font settings to server:', err);
+    }
+  };
+
   // Direct Browser Print using dedicated isolated print iframe (100% A4 utilization, 0 margin)
   const handlePrint = () => {
-    directPrintParcelLabels(slots, senderSettings, () => {
+    directPrintParcelLabels(slots, senderSettings, fontSettings, () => {
       showToast('මුද්‍රණ කවුළුව විවෘත විය (Print dialog opened)');
     });
   };
@@ -277,6 +323,7 @@ export default function AgentLabelsPage() {
     const backupData = {
       agents,
       senderSettings,
+      fontSettings,
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -299,7 +346,16 @@ export default function AgentLabelsPage() {
         if (Array.isArray(parsed.agents)) {
           setAgents(parsed.agents);
           if (parsed.senderSettings) setSenderSettings(parsed.senderSettings);
+          if (parsed.fontSettings) {
+            setFontSettings(parsed.fontSettings);
+            try {
+              localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(parsed.fontSettings));
+            } catch (e) {}
+          }
           persistChanges(parsed.agents, parsed.senderSettings);
+          if (parsed.fontSettings) {
+            handleSaveFontSettings(parsed.fontSettings);
+          }
           alert('නියෝජිත තොරතුරු සාර්ථකව ආයාත කරන ලදී! (Backup imported successfully)');
         }
       } catch (err) {
@@ -408,11 +464,23 @@ export default function AgentLabelsPage() {
           {/* Right Header Actions */}
           <div className="flex items-center gap-2">
             
+            {/* Font Settings Button */}
+            <button
+              type="button"
+              onClick={() => setIsFontModalOpen(true)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+              title="Adjust and save font sizes of labels"
+            >
+              <Type className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline font-sinhala">අකුරු ප්‍රමාණය</span>
+              <span className="text-[10px] text-slate-400 font-mono hidden md:inline">(Fonts)</span>
+            </button>
+
             {/* Sender Settings Button */}
             <button
               type="button"
               onClick={() => setIsSenderModalOpen(true)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
               title="Edit Sender / Dealer details printed on the label"
             >
               <Building className="w-3.5 h-3.5 text-slate-500" />
@@ -598,6 +666,16 @@ export default function AgentLabelsPage() {
               
               <button
                 type="button"
+                onClick={() => setIsFontModalOpen(true)}
+                className="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 transition font-sinhala flex items-center gap-1 cursor-pointer"
+                title="අකුරු ප්‍රමාණය සැකසීම (Font sizes)"
+              >
+                <Type className="w-3 h-3 text-blue-500" />
+                <span>අකුරු ප්‍රමාණය</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleClearAllSlots}
                 className="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 transition font-sinhala flex items-center gap-1"
                 title="Clear all 4 slots"
@@ -623,6 +701,7 @@ export default function AgentLabelsPage() {
           <ParcelSheetPrintView
             slots={slots}
             sender={senderSettings}
+            fontSettings={fontSettings}
             onSelectSlot={(idx) => setActiveSlotPicker(idx)}
             onClearSlot={handleClearSlot}
             onEditAgent={(agent) => {
@@ -700,6 +779,14 @@ export default function AgentLabelsPage() {
         settings={senderSettings}
         onClose={() => setIsSenderModalOpen(false)}
         onSave={handleSaveSender}
+      />
+
+      <FontSettingsModal
+        isOpen={isFontModalOpen}
+        settings={fontSettings}
+        onClose={() => setIsFontModalOpen(false)}
+        onSave={handleSaveFontSettings}
+        onPreviewChange={(temp) => setFontSettings(temp)}
       />
 
     </div>

@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
-import { AgentRecord, SenderSettings } from '@/types/agent';
+import { AgentRecord, SenderSettings, LabelFontSettings } from '@/types/agent';
 import { ParcelLabelCard } from './ParcelLabelCard';
 import { Scissors } from 'lucide-react';
 
 interface ParcelSheetPrintViewProps {
   slots: (AgentRecord | null)[];
   sender: SenderSettings;
+  fontSettings?: LabelFontSettings;
   onSelectSlot?: (index: number) => void;
   onClearSlot?: (index: number) => void;
   onEditAgent?: (agent: AgentRecord) => void;
@@ -18,6 +18,7 @@ interface ParcelSheetPrintViewProps {
 export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
   slots,
   sender,
+  fontSettings,
   onSelectSlot,
   onClearSlot,
   onEditAgent,
@@ -78,6 +79,7 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
               <ParcelLabelCard
                 agent={agent}
                 sender={sender}
+                fontSettings={fontSettings}
                 slotIndex={idx}
                 onSelectSlot={onSelectSlot}
                 onClearSlot={onClearSlot}

@@ -1,9 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { AgentRecord, SenderSettings, DEFAULT_SENDER_SETTINGS, INITIAL_AGENTS } from '@/types/agent';
+import { 
+  AgentRecord, 
+  SenderSettings, 
+  LabelFontSettings, 
+  DEFAULT_SENDER_SETTINGS, 
+  DEFAULT_FONT_SETTINGS, 
+  INITIAL_AGENTS 
+} from '@/types/agent';
 
-export { DEFAULT_SENDER_SETTINGS, INITIAL_AGENTS };
+export { DEFAULT_SENDER_SETTINGS, DEFAULT_FONT_SETTINGS, INITIAL_AGENTS };
 
 function resolveAgentsFilePath(): string {
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
@@ -28,6 +35,7 @@ function resolveAgentsFilePath(): string {
 export interface AgentStorageData {
   agents: AgentRecord[];
   senderSettings: SenderSettings;
+  fontSettings: LabelFontSettings;
   updatedAt: string;
 }
 
@@ -40,6 +48,7 @@ export function loadAgentsDataLocally(): AgentStorageData {
       return {
         agents: Array.isArray(parsed.agents) && parsed.agents.length > 0 ? parsed.agents : INITIAL_AGENTS,
         senderSettings: parsed.senderSettings ? { ...DEFAULT_SENDER_SETTINGS, ...parsed.senderSettings } : DEFAULT_SENDER_SETTINGS,
+        fontSettings: parsed.fontSettings ? { ...DEFAULT_FONT_SETTINGS, ...parsed.fontSettings } : DEFAULT_FONT_SETTINGS,
         updatedAt: parsed.updatedAt || new Date().toISOString(),
       };
     }
@@ -50,17 +59,23 @@ export function loadAgentsDataLocally(): AgentStorageData {
   return {
     agents: INITIAL_AGENTS,
     senderSettings: DEFAULT_SENDER_SETTINGS,
+    fontSettings: DEFAULT_FONT_SETTINGS,
     updatedAt: new Date().toISOString(),
   };
 }
 
-export function saveAgentsDataLocally(data: { agents?: AgentRecord[]; senderSettings?: SenderSettings }): boolean {
+export function saveAgentsDataLocally(data: { 
+  agents?: AgentRecord[]; 
+  senderSettings?: SenderSettings;
+  fontSettings?: LabelFontSettings;
+}): boolean {
   try {
     const filePath = resolveAgentsFilePath();
     const current = loadAgentsDataLocally();
     const updated: AgentStorageData = {
       agents: data.agents !== undefined ? data.agents : current.agents,
       senderSettings: data.senderSettings !== undefined ? data.senderSettings : current.senderSettings,
+      fontSettings: data.fontSettings !== undefined ? data.fontSettings : current.fontSettings,
       updatedAt: new Date().toISOString(),
     };
     fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8');

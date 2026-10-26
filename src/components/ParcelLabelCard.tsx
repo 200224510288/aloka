@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AgentRecord, SenderSettings } from '@/types/agent';
+import { AgentRecord, SenderSettings, LabelFontSettings } from '@/types/agent';
 import { UserPlus, X, Copy, Edit2 } from 'lucide-react';
 
 interface ParcelLabelCardProps {
   agent: AgentRecord | null;
   sender: SenderSettings;
+  fontSettings?: LabelFontSettings;
   slotIndex?: number;
   onSelectSlot?: (index: number) => void;
   onClearSlot?: (index: number) => void;
@@ -20,6 +21,7 @@ interface ParcelLabelCardProps {
 export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
   agent,
   sender,
+  fontSettings,
   slotIndex,
   onSelectSlot,
   onClearSlot,
@@ -97,25 +99,49 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
       {/* Single Border Frame - Utilises full 1/4 A4 quadrant */}
       <div className="w-full h-full border border-black p-3 sm:p-4 lg:p-5 flex flex-col justify-between relative overflow-hidden bg-white box-border">
         
-        {/* Top Section: Agent / Recipient Details - Large, legible, beautifully proportioned */}
+        {/* Top Section: Agent / Recipient Details - Customizable font size */}
         <div className="space-y-1 sm:space-y-1.5 text-slate-900 font-sinhala font-normal">
-          <div className="flex items-baseline gap-2 sm:gap-2.5 text-sm sm:text-base lg:text-lg leading-snug">
-            <span className="whitespace-nowrap text-slate-900 font-normal">අලෙවි නියෝජිත :</span>
-            <span className="text-black font-sinhala text-base sm:text-xl lg:text-2xl font-medium">
+          <div className="flex items-baseline gap-2 sm:gap-2.5 leading-snug">
+            <span 
+              className="whitespace-nowrap text-slate-900 font-normal shrink-0"
+              style={{ fontSize: fontSettings ? `${Math.round(fontSettings.agentDetailsSize * 0.9)}px` : undefined }}
+            >
+              අලෙවි නියෝජිත :
+            </span>
+            <span 
+              className="text-black font-sinhala font-medium"
+              style={{ fontSize: fontSettings ? `${fontSettings.agentNameSize}px` : undefined }}
+            >
               {agent.name}
             </span>
           </div>
 
-          <div className="flex items-baseline gap-2 sm:gap-2.5 text-xs sm:text-sm lg:text-base leading-snug">
-            <span className="whitespace-nowrap text-slate-900 font-normal">නගරය :</span>
-            <span className="text-black font-sinhala text-sm sm:text-lg lg:text-xl font-normal">
+          <div className="flex items-baseline gap-2 sm:gap-2.5 leading-snug">
+            <span 
+              className="whitespace-nowrap text-slate-900 font-normal shrink-0"
+              style={{ fontSize: fontSettings ? `${Math.round(fontSettings.agentDetailsSize * 0.9)}px` : undefined }}
+            >
+              නගරය :
+            </span>
+            <span 
+              className="text-black font-sinhala font-normal"
+              style={{ fontSize: fontSettings ? `${fontSettings.agentDetailsSize}px` : undefined }}
+            >
               {agent.town}
             </span>
           </div>
 
-          <div className="flex items-baseline gap-2 sm:gap-2.5 text-xs sm:text-sm lg:text-base leading-snug">
-            <span className="whitespace-nowrap text-slate-900 font-normal">දුරකථන අංකය :</span>
-            <span className="text-black tracking-wider font-normal text-sm sm:text-lg lg:text-xl font-mono">
+          <div className="flex items-baseline gap-2 sm:gap-2.5 leading-snug">
+            <span 
+              className="whitespace-nowrap text-slate-900 font-normal shrink-0"
+              style={{ fontSize: fontSettings ? `${Math.round(fontSettings.agentDetailsSize * 0.9)}px` : undefined }}
+            >
+              දුරකථන අංකය :
+            </span>
+            <span 
+              className="text-black tracking-wider font-normal font-mono"
+              style={{ fontSize: fontSettings ? `${fontSettings.agentDetailsSize}px` : undefined }}
+            >
               {agent.phone}
             </span>
           </div>
@@ -123,23 +149,38 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
 
         {/* Center Section: Delivery Note (ලබා දෙන්න.) - Centered Prominently */}
         <div className="my-auto w-full flex items-center justify-center text-center py-0.5 sm:py-1">
-          <div className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl text-black font-sinhala font-normal tracking-wide text-center">
+          <div 
+            className="text-black font-sinhala font-normal tracking-wide text-center"
+            style={{ fontSize: fontSettings ? `${fontSettings.centerNoteSize}px` : undefined }}
+          >
             {sender.centerNote || 'ලබා දෙන්න.'}
           </div>
         </div>
 
         {/* Bottom Section: Sender / Dealer Details - Proportioned cleanly */}
         <div className="space-y-0.5 text-slate-800 font-sinhala font-normal pt-1">
-          <div className="text-xs sm:text-sm lg:text-base text-black font-medium leading-tight">
+          <div 
+            className="text-black font-medium leading-tight"
+            style={{ fontSize: fontSettings ? `${Math.round(fontSettings.senderSize * 1.15)}px` : undefined }}
+          >
             {sender.name}
           </div>
-          <div className="text-[10px] sm:text-xs lg:text-sm text-slate-700 font-light leading-tight">
+          <div 
+            className="text-slate-700 font-light leading-tight"
+            style={{ fontSize: fontSettings ? `${fontSettings.senderSize}px` : undefined }}
+          >
             {sender.designation}
           </div>
-          <div className="text-[10px] sm:text-xs lg:text-sm text-slate-700 font-light leading-tight">
+          <div 
+            className="text-slate-700 font-light leading-tight"
+            style={{ fontSize: fontSettings ? `${fontSettings.senderSize}px` : undefined }}
+          >
             {sender.address}
           </div>
-          <div className="text-[10px] sm:text-xs lg:text-sm tracking-wider text-black font-normal leading-tight">
+          <div 
+            className="tracking-wider text-black font-normal leading-tight font-mono"
+            style={{ fontSize: fontSettings ? `${fontSettings.senderSize}px` : undefined }}
+          >
             {sender.phone}
           </div>
         </div>

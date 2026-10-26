@@ -22,5 +22,11 @@
     "phone": "081-2223306 / 0777803096",
     "centerNote": "ලබා දෙන්න."
   },
-  "updatedAt": "2026-10-26T05:25:35.910Z"
+  "fontSettings": {
+    "agentNameSize": 29,
+    "agentDetailsSize": 22,
+    "centerNoteSize": 38,
+    "senderSize": 14.5
+  },
+  "updatedAt": "2026-10-26T06:01:55.666Z"
 }

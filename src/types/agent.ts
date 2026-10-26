@@ -19,9 +19,23 @@ export interface SenderSettings {
   centerNote: string;     // "ලබා දෙන්න."
 }
 
+export interface LabelFontSettings {
+  agentNameSize: number;    // in px (default: 26, range: 18 - 36)
+  agentDetailsSize: number; // in px (default: 20, range: 14 - 28)
+  centerNoteSize: number;   // in px (default: 34, range: 22 - 46)
+  senderSize: number;       // in px (default: 13, range: 10 - 18)
+}
+
 export interface PrintSheetState {
   slots: (AgentRecord | null)[]; // exactly 4 items for 1 A4 sheet
 }
+
+export const DEFAULT_FONT_SETTINGS: LabelFontSettings = {
+  agentNameSize: 26,
+  agentDetailsSize: 20,
+  centerNoteSize: 34,
+  senderSize: 13,
+};
 
 export const DEFAULT_SENDER_SETTINGS: SenderSettings = {
   name: 'S . W ඔස්මන් ද සිල්වා',

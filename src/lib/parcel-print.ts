@@ -1,4 +1,4 @@
-import { AgentRecord, SenderSettings } from '@/types/agent';
+import { AgentRecord, SenderSettings, LabelFontSettings, DEFAULT_FONT_SETTINGS } from '@/types/agent';
 
 /**
  * Generates an isolated, pixel-perfect HTML document for A4 Landscape printing
@@ -6,8 +6,10 @@ import { AgentRecord, SenderSettings } from '@/types/agent';
  */
 export function generateParcelPrintHtml(
   slots: (AgentRecord | null)[],
-  sender: SenderSettings
+  sender: SenderSettings,
+  fontSettings?: LabelFontSettings
 ): string {
+  const fonts = fontSettings || DEFAULT_FONT_SETTINGS;
   const displaySlots = [
     slots[0] || null,
     slots[1] || null,
@@ -164,24 +166,24 @@ export function generateParcelPrintHtml(
       line-height: 1.25;
     }
     .field-label {
-      font-size: 20px;
+      font-size: ${Math.round(fonts.agentDetailsSize * 0.9)}px;
       font-weight: 400;
       color: #0f172a;
       white-space: nowrap;
     }
     .field-value {
-      font-size: 24px;
+      font-size: ${fonts.agentDetailsSize}px;
       font-weight: 400;
       color: #000000;
     }
     .agent-name {
-      font-size: 28px;
+      font-size: ${fonts.agentNameSize}px;
       font-weight: 500;
     }
     .agent-phone {
       letter-spacing: 1.5px;
       font-family: 'Courier New', Courier, monospace, 'Noto Sans Sinhala';
-      font-size: 24px;
+      font-size: ${fonts.agentDetailsSize}px;
       font-weight: 500;
     }
 
@@ -193,7 +195,7 @@ export function generateParcelPrintHtml(
       padding: 6px 0;
     }
     .delivery-note {
-      font-size: 36px;
+      font-size: ${fonts.centerNoteSize}px;
       font-weight: 400;
       color: #000000;
       letter-spacing: 2px;
@@ -208,17 +210,17 @@ export function generateParcelPrintHtml(
       padding-top: 6px;
     }
     .sender-name {
-      font-size: 15px;
+      font-size: ${Math.round(fonts.senderSize * 1.15)}px;
       font-weight: 500;
       color: #000000;
     }
     .sender-desig, .sender-address {
-      font-size: 13px;
+      font-size: ${fonts.senderSize}px;
       font-weight: 400;
       color: #1e293b;
     }
     .sender-phone {
-      font-size: 13.5px;
+      font-size: ${fonts.senderSize}px;
       font-weight: 500;
       color: #000000;
       letter-spacing: 0.5px;
@@ -251,12 +253,13 @@ function escapeHtml(text: string): string {
 export function directPrintParcelLabels(
   slots: (AgentRecord | null)[],
   sender: SenderSettings,
+  fontSettings?: LabelFontSettings,
   onDone?: () => void
 ): boolean {
   if (typeof window === 'undefined') return false;
 
   try {
-    const html = generateParcelPrintHtml(slots, sender);
+    const html = generateParcelPrintHtml(slots, sender, fontSettings);
 
     let printFrame = document.getElementById('parcel-labels-print-frame') as HTMLIFrameElement;
     if (!printFrame) {
