@@ -48,15 +48,10 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
   }
 
   return (
-    <div
-      className={`relative w-full h-full bg-white select-none ${className}`}
-      style={{
-        aspectRatio: '148.5 / 105',
-      }}
-    >
+    <div className={`relative w-full h-full bg-white select-none ${className}`}>
       {/* Action buttons overlay for screen mode */}
       {isInteractive && (
-        <div className="absolute top-1 right-1 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded shadow-xs border border-slate-200 no-print">
+        <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded shadow-xs border border-slate-200 no-print">
           {onDuplicateSlot && (
             <button
               type="button"
@@ -99,58 +94,56 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
         </div>
       )}
 
-      {/* Single Border Frame (Reduced cutting free space, tight fit) */}
-      <div className="w-full h-full p-[1.5mm] box-border bg-white">
-        <div className="w-full h-full border border-black p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden bg-white">
-          
-          {/* Top Section: Agent / Recipient Details - Increased font size, light/normal weight */}
-          <div className="space-y-1.5 sm:space-y-2 text-slate-900 font-sinhala font-normal">
-            <div className="flex items-baseline gap-2.5 text-lg sm:text-2xl font-normal leading-tight">
-              <span className="whitespace-nowrap text-slate-900 font-normal">අලෙවි නියෝජිත :</span>
-              <span className="text-black font-sinhala text-xl sm:text-3xl font-normal">
-                {agent.name}
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-2.5 text-base sm:text-xl font-normal leading-tight">
-              <span className="whitespace-nowrap text-slate-900 font-normal">නගරය :</span>
-              <span className="text-black font-sinhala text-lg sm:text-2xl font-normal">
-                {agent.town}
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-2.5 text-base sm:text-xl font-normal leading-tight">
-              <span className="whitespace-nowrap text-slate-900 font-normal">දුරකථන අංකය :</span>
-              <span className="text-black tracking-wider font-normal text-lg sm:text-2xl">
-                {agent.phone}
-              </span>
-            </div>
+      {/* Single Border Frame - Utilises full 1/4 A4 quadrant */}
+      <div className="w-full h-full border border-black p-3 sm:p-4 lg:p-5 flex flex-col justify-between relative overflow-hidden bg-white box-border">
+        
+        {/* Top Section: Agent / Recipient Details - Large, legible, beautifully proportioned */}
+        <div className="space-y-1 sm:space-y-1.5 text-slate-900 font-sinhala font-normal">
+          <div className="flex items-baseline gap-2 sm:gap-2.5 text-sm sm:text-base lg:text-lg leading-snug">
+            <span className="whitespace-nowrap text-slate-900 font-normal">අලෙවි නියෝජිත :</span>
+            <span className="text-black font-sinhala text-base sm:text-xl lg:text-2xl font-medium">
+              {agent.name}
+            </span>
           </div>
 
-          {/* Center Section: Delivery Note (ලබා දෙන්න.) - Centered */}
-          <div className="my-auto w-full flex items-center justify-center text-center py-1">
-            <div className="text-2xl sm:text-3xl text-black font-sinhala font-normal tracking-wide text-center">
-              {sender.centerNote || 'ලබා දෙන්න.'}
-            </div>
+          <div className="flex items-baseline gap-2 sm:gap-2.5 text-xs sm:text-sm lg:text-base leading-snug">
+            <span className="whitespace-nowrap text-slate-900 font-normal">නගරය :</span>
+            <span className="text-black font-sinhala text-sm sm:text-lg lg:text-xl font-normal">
+              {agent.town}
+            </span>
           </div>
 
-          {/* Bottom Section: Sender / Dealer Details (Light font weight, avoid bold) */}
-          <div className="space-y-0.5 text-slate-800 font-sinhala font-normal pt-1 border-t border-slate-100">
-            <div className="text-xs sm:text-sm text-black font-normal">
-              {sender.name}
-            </div>
-            <div className="text-[11px] sm:text-xs text-slate-700 font-light">
-              {sender.designation}
-            </div>
-            <div className="text-[11px] sm:text-xs text-slate-700 font-light">
-              {sender.address}
-            </div>
-            <div className="text-[11px] sm:text-xs tracking-wider text-black font-normal">
-              {sender.phone}
-            </div>
+          <div className="flex items-baseline gap-2 sm:gap-2.5 text-xs sm:text-sm lg:text-base leading-snug">
+            <span className="whitespace-nowrap text-slate-900 font-normal">දුරකථන අංකය :</span>
+            <span className="text-black tracking-wider font-normal text-sm sm:text-lg lg:text-xl font-mono">
+              {agent.phone}
+            </span>
           </div>
-
         </div>
+
+        {/* Center Section: Delivery Note (ලබා දෙන්න.) - Centered Prominently */}
+        <div className="my-auto w-full flex items-center justify-center text-center py-0.5 sm:py-1">
+          <div className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl text-black font-sinhala font-normal tracking-wide text-center">
+            {sender.centerNote || 'ලබා දෙන්න.'}
+          </div>
+        </div>
+
+        {/* Bottom Section: Sender / Dealer Details - Proportioned cleanly */}
+        <div className="space-y-0.5 text-slate-800 font-sinhala font-normal pt-1">
+          <div className="text-xs sm:text-sm lg:text-base text-black font-medium leading-tight">
+            {sender.name}
+          </div>
+          <div className="text-[10px] sm:text-xs lg:text-sm text-slate-700 font-light leading-tight">
+            {sender.designation}
+          </div>
+          <div className="text-[10px] sm:text-xs lg:text-sm text-slate-700 font-light leading-tight">
+            {sender.address}
+          </div>
+          <div className="text-[10px] sm:text-xs lg:text-sm tracking-wider text-black font-normal leading-tight">
+            {sender.phone}
+          </div>
+        </div>
+
       </div>
     </div>
   );

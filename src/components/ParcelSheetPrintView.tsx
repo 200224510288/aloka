@@ -40,7 +40,7 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
       */}
       <div
         id="parcel-a4-sheet"
-        className="print-sheet relative bg-white shadow-xl rounded-sm border border-slate-200 overflow-hidden w-full max-w-[1050px]"
+        className="print-sheet relative bg-white shadow-xl rounded-sm border border-slate-200 overflow-hidden w-full max-w-[1123px]"
         style={{
           aspectRatio: '297 / 210',
         }}
@@ -68,12 +68,12 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
           </div>
         </div>
 
-        {/* 2x2 Quadrant Grid with minimal outer margins */}
+        {/* 2x2 Quadrant Grid filling exact 100% space */}
         <div className="w-full h-full grid grid-cols-2 grid-rows-2">
           {displaySlots.map((agent, idx) => (
             <div
               key={idx}
-              className="group relative w-full h-full p-1 sm:p-1.5 box-border flex items-center justify-center overflow-hidden"
+              className="group relative w-full h-full p-[2mm] box-border flex items-center justify-center overflow-hidden"
             >
               <ParcelLabelCard
                 agent={agent}

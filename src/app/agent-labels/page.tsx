@@ -22,6 +22,7 @@ import { ParcelSheetPrintView } from '@/components/ParcelSheetPrintView';
 import { AgentModal } from '@/components/AgentModal';
 import { SenderSettingsModal } from '@/components/SenderSettingsModal';
 import { toPng } from 'html-to-image';
+import { directPrintParcelLabels } from '@/lib/parcel-print';
 
 const LOCAL_STORAGE_AGENTS_KEY = 'parcel_agents_list_v2';
 const LOCAL_STORAGE_SENDER_KEY = 'parcel_sender_settings_v2';
@@ -242,9 +243,11 @@ export default function AgentLabelsPage() {
     persistChanges(undefined, newSettings);
   };
 
-  // Direct Browser Print
+  // Direct Browser Print using dedicated isolated print iframe (100% A4 utilization, 0 margin)
   const handlePrint = () => {
-    window.print();
+    directPrintParcelLabels(slots, senderSettings, () => {
+      showToast('මුද්‍රණ කවුළුව විවෘත විය (Print dialog opened)');
+    });
   };
 
   // Download Image (PNG)
@@ -323,7 +326,7 @@ export default function AgentLabelsPage() {
         @media print {
           @page {
             size: 297mm 210mm landscape !important;
-            margin: 0 !important;
+            margin: 0mm !important;
           }
           html, body {
             margin: 0 !important;
@@ -331,22 +334,36 @@ export default function AgentLabelsPage() {
             background: #ffffff !important;
             width: 297mm !important;
             height: 210mm !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
           }
-          .print-sheet {
-            position: absolute !important;
+          body * {
+            visibility: hidden;
+          }
+          #parcel-a4-sheet, #parcel-a4-sheet * {
+            visibility: visible;
+          }
+          #parcel-a4-sheet {
+            position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             width: 297mm !important;
             height: 210mm !important;
+            max-width: none !important;
+            max-height: none !important;
             margin: 0 !important;
             padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
             border-radius: 0 !important;
             overflow: hidden !important;
+            z-index: 999999 !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
           }
         }
       `}</style>
