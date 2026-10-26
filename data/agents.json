@@ -2,26 +2,26 @@
   "agents": [
     {
       "createdAt": "2026-10-26T00:00:00.000Z",
-      "phone": "0773002230",
-      "name": "දිනේෂ් මහතා",
       "id": "agent_dinesh_wattegama",
-      "town": "වත්තේගම"
+      "town": "වත්තේගම",
+      "name": "දිනේෂ් මහතා",
+      "phone": "0773002230"
     }
   ],
   "senderSettings": {
-    "phone": "081-2223306 / 0777803096",
     "name": "S.W ඔස්මන් ද සිල්වා",
-    "address": "204, මධ්‍යම වෙළඳපල, මහනුවර.",
     "centerNote": "ලබා දෙන්න.",
-    "designation": "ලොතරැයි දිස්ත්‍රික් අලෙවි නියෝජිත,"
+    "phone": "081-2223306 / 0777803096",
+    "designation": "ලොතරැයි දිස්ත්‍රික් අලෙවි නියෝජිත,",
+    "address": "204, මධ්‍යම වෙළඳපල, මහනුවර."
   },
   "fontSettings": {
     "agentNameSize": 24,
     "agentDetailsSize": 22,
     "centerNoteSize": 38,
     "senderSize": 14.5,
-    "outerMarginMm": 6,
+    "outerMarginMm": 4.5,
     "innerPaddingPx": 16
   },
-  "updatedAt": "2026-10-26T06:31:17.347Z"
+  "updatedAt": "2026-10-26T06:32:45.125Z"
 }
