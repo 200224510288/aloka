@@ -327,3 +327,41 @@ export function transliterateSinglish(input: string): string {
 export function hasEnglishLetters(text: string): boolean {
   return /[a-zA-Z]/.test(text);
 }
+
+/**
+ * Smart transliteration for names with English initials.
+ * Preserves English initials at the start (e.g. "S. W.", "W. M.", "K. G.", "A. B.", "S . W")
+ * and transliterates the remaining Sinhala/Singlish name (e.g. "dinesh" -> "දිනේෂ්").
+ */
+export function smartTransliterateName(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+
+  // Match sequence of single English letters followed by dot or space:
+  // e.g. "S. W.", "S.W.", "S . W ", "s. w.", "S W ", "K. G. ", "S. "
+  const initialsMatch = trimmed.match(/^((?:[A-Za-z](?:\s*\.\s*|\s+))+)(.*)$/);
+  if (initialsMatch) {
+    const rawInitials = initialsMatch[1];
+    const rest = initialsMatch[2].trim();
+
+    // Check that initials aren't just a 1-letter word if rest is empty and has no dots
+    if (!rest && !rawInitials.includes('.')) {
+      return transliterateSinglish(trimmed);
+    }
+
+    // Clean and normalize initials to standard "S. W. " format
+    const cleanInitials = rawInitials
+      .replace(/\./g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(ch => ch.toUpperCase() + '.')
+      .join(' ') + ' ';
+
+    if (!rest) return cleanInitials.trim();
+    return cleanInitials + (hasEnglishLetters(rest) ? transliterateSinglish(rest) : rest);
+  }
+
+  return transliterateSinglish(trimmed);
+}
+

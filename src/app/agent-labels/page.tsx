@@ -225,6 +225,7 @@ export default function AgentLabelsPage() {
       handleAddToNextSlot(newAgent);
     }
     setEditingAgent(null);
+    setIsAgentModalOpen(false);
   };
 
   const handleDeleteAgent = (id: string) => {

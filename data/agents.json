@@ -1,12 +1,17 @@
 {
   "agents": [
     {
+      "id": "agent_sw_dinesh",
+      "name": "S. W. දිනේෂ් මහතා",
+      "town": "වත්තේගම",
+      "phone": "0771234567",
+      "createdAt": "2026-10-26T00:00:00.000Z"
+    },
+    {
       "id": "agent_dinesh_wattegama",
       "name": "දිනේෂ් මහතා",
       "town": "වත්තේගම",
       "phone": "0773002230",
-      "isFavorite": true,
-      "orderIndex": 0,
       "createdAt": "2026-10-26T00:00:00.000Z"
     }
   ],
@@ -17,5 +22,5 @@
     "phone": "081-2223306 / 0777803096",
     "centerNote": "ලබා දෙන්න."
   },
-  "updatedAt": "2026-10-26T04:40:02.494Z"
+  "updatedAt": "2026-10-26T05:25:35.910Z"
 }
