@@ -509,65 +509,46 @@ export default function AgentLabelsPage() {
                 filteredAgents.map((agent) => (
                   <div
                     key={agent.id}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-white hover:bg-blue-50/20 transition-all flex flex-col gap-2 group"
+                    onClick={() => handleFillAllSlots(agent)}
+                    className="p-3 rounded-xl border border-slate-200 hover:border-emerald-400 bg-white hover:bg-emerald-50/20 transition-all flex items-center justify-between cursor-pointer group shadow-2xs"
+                    title="පත්‍රය මෙම නියෝජිතයාගෙන් පිරවීමට ක්ලික් කරන්න"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-sm text-slate-900 font-sinhala truncate block">
-                          {agent.name}
-                        </span>
-                        <p className="text-xs text-slate-600 font-sinhala mt-0.5">
-                          {agent.town}
-                        </p>
-                        <p className="text-[11px] font-mono text-slate-500">
-                          {agent.phone}
-                        </p>
-                      </div>
-
-                      {/* Edit & Delete Icons */}
-                      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingAgent(agent);
-                            setIsAgentModalOpen(true);
-                          }}
-                          className="p-1 rounded text-slate-400 hover:text-amber-600 hover:bg-slate-100"
-                          title="සංස්කරණය කරන්න"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAgent(agent.id)}
-                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          title="ඉවත් කරන්න"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-sm text-slate-900 font-sinhala truncate block">
+                        {agent.name}
+                      </span>
+                      <p className="text-xs text-slate-600 font-sinhala mt-0.5">
+                        {agent.town}
+                      </p>
+                      <p className="text-[11px] font-mono text-slate-500">
+                        {agent.phone}
+                      </p>
                     </div>
 
-                    {/* Quick Assignment Actions */}
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                    {/* Edit & Delete Icons */}
+                    <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        onClick={() => handleFillAllSlots(agent)}
-                        className="flex-1 py-1 px-2 text-[11px] font-medium rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center gap-1 transition font-sinhala"
-                        title="මෙම නියෝජිතයාගෙන් සම්පූර්ණ A4 පත්‍රයම (ස්ලිප් 4ම) පුරවන්න"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingAgent(agent);
+                          setIsAgentModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 transition"
+                        title="සංස්කරණය කරන්න"
                       >
-                        <Copy className="w-3 h-3 text-emerald-600" />
-                        <span>ස්ලිප් 4ම පුරවන්න</span>
+                        <Edit3 className="w-4 h-4" />
                       </button>
-
                       <button
                         type="button"
-                        onClick={() => handleAddToNextSlot(agent)}
-                        className="py-1 px-2.5 text-[11px] font-medium rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center gap-1 transition font-sinhala"
-                        title="ඊළඟ හිස් කොටසට එක් කරන්න"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAgent(agent.id);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title="ඉවත් කරන්න"
                       >
-                        <Plus className="w-3 h-3 text-blue-600" />
-                        <span>+ කොටස</span>
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>

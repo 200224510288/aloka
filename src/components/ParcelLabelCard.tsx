@@ -127,9 +127,9 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
             </div>
           </div>
 
-          {/* Center Section: Delivery Note (ලබා දෙන්න.) (Light font weight, avoid bold) */}
-          <div className="my-auto self-center sm:self-end sm:mr-8 text-center sm:text-right py-0.5">
-            <div className="text-2xl sm:text-3xl text-black font-sinhala font-normal tracking-wide">
+          {/* Center Section: Delivery Note (ලබා දෙන්න.) - Centered */}
+          <div className="my-auto w-full flex items-center justify-center text-center py-1">
+            <div className="text-2xl sm:text-3xl text-black font-sinhala font-normal tracking-wide text-center">
               {sender.centerNote || 'ලබා දෙන්න.'}
             </div>
           </div>

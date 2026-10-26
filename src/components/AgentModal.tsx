@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AgentRecord } from '@/types/agent';
-import { X, Save, Sparkles, User } from 'lucide-react';
+import { X, Save, User } from 'lucide-react';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 
 interface AgentModalProps {
@@ -36,13 +36,22 @@ export const AgentModal: React.FC<AgentModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleTransliterateName = () => {
+  // Auto-transliterate Singlish to Sinhala when typing
+  const handleNameChange = (val: string) => {
+    setName(val);
+  };
+
+  const handleNameBlur = () => {
     if (hasEnglishLetters(name)) {
       setName(transliterateSinglish(name));
     }
   };
 
-  const handleTransliterateTown = () => {
+  const handleTownChange = (val: string) => {
+    setTown(val);
+  };
+
+  const handleTownBlur = () => {
     if (hasEnglishLetters(town)) {
       setTown(transliterateSinglish(town));
     }
@@ -52,6 +61,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    // Guarantee final output is Sinhala only
     const finalName = hasEnglishLetters(name.trim()) ? transliterateSinglish(name.trim()) : name.trim();
     const finalTown = hasEnglishLetters(town.trim()) ? transliterateSinglish(town.trim()) : town.trim();
 
@@ -67,7 +77,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
-        {/* Header */}
+        {/* Header - Sinhala Only */}
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -75,10 +85,10 @@ export const AgentModal: React.FC<AgentModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base tracking-tight font-sinhala">
-                {agent ? 'අලෙවි නියෝජිත සංස්කරණය' : 'නව අලෙවි නියෝජිතයෙකු ඇතුළත් කරන්න'}
+                {agent ? 'අලෙවි නියෝජිත සංස්කරණය' : 'නව අලෙවි නියෝජිතයෙකු ඇතුළත් කිරීම'}
               </h3>
-              <p className="text-xs text-slate-400">
-                {agent ? 'Edit agent details' : 'Add new agent'}
+              <p className="text-xs text-slate-400 font-sinhala">
+                {agent ? 'නියෝජිත තොරතුරු සංස්කරණය කරන්න' : 'පාර්සල් ලේබලය සඳහා තොරතුරු ඇතුළත් කරන්න'}
               </p>
             </div>
           </div>
@@ -91,73 +101,46 @@ export const AgentModal: React.FC<AgentModalProps> = ({
           </button>
         </div>
 
-        {/* Form Body */}
+        {/* Form Body - Sinhala Only */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
           {/* Agent Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
-              අලෙවි නියෝජිත නම (Agent Name) <span className="text-red-500">*</span>
+              අලෙවි නියෝජිත නම <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="උදා: දිනේෂ් මහතා / Dinesh mahatha"
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
-                autoFocus
-              />
-              {hasEnglishLetters(name) && (
-                <button
-                  type="button"
-                  onClick={handleTransliterateName}
-                  className="absolute right-2 top-2 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-md font-bold flex items-center gap-1 hover:bg-blue-100"
-                  title="Singlish to Sinhala"
-                >
-                  <Sparkles className="w-3 h-3 text-blue-600" />
-                  <span>සිංහල</span>
-                </button>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-sinhala">
-              සිංහලෙන් හෝ ඉංග්‍රීසියෙන් (Singlish) ටයිප් කළ හැක
-            </p>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onBlur={handleNameBlur}
+              placeholder="උදා: දිනේෂ් මහතා"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
+              autoFocus
+            />
           </div>
 
           {/* Town / Destination */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
-              නගරය / ප්‍රදේශය (Town / Area) <span className="text-red-500">*</span>
+              නගරය / ප්‍රදේශය <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                value={town}
-                onChange={(e) => setTown(e.target.value)}
-                placeholder="උදා: වත්තේගම / Wattegama"
-                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
-              />
-              {hasEnglishLetters(town) && (
-                <button
-                  type="button"
-                  onClick={handleTransliterateTown}
-                  className="absolute right-2 top-2 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded-md font-bold flex items-center gap-1 hover:bg-blue-100"
-                  title="Singlish to Sinhala"
-                >
-                  <Sparkles className="w-3 h-3 text-blue-600" />
-                  <span>සිංහල</span>
-                </button>
-              )}
-            </div>
+            <input
+              type="text"
+              required
+              value={town}
+              onChange={(e) => handleTownChange(e.target.value)}
+              onBlur={handleTownBlur}
+              placeholder="උදා: වත්තේගම"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
+            />
           </div>
 
           {/* Phone Number */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
-              දුරකථන අංකය (Phone Number) <span className="text-red-500">*</span>
+              දුරකථන අංකය <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -169,18 +152,18 @@ export const AgentModal: React.FC<AgentModalProps> = ({
             />
           </div>
 
-          {/* Buttons */}
+          {/* Buttons - Sinhala Only */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-100 transition"
+              className="px-4 py-2 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-100 transition font-sinhala"
             >
               අවලංගු කරන්න
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition flex items-center gap-2"
+              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition flex items-center gap-2 font-sinhala"
             >
               <Save className="w-4 h-4" />
               <span>{agent ? 'යාවත්කාලීන කරන්න' : 'සුරකින්න'}</span>
