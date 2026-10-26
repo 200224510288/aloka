@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AgentRecord } from '@/types/agent';
-import { X, Save, Sparkles, User, MapPin, Phone, FileText } from 'lucide-react';
+import { X, Save, Sparkles, User } from 'lucide-react';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 
 interface AgentModalProps {
@@ -21,25 +21,16 @@ export const AgentModal: React.FC<AgentModalProps> = ({
   const [name, setName] = useState('');
   const [town, setTown] = useState('');
   const [phone, setPhone] = useState('');
-  const [route, setRoute] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     if (agent) {
       setName(agent.name || '');
       setTown(agent.town || '');
       setPhone(agent.phone || '');
-      setRoute(agent.route || '');
-      setNotes(agent.notes || '');
-      setIsFavorite(Boolean(agent.isFavorite));
     } else {
       setName('');
       setTown('');
       setPhone('');
-      setRoute('');
-      setNotes('');
-      setIsFavorite(false);
     }
   }, [agent, isOpen]);
 
@@ -68,16 +59,13 @@ export const AgentModal: React.FC<AgentModalProps> = ({
       name: finalName,
       town: finalTown,
       phone: phone.trim(),
-      route: route.trim() || undefined,
-      notes: notes.trim() || undefined,
-      isFavorite,
     });
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
@@ -86,11 +74,11 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               <User className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base tracking-tight font-sinhala">
+              <h3 className="font-bold text-base tracking-tight font-sinhala">
                 {agent ? 'අලෙවි නියෝජිත සංස්කරණය' : 'නව අලෙවි නියෝජිතයෙකු ඇතුළත් කරන්න'}
               </h3>
               <p className="text-xs text-slate-400">
-                {agent ? 'Edit agent details' : 'Add new agent for parcel labels'}
+                {agent ? 'Edit agent details' : 'Add new agent'}
               </p>
             </div>
           </div>
@@ -108,7 +96,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
           
           {/* Agent Name */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
               අලෙවි නියෝජිත නම (Agent Name) <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -119,6 +107,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="උදා: දිනේෂ් මහතා / Dinesh mahatha"
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
+                autoFocus
               />
               {hasEnglishLetters(name) && (
                 <button
@@ -139,7 +128,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
 
           {/* Town / Destination */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
               නගරය / ප්‍රදේශය (Town / Area) <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -167,7 +156,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
 
           {/* Phone Number */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
               දුරකථන අංකය (Phone Number) <span className="text-red-500">*</span>
             </label>
             <input
@@ -175,37 +164,9 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="උදා: 0773002230 / 081-2223306"
+              placeholder="උදා: 0773002230"
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
             />
-          </div>
-
-          {/* Optional Route / Bus */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 font-sinhala">
-              බස් රථය / බෙදාහැරීමේ මාර්ගය (Route / Bus - Optional)
-            </label>
-            <input
-              type="text"
-              value={route}
-              onChange={(e) => setRoute(e.target.value)}
-              placeholder="උදා: මහනුවර - වත්තේගම බස් රථය"
-              className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
-            />
-          </div>
-
-          {/* Favorite checkbox */}
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="agent-favorite"
-              checked={isFavorite}
-              onChange={(e) => setIsFavorite(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-            />
-            <label htmlFor="agent-favorite" className="text-xs font-bold text-slate-700 font-sinhala cursor-pointer">
-              නිතර භාවිතා කරන නියෝජිතයින් අතරට එක් කරන්න (Pin to Favorites)
-            </label>
           </div>
 
           {/* Buttons */}
@@ -213,13 +174,13 @@ export const AgentModal: React.FC<AgentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 transition"
+              className="px-4 py-2 text-sm font-medium rounded-xl text-slate-600 hover:bg-slate-100 transition"
             >
               අවලංගු කරන්න
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg transition flex items-center gap-2"
+              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               <span>{agent ? 'යාවත්කාලීන කරන්න' : 'සුරකින්න'}</span>

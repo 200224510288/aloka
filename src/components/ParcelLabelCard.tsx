@@ -13,7 +13,7 @@ interface ParcelLabelCardProps {
   onEditAgent?: (agent: AgentRecord) => void;
   onDuplicateSlot?: (agent: AgentRecord) => void;
   isInteractive?: boolean;
-  scale?: number; // for preview scaling
+  scale?: number;
   className?: string;
 }
 
@@ -32,15 +32,15 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
     return (
       <div
         onClick={() => slotIndex !== undefined && onSelectSlot && onSelectSlot(slotIndex)}
-        className={`group relative w-full h-full min-h-[220px] rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 flex flex-col items-center justify-center p-6 text-center transition-all cursor-pointer select-none ${className}`}
+        className={`group relative w-full h-full min-h-[160px] rounded border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50/40 hover:bg-blue-50/20 flex flex-col items-center justify-center p-3 text-center transition-all cursor-pointer select-none ${className}`}
       >
-        <div className="w-12 h-12 rounded-full bg-white shadow-2xs border border-slate-200 group-hover:border-blue-300 group-hover:scale-110 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-all mb-3">
-          <UserPlus className="w-6 h-6" />
+        <div className="w-9 h-9 rounded-full bg-white shadow-2xs border border-slate-200 group-hover:border-blue-300 group-hover:scale-105 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-all mb-1.5">
+          <UserPlus className="w-4 h-4" />
         </div>
-        <p className="text-sm font-bold text-slate-700 font-sinhala group-hover:text-blue-700">
+        <p className="text-xs font-normal text-slate-700 font-sinhala group-hover:text-blue-700">
           {slotIndex !== undefined ? `කොටස ${slotIndex + 1}` : 'අලෙවි නියෝජිතයෙකු තෝරන්න'}
         </p>
-        <p className="text-xs text-slate-500 font-sinhala mt-1">
+        <p className="text-[10px] text-slate-400 font-sinhala mt-0.5">
           ක්ලික් කර අලෙවි නියෝජිතයෙකු ඇතුළත් කරන්න
         </p>
       </div>
@@ -56,7 +56,7 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
     >
       {/* Action buttons overlay for screen mode */}
       {isInteractive && (
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded-md shadow-xs border border-slate-200 no-print">
+        <div className="absolute top-1 right-1 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded shadow-xs border border-slate-200 no-print">
           {onDuplicateSlot && (
             <button
               type="button"
@@ -65,7 +65,7 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
                 onDuplicateSlot(agent);
               }}
               className="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-blue-600"
-              title="සියලු කොටස් 4ම මෙම නියෝජිතයාගෙන් පුරවන්න (Fill all 4)"
+              title="සියලු කොටස් 4ම මෙම නියෝජිතයාගෙන් පුරවන්න"
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
@@ -78,7 +78,7 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
                 onEditAgent(agent);
               }}
               className="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-amber-600"
-              title="නියෝජිත තොරතුරු සංස්කරණය (Edit Agent)"
+              title="නියෝජිත තොරතුරු සංස්කරණය"
             >
               <Edit2 className="w-3.5 h-3.5" />
             </button>
@@ -91,7 +91,7 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
                 onClearSlot(slotIndex);
               }}
               className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600"
-              title="මෙම කොටස ඉවත් කරන්න (Clear slot)"
+              title="මෙම කොටස ඉවත් කරන්න"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -99,59 +99,57 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
         </div>
       )}
 
-      {/* Exact Visual Frame Matching Photo (Double Border) */}
-      <div className="w-full h-full p-[3mm] box-border bg-white">
-        <div className="w-full h-full border border-black p-[2.5mm] box-border bg-white flex flex-col justify-between">
-          <div className="w-full h-full border border-black p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden bg-white">
-            
-            {/* Top Section: Agent / Recipient Information */}
-            <div className="space-y-1.5 text-black font-sinhala">
-              <div className="flex items-baseline gap-2 text-lg sm:text-xl font-bold tracking-tight">
-                <span className="whitespace-nowrap text-slate-900 font-bold">අලෙවි නියෝජිත :</span>
-                <span className="font-extrabold text-black font-sinhala text-xl sm:text-2xl">
-                  {agent.name}
-                </span>
-              </div>
-
-              <div className="flex items-baseline gap-2 text-base sm:text-lg font-bold">
-                <span className="whitespace-nowrap text-slate-900 font-bold">නගරය :</span>
-                <span className="font-extrabold text-black font-sinhala">
-                  {agent.town}
-                </span>
-              </div>
-
-              <div className="flex items-baseline gap-2 text-base sm:text-lg font-bold">
-                <span className="whitespace-nowrap text-slate-900 font-bold">දුරකථන අංකය :</span>
-                <span className="font-extrabold text-black tracking-wider">
-                  {agent.phone}
-                </span>
-              </div>
+      {/* Single Border Frame (Reduced cutting free space, tight fit) */}
+      <div className="w-full h-full p-[1.5mm] box-border bg-white">
+        <div className="w-full h-full border border-black p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden bg-white">
+          
+          {/* Top Section: Agent / Recipient Details (Light font weight, avoid bold) */}
+          <div className="space-y-1 text-slate-900 font-sinhala font-normal">
+            <div className="flex items-baseline gap-2 text-base sm:text-lg font-normal">
+              <span className="whitespace-nowrap text-slate-800 font-normal">අලෙවි නියෝජිත :</span>
+              <span className="text-black font-sinhala text-lg sm:text-xl font-normal">
+                {agent.name}
+              </span>
             </div>
 
-            {/* Center Section: Delivery Note (ලබා දෙන්න.) */}
-            <div className="my-auto self-center sm:self-end sm:mr-8 text-center sm:text-right py-1">
-              <div className="text-2xl sm:text-3xl font-extrabold text-black font-sinhala tracking-wide drop-shadow-2xs">
-                {sender.centerNote || 'ලබා දෙන්න.'}
-              </div>
+            <div className="flex items-baseline gap-2 text-sm sm:text-base font-normal">
+              <span className="whitespace-nowrap text-slate-800 font-normal">නගරය :</span>
+              <span className="text-black font-sinhala font-normal">
+                {agent.town}
+              </span>
             </div>
 
-            {/* Bottom Section: Sender / Dealer Details */}
-            <div className="space-y-0.5 text-slate-900 font-sinhala pt-1 border-t border-slate-100">
-              <div className="text-xs sm:text-sm font-extrabold text-black">
-                {sender.name}
-              </div>
-              <div className="text-[11px] sm:text-xs font-bold text-slate-800">
-                {sender.designation}
-              </div>
-              <div className="text-[11px] sm:text-xs font-medium text-slate-800">
-                {sender.address}
-              </div>
-              <div className="text-[11px] sm:text-xs font-bold tracking-wider text-black">
-                {sender.phone}
-              </div>
+            <div className="flex items-baseline gap-2 text-sm sm:text-base font-normal">
+              <span className="whitespace-nowrap text-slate-800 font-normal">දුරකථන අංකය :</span>
+              <span className="text-black tracking-wider font-normal">
+                {agent.phone}
+              </span>
             </div>
-
           </div>
+
+          {/* Center Section: Delivery Note (ලබා දෙන්න.) (Light font weight, avoid bold) */}
+          <div className="my-auto self-center sm:self-end sm:mr-8 text-center sm:text-right py-0.5">
+            <div className="text-2xl sm:text-3xl text-black font-sinhala font-normal tracking-wide">
+              {sender.centerNote || 'ලබා දෙන්න.'}
+            </div>
+          </div>
+
+          {/* Bottom Section: Sender / Dealer Details (Light font weight, avoid bold) */}
+          <div className="space-y-0.5 text-slate-800 font-sinhala font-normal pt-1 border-t border-slate-100">
+            <div className="text-xs sm:text-sm text-black font-normal">
+              {sender.name}
+            </div>
+            <div className="text-[11px] sm:text-xs text-slate-700 font-light">
+              {sender.designation}
+            </div>
+            <div className="text-[11px] sm:text-xs text-slate-700 font-light">
+              {sender.address}
+            </div>
+            <div className="text-[11px] sm:text-xs tracking-wider text-black font-normal">
+              {sender.phone}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

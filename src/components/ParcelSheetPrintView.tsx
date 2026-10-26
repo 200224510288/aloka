@@ -40,40 +40,40 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
       */}
       <div
         id="parcel-a4-sheet"
-        className="print-sheet relative bg-white shadow-xl rounded-md border border-slate-200 overflow-hidden w-full max-w-[1050px]"
+        className="print-sheet relative bg-white shadow-xl rounded-sm border border-slate-200 overflow-hidden w-full max-w-[1050px]"
         style={{
           aspectRatio: '297 / 210',
         }}
       >
-        {/* Subtle Scissor Guides in the center (Visible on screen and optionally print) */}
+        {/* Subtle Scissor Guides in the center */}
         <div className="absolute inset-0 pointer-events-none z-20">
           {/* Vertical Cut Guide Line (Center: 50% = 148.5mm) */}
-          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 border-r border-dashed border-slate-300 flex flex-col justify-between items-center py-2">
-            <span className="text-[10px] text-slate-400 bg-white px-1 font-mono flex items-center gap-0.5">
+          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 border-r border-dashed border-slate-300 flex flex-col justify-between items-center py-1.5">
+            <span className="text-[10px] text-slate-400 bg-white px-0.5 font-mono flex items-center gap-0.5">
               <Scissors className="w-3 h-3 text-slate-400 rotate-90" />
             </span>
-            <span className="text-[10px] text-slate-400 bg-white px-1 font-mono flex items-center gap-0.5">
+            <span className="text-[10px] text-slate-400 bg-white px-0.5 font-mono flex items-center gap-0.5">
               <Scissors className="w-3 h-3 text-slate-400 -rotate-90" />
             </span>
           </div>
 
           {/* Horizontal Cut Guide Line (Center: 50% = 105mm) */}
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 border-b border-dashed border-slate-300 flex justify-between items-center px-2">
-            <span className="text-[10px] text-slate-400 bg-white px-1 font-mono flex items-center gap-0.5">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 border-b border-dashed border-slate-300 flex justify-between items-center px-1.5">
+            <span className="text-[10px] text-slate-400 bg-white px-0.5 font-mono flex items-center gap-0.5">
               <Scissors className="w-3 h-3 text-slate-400" />
             </span>
-            <span className="text-[10px] text-slate-400 bg-white px-1 font-mono flex items-center gap-0.5">
+            <span className="text-[10px] text-slate-400 bg-white px-0.5 font-mono flex items-center gap-0.5">
               <Scissors className="w-3 h-3 text-slate-400 rotate-180" />
             </span>
           </div>
         </div>
 
-        {/* 2x2 Quadrant Grid */}
+        {/* 2x2 Quadrant Grid with minimal outer margins */}
         <div className="w-full h-full grid grid-cols-2 grid-rows-2">
           {displaySlots.map((agent, idx) => (
             <div
               key={idx}
-              className="group relative w-full h-full p-2.5 sm:p-3 box-border flex items-center justify-center overflow-hidden"
+              className="group relative w-full h-full p-1 sm:p-1.5 box-border flex items-center justify-center overflow-hidden"
             >
               <ParcelLabelCard
                 agent={agent}

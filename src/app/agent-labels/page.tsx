@@ -7,19 +7,14 @@ import {
   ArrowLeft, 
   Plus, 
   Search, 
-  Star, 
   Edit3, 
   Trash2, 
   Copy, 
   Download, 
-  Settings, 
-  FileText, 
   RotateCcw, 
   Upload, 
-  Layers,
+  Building, 
   Check,
-  Building,
-  UserCheck,
   Scissors
 } from 'lucide-react';
 import { AgentRecord, SenderSettings, DEFAULT_SENDER_SETTINGS, INITIAL_AGENTS } from '@/types/agent';
@@ -28,12 +23,15 @@ import { AgentModal } from '@/components/AgentModal';
 import { SenderSettingsModal } from '@/components/SenderSettingsModal';
 import { toPng } from 'html-to-image';
 
+const LOCAL_STORAGE_AGENTS_KEY = 'parcel_agents_list_v2';
+const LOCAL_STORAGE_SENDER_KEY = 'parcel_sender_settings_v2';
+
 export default function AgentLabelsPage() {
   const [agents, setAgents] = useState<AgentRecord[]>(INITIAL_AGENTS);
   const [senderSettings, setSenderSettings] = useState<SenderSettings>(DEFAULT_SENDER_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterFavorite, setFilterFavorite] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Print slots (exactly 4 quadrants for 1 A4 sheet)
   const [slots, setSlots] = useState<(AgentRecord | null)[]>([
@@ -53,8 +51,36 @@ export default function AgentLabelsPage() {
   // File input ref for importing JSON
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch agents & sender settings from API
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // 1. Initial Load: Read from LocalStorage immediately, then fetch from API
   useEffect(() => {
+    // Check localStorage cache
+    try {
+      const cachedAgents = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
+      const cachedSender = localStorage.getItem(LOCAL_STORAGE_SENDER_KEY);
+      if (cachedAgents) {
+        const parsed = JSON.parse(cachedAgents);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAgents(parsed);
+          const first = parsed[0];
+          setSlots([first, first, first, first]);
+        }
+      }
+      if (cachedSender) {
+        const parsedSender = JSON.parse(cachedSender);
+        if (parsedSender && parsedSender.name) {
+          setSenderSettings(parsedSender);
+        }
+      }
+    } catch (e) {
+      console.warn('LocalStorage read error:', e);
+    }
+
+    // Fetch from API
     async function loadData() {
       setIsLoading(true);
       try {
@@ -64,17 +90,22 @@ export default function AgentLabelsPage() {
           if (json.success) {
             if (Array.isArray(json.agents) && json.agents.length > 0) {
               setAgents(json.agents);
-              // Pre-fill slots with the first agent or saved ones
+              try {
+                localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(json.agents));
+              } catch (e) {}
               const first = json.agents[0];
               setSlots([first, first, first, first]);
             }
             if (json.senderSettings) {
               setSenderSettings(json.senderSettings);
+              try {
+                localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(json.senderSettings));
+              } catch (e) {}
             }
           }
         }
       } catch (err) {
-        console.warn('Failed to load agents from API, using defaults:', err);
+        console.warn('Failed to load agents from API:', err);
       } finally {
         setIsLoading(false);
       }
@@ -82,36 +113,49 @@ export default function AgentLabelsPage() {
     loadData();
   }, []);
 
-  // Save changes to API
+  // Save changes to both LocalStorage and server API
   const persistChanges = async (newAgents?: AgentRecord[], newSender?: SenderSettings) => {
+    const toSaveAgents = newAgents !== undefined ? newAgents : agents;
+    const toSaveSender = newSender !== undefined ? newSender : senderSettings;
+
+    // Immediately save to localStorage
     try {
-      await fetch('/api/agents', {
+      localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(toSaveAgents));
+      localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(toSaveSender));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+
+    // Save to server API
+    try {
+      const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agents: newAgents !== undefined ? newAgents : agents,
-          senderSettings: newSender !== undefined ? newSender : senderSettings,
+          agents: toSaveAgents,
+          senderSettings: toSaveSender,
         }),
       });
+      if (res.ok) {
+        showToast('නියෝජිත තොරතුරු සාර්ථකව සුරකින ලදී (Saved successfully)');
+      }
     } catch (err) {
       console.error('Error persisting agents to server:', err);
     }
   };
 
-  // Filtered agent list
+  // Filtered agent list by search term
   const filteredAgents = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
+    if (!q) return agents;
     return agents.filter((a) => {
-      if (filterFavorite && !a.isFavorite) return false;
-      if (!q) return true;
       return (
         a.name.toLowerCase().includes(q) ||
         a.town.toLowerCase().includes(q) ||
-        a.phone.toLowerCase().includes(q) ||
-        (a.route && a.route.toLowerCase().includes(q))
+        a.phone.toLowerCase().includes(q)
       );
     });
-  }, [agents, searchTerm, filterFavorite]);
+  }, [agents, searchTerm]);
 
   // Slot operations
   const handleAssignToSlot = (slotIdx: number, agent: AgentRecord) => {
@@ -134,7 +178,7 @@ export default function AgentLabelsPage() {
       if (emptyIdx !== -1) {
         copy[emptyIdx] = agent;
       } else {
-        copy[0] = agent; // cycle back to first if all filled
+        copy[0] = agent;
       }
       return copy;
     });
@@ -155,27 +199,23 @@ export default function AgentLabelsPage() {
   // Agent CRUD
   const handleSaveAgent = (agentData: Partial<AgentRecord>) => {
     if (editingAgent) {
-      // Update existing
+      // Update existing agent
       const updated = agents.map((a) =>
         a.id === editingAgent.id ? ({ ...a, ...agentData, updatedAt: new Date().toISOString() } as AgentRecord) : a
       );
       setAgents(updated);
       persistChanges(updated);
-      // Also update in active slots
+      // Update in active slots
       setSlots((prev) =>
         prev.map((s) => (s && s.id === editingAgent.id ? ({ ...s, ...agentData } as AgentRecord) : s))
       );
     } else {
-      // Create new
+      // Create and save new agent
       const newAgent: AgentRecord = {
         id: `agent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         name: agentData.name || '',
         town: agentData.town || '',
         phone: agentData.phone || '',
-        route: agentData.route,
-        notes: agentData.notes,
-        isFavorite: Boolean(agentData.isFavorite),
-        orderIndex: agents.length,
         createdAt: new Date().toISOString(),
       };
       const updated = [newAgent, ...agents];
@@ -194,13 +234,6 @@ export default function AgentLabelsPage() {
       persistChanges(updated);
       setSlots((prev) => prev.map((s) => (s && s.id === id ? null : s)));
     }
-  };
-
-  const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = agents.map((a) => (a.id === id ? { ...a, isFavorite: !a.isFavorite } : a));
-    setAgents(updated);
-    persistChanges(updated);
   };
 
   const handleSaveSender = (newSettings: SenderSettings) => {
@@ -276,6 +309,14 @@ export default function AgentLabelsPage() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200 no-print font-sinhala">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Dynamic Scoped Print Styles */}
       <style jsx global>{`
         @media print {
@@ -317,7 +358,7 @@ export default function AgentLabelsPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition flex items-center gap-1.5 text-xs font-bold"
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition flex items-center gap-1.5 text-xs font-semibold"
               title="Return to Result Sheet Generator"
             >
               <ArrowLeft className="w-4 h-4 text-slate-500" />
@@ -327,19 +368,19 @@ export default function AgentLabelsPage() {
             <div className="h-6 w-px bg-slate-200" />
 
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white font-extrabold text-sm shadow-xs">
+              <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-sm shadow-xs">
                 ලේ
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight font-sinhala">
+                  <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight font-sinhala">
                     පාර්සල් ලේබල් මුද්‍රණය (Parcel Labels)
                   </h1>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                     A4 = ලේබල් 4ක් (1/4 Size)
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5 font-sinhala">
+                <p className="text-[11px] text-slate-500 font-normal leading-none mt-0.5 font-sinhala">
                   නියෝජිත පාර්සල් සඳහා 1/4 ප්‍රමාණයේ මුද්‍රණ ස්ලිප්
                 </p>
               </div>
@@ -353,7 +394,7 @@ export default function AgentLabelsPage() {
             <button
               type="button"
               onClick={() => setIsSenderModalOpen(true)}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs"
               title="Edit Sender / Dealer details printed on the label"
             >
               <Building className="w-3.5 h-3.5 text-slate-500" />
@@ -366,7 +407,7 @@ export default function AgentLabelsPage() {
               type="button"
               onClick={handleExportPng}
               disabled={isExportingImage}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-2xs"
               title="Download sheet as high-res PNG image"
             >
               <Download className="w-3.5 h-3.5 text-blue-600" />
@@ -377,7 +418,7 @@ export default function AgentLabelsPage() {
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-1.5 text-xs font-extrabold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
+              className="px-4 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
               title="Print standard A4 Landscape Sheet (4 Slips)"
             >
               <Printer className="w-4 h-4" />
@@ -389,17 +430,17 @@ export default function AgentLabelsPage() {
       </header>
 
       {/* Main Body Workspace (No-Print on Sidebar) */}
-      <div className="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
+      <div className="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 items-start">
         
         {/* Left Panel: Agent Directory & Selector (No-Print) */}
-        <div className="w-full lg:w-96 shrink-0 flex flex-col gap-4 no-print">
+        <div className="w-full lg:w-[360px] shrink-0 flex flex-col gap-4 no-print">
           
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 flex flex-col gap-3">
             
             {/* Panel Title & Add Button */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-extrabold text-slate-900 font-sinhala">
+                <h2 className="text-sm font-bold text-slate-900 font-sinhala">
                   අලෙවි නියෝජිතයින් ({filteredAgents.length})
                 </h2>
               </div>
@@ -409,7 +450,7 @@ export default function AgentLabelsPage() {
                   setEditingAgent(null);
                   setIsAgentModalOpen(true);
                 }}
-                className="px-2.5 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 shadow-2xs transition"
+                className="px-2.5 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 shadow-2xs transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span className="font-sinhala">නව නියෝජිතයෙක්</span>
@@ -428,46 +469,34 @@ export default function AgentLabelsPage() {
               />
             </div>
 
-            {/* Filters */}
-            <div className="flex items-center justify-between text-xs">
+            {/* Backup actions */}
+            <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
+              <span className="text-[11px] font-sinhala mr-auto">බැකප්:</span>
               <button
                 type="button"
-                onClick={() => setFilterFavorite(!filterFavorite)}
-                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition ${
-                  filterFavorite
-                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                onClick={handleExportBackup}
+                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center gap-1 text-[11px]"
+                title="Export Backup (JSON)"
               >
-                <Star className={`w-3.5 h-3.5 ${filterFavorite ? 'fill-amber-500 text-amber-500' : 'text-slate-400'}`} />
-                <span className="font-sinhala">නිතර භාවිතා කරන (Favorites)</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>Export</span>
               </button>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleExportBackup}
-                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                  title="Export Backup (JSON)"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                  title="Import Backup (JSON)"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImportBackup}
-                  accept=".json"
-                  className="hidden"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center gap-1 text-[11px]"
+                title="Import Backup (JSON)"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import</span>
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportBackup}
+                accept=".json"
+                className="hidden"
+              />
             </div>
 
             {/* Agent List */}
@@ -484,26 +513,13 @@ export default function AgentLabelsPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-sm text-slate-900 font-sinhala truncate">
-                            {agent.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleFavorite(agent.id, e)}
-                            className="text-slate-300 hover:text-amber-500 p-0.5"
-                          >
-                            <Star
-                              className={`w-3.5 h-3.5 ${
-                                agent.isFavorite ? 'fill-amber-400 text-amber-500' : ''
-                              }`}
-                            />
-                          </button>
-                        </div>
-                        <p className="text-xs font-bold text-slate-700 font-sinhala">
+                        <span className="font-semibold text-sm text-slate-900 font-sinhala truncate block">
+                          {agent.name}
+                        </span>
+                        <p className="text-xs text-slate-600 font-sinhala mt-0.5">
                           {agent.town}
                         </p>
-                        <p className="text-[11px] font-mono font-medium text-slate-500">
+                        <p className="text-[11px] font-mono text-slate-500">
                           {agent.phone}
                         </p>
                       </div>
@@ -537,7 +553,7 @@ export default function AgentLabelsPage() {
                       <button
                         type="button"
                         onClick={() => handleFillAllSlots(agent)}
-                        className="flex-1 py-1 px-2 text-[11px] font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center gap-1 transition font-sinhala"
+                        className="flex-1 py-1 px-2 text-[11px] font-medium rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center gap-1 transition font-sinhala"
                         title="මෙම නියෝජිතයාගෙන් සම්පූර්ණ A4 පත්‍රයම (ස්ලිප් 4ම) පුරවන්න"
                       >
                         <Copy className="w-3 h-3 text-emerald-600" />
@@ -547,7 +563,7 @@ export default function AgentLabelsPage() {
                       <button
                         type="button"
                         onClick={() => handleAddToNextSlot(agent)}
-                        className="py-1 px-2.5 text-[11px] font-bold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center gap-1 transition font-sinhala"
+                        className="py-1 px-2.5 text-[11px] font-medium rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center gap-1 transition font-sinhala"
                         title="ඊළඟ හිස් කොටසට එක් කරන්න"
                       >
                         <Plus className="w-3 h-3 text-blue-600" />
@@ -564,14 +580,14 @@ export default function AgentLabelsPage() {
         </div>
 
         {/* Right Panel: Live A4 Print Sheet Preview */}
-        <div className="flex-1 flex flex-col gap-4 items-center">
+        <div className="flex-1 w-full min-w-0 flex flex-col gap-4 items-center">
           
           {/* Sheet Toolbar (No-Print) */}
           <div className="w-full max-w-[1050px] bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
             
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-extrabold text-slate-800 font-sinhala">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="text-xs font-semibold text-slate-800 font-sinhala">
                 A4 මුද්‍රණ පෙරදසුන (Landscape 297mm × 210mm)
               </span>
               <span className="text-[11px] text-slate-400 font-mono">
@@ -584,7 +600,7 @@ export default function AgentLabelsPage() {
               <button
                 type="button"
                 onClick={handleClearAllSlots}
-                className="px-2.5 py-1 text-xs font-bold rounded-lg text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 transition font-sinhala flex items-center gap-1"
+                className="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 transition font-sinhala flex items-center gap-1"
                 title="Clear all 4 slots"
               >
                 <RotateCcw className="w-3 h-3 text-slate-400" />
@@ -594,7 +610,7 @@ export default function AgentLabelsPage() {
               <button
                 type="button"
                 onClick={handlePrint}
-                className="px-3.5 py-1 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-2xs transition font-sinhala"
+                className="px-3.5 py-1 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-2xs transition font-sinhala cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>මුද්‍රණය කරන්න (Print)</span>
@@ -621,10 +637,9 @@ export default function AgentLabelsPage() {
           <div className="w-full max-w-[1050px] bg-blue-50/70 border border-blue-200 rounded-xl p-3 text-xs text-blue-900 flex items-start gap-2.5 no-print font-sinhala">
             <Scissors className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold">මුද්‍රණ උපදෙස් (Printing Advice):</p>
+              <p className="font-semibold">මුද්‍රණ උපදෙස් (Printing Advice):</p>
               <p className="text-blue-800 text-[11px] mt-0.5">
                 සාමාන්‍ය A4 කඩදාසියක් Print කර මැද ඇති කඩ ඉරි ඔස්සේ කොටස් 4කට කපාගන්න. එක් ලේබලයක් නියෝජිත පාර්සලයේ අලවන්න.
-                (Print on standard A4 paper in Landscape mode at 100% scale, then cut along the dashed guidelines into 4 equal slips).
               </p>
             </div>
           </div>
@@ -657,10 +672,10 @@ export default function AgentLabelsPage() {
                   className="p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition"
                 >
                   <div>
-                    <p className="font-extrabold text-sm text-slate-900 font-sinhala">{a.name}</p>
-                    <p className="text-xs font-bold text-slate-600 font-sinhala">{a.town} • {a.phone}</p>
+                    <p className="font-semibold text-sm text-slate-900 font-sinhala">{a.name}</p>
+                    <p className="text-xs text-slate-600 font-sinhala">{a.town} • {a.phone}</p>
                   </div>
-                  <button className="px-2.5 py-1 text-xs bg-blue-600 text-white font-bold rounded-lg font-sinhala">
+                  <button className="px-2.5 py-1 text-xs bg-blue-600 text-white font-medium rounded-lg font-sinhala">
                     තෝරන්න
                   </button>
                 </div>
