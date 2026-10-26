@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown, Globe, Share2 } from 'lucide-react';
+import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown, Globe, Share2, Package } from 'lucide-react';
 import { DailySheet } from '@/types/lottery';
 import { WorkflowStep } from './StepNavigation';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -113,11 +113,22 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Link to Official Results Hub */}
             <Link
               href="/official-results"
-              className="hidden lg:flex items-center gap-1.5 text-[11px] font-bold text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
+              className="hidden xl:flex items-center gap-1.5 text-[11px] font-bold text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
               title="View live fetched results from NLB & DLB official portals"
             >
               <Globe className="w-3.5 h-3.5 text-blue-600" />
               <span>Official Results</span>
+            </Link>
+
+            {/* Link to Agent Parcel Labels */}
+            <Link
+              href="/agent-labels"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 hover:text-emerald-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 transition shadow-2xs"
+              title="Print 1/4 A4 size parcel labels for agent orders"
+            >
+              <Package className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="font-sinhala">පාර්සල් ලේබල්</span>
+              <span className="text-[10px] text-emerald-700 font-mono hidden sm:inline">(Parcel Labels)</span>
             </Link>
           </div>
 
