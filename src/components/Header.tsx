@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown, Globe } from 'lucide-react';
+import { Calendar, AlertTriangle, Building2, ArrowRight, ArrowLeft, Cloud, RefreshCw, Printer, Sliders, FileDown, Globe, Share2 } from 'lucide-react';
 import { DailySheet } from '@/types/lottery';
 import { WorkflowStep } from './StepNavigation';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
@@ -26,6 +26,7 @@ interface HeaderProps {
   exportBlockedErrors: string[];
   onPrint?: () => void;
   isPrintDisabled?: boolean;
+  onOpenImageExport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   exportBlockedErrors,
   onPrint,
   isPrintDisabled = false,
+  onOpenImageExport,
 }) => {
   const [isEditingDealer, setIsEditingDealer] = useState(false);
   const [dealerInput, setDealerInput] = useState(sheet.headerDealerName);
@@ -67,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 py-2">
         <div className="flex items-center justify-between gap-3">
-          
+
           {/* Left: Brand Identity & Date */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="flex items-center gap-2.5 shrink-0">
@@ -84,8 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium leading-none mt-0.5">
-                  {pageMode === 'print' 
-                    ? 'Sinhala Daily Result Sheets • 1-Click Quick Print' 
+                  {pageMode === 'print'
+                    ? 'Sinhala Daily Result Sheets • 1-Click Quick Print'
                     : 'Sinhala Daily Result Sheets (A4 Landscape)'}
                 </p>
               </div>
@@ -121,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right: Dealer Info & Primary Actions */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            
+
             {/* Dealer Agency Pill */}
             <div className="hidden 2xl:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700">
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
@@ -159,21 +161,20 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Cloud Auto-Sync Status */}
             <div
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
-                cloudStatus === 'syncing'
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${cloudStatus === 'syncing'
                   ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
                   : cloudStatus === 'synced'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : cloudStatus === 'permission_denied'
-                  ? 'bg-amber-50 text-amber-800 border-amber-300'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
-              }`}
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : cloudStatus === 'permission_denied'
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
               title={
                 cloudStatus === 'permission_denied'
                   ? 'Firebase Firestore permission denied: Set allow read, write in Firebase Console -> Firestore -> Rules'
                   : cloudStatus === 'synced'
-                  ? 'Auto-synced to cloud (branch: result_generator_daily_sheets)'
-                  : 'Offline / local cache'
+                    ? 'Auto-synced to cloud (branch: result_generator_daily_sheets)'
+                    : 'Offline / local cache'
               }
             >
               {cloudStatus === 'syncing' ? (
@@ -187,10 +188,10 @@ export const Header: React.FC<HeaderProps> = ({
                 {cloudStatus === 'syncing'
                   ? 'Saving edits...'
                   : cloudStatus === 'synced'
-                  ? 'Auto-Saved'
-                  : cloudStatus === 'permission_denied'
-                  ? 'Cloud: Rule Blocked'
-                  : 'Local Cache'}
+                    ? 'Auto-Saved'
+                    : cloudStatus === 'permission_denied'
+                      ? 'Cloud: Rule Blocked'
+                      : 'Local Cache'}
               </span>
             </div>
 
@@ -199,13 +200,12 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenRoleModal}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer shadow-2xs ${
-                  currentRole === 'staff'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer shadow-2xs ${currentRole === 'staff'
                     ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
                     : currentRole === 'aloka'
-                    ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
-                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 animate-pulse'
-                }`}
+                      ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 animate-pulse'
+                  }`}
                 title="ඔබගේ භූමිකාව මාරු කිරීමට ක්ලික් කරන්න (Click to switch between Aloka and Staff mode)"
               >
                 {currentRole === 'staff' ? (
@@ -235,11 +235,10 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={onPrint}
                   disabled={isPrintDisabled}
-                  className={`px-4 py-2 text-xs font-black rounded-xl flex items-center gap-2 shadow-sm transition ${
-                    isPrintDisabled
+                  className={`px-4 py-2 text-xs font-black rounded-xl flex items-center gap-2 shadow-sm transition ${isPrintDisabled
                       ? 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60'
                       : 'bg-[#15803d] text-white hover:bg-[#166534] active:scale-95 cursor-pointer'
-                  }`}
+                    }`}
                   title={isPrintDisabled ? 'No lottery results available to print for this date' : 'Open Print Dialog to select copies and print'}
                 >
                   <Printer className="w-4 h-4" />
@@ -312,11 +311,10 @@ export const Header: React.FC<HeaderProps> = ({
                         type="button"
                         onClick={onExportPdf}
                         disabled={!isReadyToExport || isExporting}
-                        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition ${
-                          isReadyToExport
+                        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition ${isReadyToExport
                             ? 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                        }`}
+                          }`}
                       >
                         <FileDown className="w-3.5 h-3.5" />
                         <span>{isExporting ? 'Generating PDF...' : 'Download PDF'}</span>
@@ -335,6 +333,22 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {onOpenImageExport && (
+                      <button
+                        type="button"
+                        onClick={onOpenImageExport}
+                        disabled={!isReadyToExport || isExporting}
+                        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer ${isReadyToExport
+                            ? 'bg-[#15803d] text-white hover:bg-[#166534] active:scale-95'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        title="Export single Half-A4 sheet as image and share to WhatsApp"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Image / WhatsApp</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </>

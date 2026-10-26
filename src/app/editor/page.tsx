@@ -18,6 +18,7 @@ import { directPrintSheet } from '@/lib/direct-print';
 import { UnifiedCalendar } from '@/components/UnifiedCalendar';
 import { transliterateSinglish, hasEnglishLetters } from '@/lib/singlish';
 import { RoleSelectModal } from '@/components/RoleSelectModal';
+import ExportImageModal from '@/components/ExportImageModal';
 import { UserRole, getStoredUserRole, setStoredUserRole } from '@/lib/user-role';
 import { buildSheetFromOfficialData, secureFormatLotteryItem } from '@/lib/lottery-format-security';
 import { 
@@ -39,7 +40,8 @@ import {
   RotateCcw,
   Zap,
   ShieldCheck,
-  Trash2
+  Trash2,
+  Share2
 } from 'lucide-react';
 
 
@@ -112,6 +114,7 @@ function EditorContent() {
   // User Role State
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
 
   // Hydrate availableDates from browser localStorage on mount for instant visual indicators
   useEffect(() => {
@@ -2354,6 +2357,21 @@ function EditorContent() {
                   <FileDown className="w-4 h-4" />
                   <span>{isExporting ? 'Generating PDF...' : 'Download PDF'}</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsImageModalOpen(true)}
+                  disabled={!canExport || isExporting}
+                  className={`px-4 py-2 text-xs font-extrabold rounded-xl shadow-sm flex items-center gap-1.5 transition active:scale-[0.98] cursor-pointer ${
+                    canExport
+                      ? 'bg-[#15803d] hover:bg-[#166534] text-white'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
+                  title="Export single Half-A4 sheet as image and share to WhatsApp"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Image / WhatsApp</span>
+                </button>
               </div>
             </div>
 
@@ -2417,6 +2435,15 @@ function EditorContent() {
         currentRole={userRole}
         onSelectRole={handleRoleSelect}
         onClose={() => setIsRoleModalOpen(false)}
+      />
+
+      {/* Export Half-A4 Slip Image & WhatsApp Share Modal */}
+      <ExportImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        sheet={sheet}
+        styleOptions={previewStyles}
+        showToast={showToast}
       />
 
     </div>

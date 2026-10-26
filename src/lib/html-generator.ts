@@ -686,3 +686,416 @@ export function generatePrintHtml(
 </body>
 </html>`;
 }
+
+/**
+ * Generates HTML for a single Half-A4 / A5 slip (148.5mm x 210mm)
+ * Strictly 1 single slip without cut lines, optimized for high-res image export & WhatsApp sharing
+ */
+export function generateSingleSlipHtml(
+  sheet: DailySheet,
+  options: PreviewStyleOptions = {}
+): string {
+  const merged: Required<Omit<PreviewStyleOptions, 'printDensity' | 'customRowGaps'>> & { printDensity: 'eco' | 'high'; customRowGaps?: Record<string, number> } = {
+    ...DEFAULT_STYLE_OPTIONS,
+    ...options,
+    printDensity: options.printDensity || 'eco',
+  };
+  const isHighDensity = merged.printDensity === 'high';
+  const rowHeightMm = merged.rowHeightMm ?? DEFAULT_STYLE_OPTIONS.rowHeightMm;
+  const lotteryNameFontSizePt = merged.lotteryNameFontSizePt ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontSizePt;
+  const drawNoFontSizePt = merged.drawNoFontSizePt ?? DEFAULT_STYLE_OPTIONS.drawNoFontSizePt;
+  const resultFontSizePt = merged.resultFontSizePt ?? DEFAULT_STYLE_OPTIONS.resultFontSizePt;
+  const footerFontSizePt = merged.footerFontSizePt ?? DEFAULT_STYLE_OPTIONS.footerFontSizePt;
+  const metaFontSizePt = merged.metaFontSizePt ?? DEFAULT_STYLE_OPTIONS.metaFontSizePt;
+  const dateFontSizePt = merged.dateFontSizePt ?? metaFontSizePt;
+  const dealerFontSizePt = merged.dealerFontSizePt ?? metaFontSizePt;
+  const dateOffsetYMm = merged.dateOffsetYMm ?? 0.0;
+  const dealerOffsetYMm = merged.dealerOffsetYMm ?? 0.0;
+  const bottomLayoutStyle = merged.bottomLayoutStyle ?? 'clean';
+  const contentGapMm = merged.contentGapMm ?? DEFAULT_STYLE_OPTIONS.contentGapMm;
+  const cellPaddingLeftMm = merged.cellPaddingLeftMm ?? DEFAULT_STYLE_OPTIONS.cellPaddingLeftMm;
+  const announcementOffsetYMm = merged.announcementOffsetYMm ?? DEFAULT_STYLE_OPTIONS.announcementOffsetYMm;
+  const topMarginMm = merged.topMarginMm ?? DEFAULT_STYLE_OPTIONS.topMarginMm;
+  const zodiacIconSizeMm = merged.zodiacIconSizeMm ?? DEFAULT_STYLE_OPTIONS.zodiacIconSizeMm;
+  const showRowTick = merged.showRowTick ?? DEFAULT_STYLE_OPTIONS.showRowTick;
+  const rowTickPosition = merged.rowTickPosition ?? DEFAULT_STYLE_OPTIONS.rowTickPosition;
+  const rowTickColor = merged.rowTickColor ?? DEFAULT_STYLE_OPTIONS.rowTickColor;
+
+  const lotteryNameFontFamily = merged.lotteryNameFontFamily ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontFamily;
+  const lotteryNameFontWeight = merged.lotteryNameFontWeight ?? DEFAULT_STYLE_OPTIONS.lotteryNameFontWeight;
+
+  const drawNoFontFamily = merged.drawNoFontFamily ?? DEFAULT_STYLE_OPTIONS.drawNoFontFamily;
+  const drawNoFontWeight = merged.drawNoFontWeight ?? DEFAULT_STYLE_OPTIONS.drawNoFontWeight;
+
+  const resultFontFamily = merged.resultFontFamily ?? DEFAULT_STYLE_OPTIONS.resultFontFamily;
+  const resultFontWeight = merged.resultFontWeight ?? (isHighDensity ? 800 : DEFAULT_STYLE_OPTIONS.resultFontWeight);
+
+  const letterFontFamily = merged.letterFontFamily ?? DEFAULT_STYLE_OPTIONS.letterFontFamily;
+  const letterFontWeight = merged.letterFontWeight ?? (isHighDensity ? 900 : DEFAULT_STYLE_OPTIONS.letterFontWeight);
+
+  const footerFontFamily = merged.footerFontFamily ?? DEFAULT_STYLE_OPTIONS.footerFontFamily;
+  const footerFontWeight = merged.footerFontWeight ?? DEFAULT_STYLE_OPTIONS.footerFontWeight;
+
+  const dateFontFamily = merged.dateFontFamily ?? DEFAULT_STYLE_OPTIONS.dateFontFamily;
+  const dateFontWeight = merged.dateFontWeight ?? DEFAULT_STYLE_OPTIONS.dateFontWeight;
+
+  const dealerFontFamily = merged.dealerFontFamily ?? DEFAULT_STYLE_OPTIONS.dealerFontFamily;
+  const dealerFontWeight = merged.dealerFontWeight ?? DEFAULT_STYLE_OPTIONS.dealerFontWeight;
+
+  const singleSheetHtml = renderSingleSheet(sheet, isHighDensity, merged);
+
+  return `<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sinhala Lottery Slip - ${sheet.date}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/fonts/fonts.css">
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(/fonts/font_0.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 600;
+      font-display: swap;
+      src: url(/fonts/font_2.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url(/fonts/font_3.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Noto Sans Sinhala';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(/fonts/font_4.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Noto Sans Sinhala';
+      font-style: normal;
+      font-weight: 600;
+      font-display: swap;
+      src: url(/fonts/font_5.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Noto Sans Sinhala';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url(/fonts/font_6.woff2) format('truetype');
+    }
+    @font-face {
+      font-family: 'Noto Sans Sinhala';
+      font-style: normal;
+      font-weight: 800;
+      font-display: swap;
+      src: url(/fonts/font_7.woff2) format('truetype');
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: 'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', sans-serif;
+      width: 148.5mm;
+      min-height: 210mm;
+      height: 210mm;
+      overflow: hidden;
+    }
+
+    .slip-page {
+      width: 148.5mm;
+      height: 210mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      box-sizing: border-box;
+      padding-top: ${topMarginMm}mm;
+      padding-bottom: 5mm;
+      background: #ffffff;
+      position: relative;
+    }
+
+    .sheet-copy {
+      width: 137.5mm;
+      height: ${Math.max(180, 205 - topMarginMm)}mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+    }
+
+    .table-container {
+      width: 137.5mm;
+      border: ${isHighDensity ? '1.5px' : '1.2px'} solid #2b4c7e;
+      border-radius: 3.5mm;
+      overflow: hidden;
+      background-color: #ffffff;
+    }
+
+    .lottery-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+      table-layout: fixed;
+    }
+
+    .lottery-table th,
+    .lottery-table td {
+      border: none;
+      border-bottom: ${isHighDensity ? '1px' : '0.9px'} solid #2b4c7e;
+      border-right: ${isHighDensity ? '1px' : '0.9px'} solid #2b4c7e;
+      padding: 0;
+      vertical-align: middle;
+    }
+
+    .lottery-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .lottery-table tr td:last-child {
+      border-right: none;
+    }
+
+    .col-name {
+      width: 35.5mm;
+      font-size: ${lotteryNameFontSizePt}pt;
+      font-family: ${lotteryNameFontFamily};
+      font-weight: ${lotteryNameFontWeight};
+      color: #000000;
+      padding-left: 1.5mm !important;
+      white-space: nowrap;
+      overflow: hidden;
+      letter-spacing: -0.2px;
+    }
+
+    .col-draw {
+      width: 13mm;
+      font-size: ${drawNoFontSizePt}pt;
+      font-family: ${drawNoFontFamily};
+      font-weight: ${drawNoFontWeight};
+      text-align: center;
+      color: #000000;
+    }
+
+    .col-result {
+      width: 89mm;
+      font-size: ${resultFontSizePt}pt;
+      font-family: ${resultFontFamily};
+      font-weight: ${resultFontWeight};
+      color: #000000;
+      padding-left: ${cellPaddingLeftMm}mm !important;
+      padding-right: 1.5mm !important;
+      letter-spacing: 0.3px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .table-row {
+      height: ${rowHeightMm}mm;
+    }
+
+    .result-content {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      width: 100%;
+      ${showRowTick && rowTickPosition === 'right' ? 'justify-content: space-between;' : ''}
+    }
+
+    .result-numbers-wrapper {
+      display: flex;
+      align-items: center;
+      gap: ${contentGapMm}mm;
+      height: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .row-tick-mark {
+      font-size: ${Math.max(10, resultFontSizePt - 4)}pt;
+      font-weight: 900;
+      color: ${rowTickColor};
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding-right: 1.5mm;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .result-letter {
+      font-size: ${resultFontSizePt}pt;
+      font-weight: ${letterFontWeight};
+      font-family: ${letterFontFamily};
+      min-width: 5.5mm;
+      text-align: center;
+      line-height: 1;
+      color: #000000;
+    }
+
+    .result-zodiac {
+      display: inline-flex;
+      align-items: center;
+      gap: 1.8mm;
+      font-size: ${Math.max(10, resultFontSizePt - 5)}pt;
+      font-family: ${lotteryNameFontFamily};
+      font-weight: ${lotteryNameFontWeight};
+      line-height: 1;
+      color: #000000;
+    }
+
+    .zodiac-icon-img {
+      width: ${zodiacIconSizeMm}mm;
+      height: ${zodiacIconSizeMm}mm;
+      object-fit: contain;
+      vertical-align: middle;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .number-item {
+      font-size: ${resultFontSizePt}pt;
+      font-family: ${resultFontFamily};
+      font-weight: ${resultFontWeight};
+      color: #000000;
+      line-height: 1;
+      display: inline-block;
+      letter-spacing: 0.2px;
+    }
+
+    .boxed-number {
+      border: ${isHighDensity ? '2px' : '1.5px'} solid #000000;
+      padding: 0.3mm 1.6mm;
+      border-radius: 12px;
+      font-family: ${resultFontFamily};
+      font-weight: ${Math.min(900, Number(resultFontWeight) + 100)};
+      line-height: 1;
+    }
+
+    .tiered-sep {
+      font-size: 14pt;
+      color: #222222;
+      font-weight: 700;
+      padding: 0 1mm;
+      line-height: 1;
+    }
+
+    .bonus-number {
+      font-size: 12.5pt;
+      font-weight: ${resultFontWeight};
+      font-family: ${resultFontFamily};
+      color: #000000;
+      margin-left: 1mm;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .no-draw-tag {
+      font-size: 9.5pt;
+      color: #555555;
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    .sheet-footer {
+      padding-top: 1.5mm;
+      padding-left: 3.5mm;
+      padding-right: 3.5mm;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2mm;
+    }
+
+    .footer-announcement {
+      font-size: ${footerFontSizePt}pt;
+      font-family: ${footerFontFamily};
+      font-weight: ${footerFontWeight};
+      line-height: 1.2;
+      color: #000000;
+      min-height: 4.5mm;
+      max-height: 9mm;
+      overflow: hidden;
+      white-space: normal;
+      position: relative;
+      top: ${announcementOffsetYMm}mm;
+    }
+
+    .footer-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #000000;
+      padding-top: 0.5mm;
+    }
+
+    .meta-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 3mm;
+      font-size: ${dateFontSizePt}pt;
+      font-weight: ${dateFontWeight};
+      color: #000000;
+      position: relative;
+      top: ${dateOffsetYMm}mm;
+      ${bottomLayoutStyle === 'boxed' ? 'border: 1.2px solid #2b4c7e; border-radius: 2.5mm; padding: 0.5mm 3mm;' : ''}
+    }
+
+    .footer-dealer {
+      display: inline-flex;
+      align-items: center;
+      font-size: ${dealerFontSizePt}pt;
+      font-family: ${dealerFontFamily};
+      font-weight: ${dealerFontWeight};
+      color: #000000;
+      letter-spacing: -0.2px;
+      text-align: right;
+      position: relative;
+      top: ${dealerOffsetYMm}mm;
+      ${bottomLayoutStyle === 'boxed' ? 'border: 1.2px solid #2b4c7e; border-radius: 2.5mm; padding: 0.5mm 3mm;' : ''}
+    }
+
+    .date-text {
+      font-family: ${dateFontFamily};
+      font-weight: ${dateFontWeight};
+      letter-spacing: 0.5px;
+    }
+
+    .day-text {
+      font-family: ${dealerFontFamily};
+      font-weight: ${dateFontWeight};
+    }
+  </style>
+</head>
+<body>
+  <div class="slip-page">
+    <div class="sheet-copy">
+      ${singleSheetHtml}
+    </div>
+  </div>
+</body>
+</html>`;
+}
+

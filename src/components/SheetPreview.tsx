@@ -40,9 +40,11 @@ import {
   Check,
   ShieldCheck,
   Expand,
-  Cloud
+  Cloud,
+  Share2
 } from 'lucide-react';
 import SaveDesignModal from './SaveDesignModal';
+import ExportImageModal from './ExportImageModal';
 import { calculateRowSpacing, getAllRowsSpacing } from '@/lib/row-spacing';
 
 interface SheetPreviewProps {
@@ -80,6 +82,7 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
   const [defaultDesignId, setDefaultDesignId] = useState<string | null>(null);
   const [activeCustomDesignId, setActiveCustomDesignId] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
   const [customizerTab, setCustomizerTab] = useState<'presets' | 'typography' | 'spacing'>('presets');
   const [cloudDesignsStatus, setCloudDesignsStatus] = useState<'synced' | 'syncing' | 'offline'>('syncing');
 
@@ -1054,6 +1057,21 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
           >
             <FileDown className="w-3.5 h-3.5" />
             <span>{isExporting ? 'Exporting...' : 'Download PDF'}</span>
+          </button>
+
+          {/* Half A4 Image & WhatsApp Share Button */}
+          <button
+            type="button"
+            onClick={() => setIsImageModalOpen(true)}
+            disabled={!canExport || isExporting}
+            className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 shadow-xs transition cursor-pointer ${canExport
+                ? 'bg-[#15803d] text-white hover:bg-[#166534] active:scale-95'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+            title="Export single Half-A4 sheet as image and share to WhatsApp"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Image / WhatsApp</span>
           </button>
         </div>
       </div>
@@ -2280,6 +2298,15 @@ export const SheetPreview: React.FC<SheetPreviewProps> = ({
         currentStyles={styles}
         onSave={handleSaveCustomDesign}
         existingDesigns={savedDesigns}
+      />
+
+      {/* Export Half-A4 Slip Image & WhatsApp Share Modal */}
+      <ExportImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        sheet={sheet}
+        styleOptions={styles}
+        showToast={showToast}
       />
 
     </div>

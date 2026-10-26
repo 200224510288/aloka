@@ -8,15 +8,17 @@ import { Header } from '@/components/Header';
 import { SheetPreview } from '@/components/SheetPreview';
 import { directPrintSheet } from '@/lib/direct-print';
 import { RoleSelectModal } from '@/components/RoleSelectModal';
+import ExportImageModal from '@/components/ExportImageModal';
 import { UserRole, getStoredUserRole, setStoredUserRole } from '@/lib/user-role';
 import { runStaffOfficialAutomation, StaffAutomationState } from '@/lib/staff-automation';
-import { 
-  Printer, 
-  FileDown, 
-  CheckCircle2, 
-  AlertTriangle, 
+import {
+  Printer,
+  FileDown,
+  CheckCircle2,
+  AlertTriangle,
   Pencil,
-  Calendar
+  Calendar,
+  Share2
 } from 'lucide-react';
 
 function getYesterdayDateStr(): string {
@@ -30,8 +32,8 @@ function getYesterdayDateStr(): string {
 
 function formatDateShort(dateStr: string): { day: string; monthShort: string; weekday: string; weekdaySi: string } {
   const d = new Date(dateStr);
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return {
     day: String(d.getDate()),
     monthShort: MONTHS[d.getMonth()] || '',
@@ -60,6 +62,7 @@ export default function Home() {
   // Role Selection State
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState<boolean>(false);
 
   // Staff Automation State
   const [isAutomating, setIsAutomating] = useState<boolean>(false);
@@ -118,11 +121,11 @@ export default function Home() {
         if (hasData) {
           try {
             localStorage.setItem(`sinhala_lottery_sheet_${date}`, JSON.stringify(clean));
-          } catch {}
+          } catch { }
         } else {
           try {
             localStorage.removeItem(`sinhala_lottery_sheet_${date}`);
-          } catch {}
+          } catch { }
         }
       } else {
         if (data.availableDates && Array.isArray(data.availableDates)) {
@@ -130,7 +133,7 @@ export default function Home() {
         }
         try {
           localStorage.removeItem(`sinhala_lottery_sheet_${date}`);
-        } catch {}
+        } catch { }
         setSheet(sanitizeSheet(createEmptySheet(date)));
       }
     } catch (e) {
@@ -141,7 +144,7 @@ export default function Home() {
           setSheet(sanitizeSheet(JSON.parse(cached)));
           return;
         }
-      } catch {}
+      } catch { }
       setSheet(sanitizeSheet(createEmptySheet(date)));
     }
   }, []);
@@ -202,7 +205,7 @@ export default function Home() {
           // Document was deleted from Firestore
           try {
             localStorage.removeItem(`sinhala_lottery_sheet_${selectedDate}`);
-          } catch {}
+          } catch { }
           setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
           setAvailableDates((prev) => prev.filter((d) => d !== selectedDate));
           setCloudStatus('synced');
@@ -216,7 +219,7 @@ export default function Home() {
           try {
             const updated = JSON.parse(e.newValue);
             setSheet(updated);
-          } catch {}
+          } catch { }
         } else {
           setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
         }
@@ -229,7 +232,7 @@ export default function Home() {
           const cached = localStorage.getItem(`sinhala_lottery_sheet_${selectedDate}`);
           if (cached) setSheet(JSON.parse(cached));
           else setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
-        } catch {}
+        } catch { }
       }
     };
 
@@ -239,7 +242,7 @@ export default function Home() {
         setAvailableDates((prev) => prev.filter((d) => d !== deletedDate));
         try {
           localStorage.removeItem(`sinhala_lottery_sheet_${deletedDate}`);
-        } catch {}
+        } catch { }
         if (deletedDate === selectedDate) {
           setSheet(sanitizeSheet(createEmptySheet(selectedDate)));
           showToast(`මෙම දිනයේ ප්‍රතිඵල පරිපාලක විසින් මකා දමා ඇත (Results for this date deleted by manager)`, 'info');
@@ -327,8 +330,8 @@ export default function Home() {
         setSheet(result.sheet);
         setCloudStatus('synced');
         showToast(
-          result.rawSheetAttached 
-            ? '✓ අමු පත්‍රිකාව (PDF) සහ නිල දත්ත 100% තහවුරු විය!' 
+          result.rawSheetAttached
+            ? '✓ අමු පත්‍රිකාව (PDF) සහ නිල දත්ත 100% තහවුරු විය!'
             : '✓ නිල ලොතරැයි ප්‍රතිඵල 100% තහවුරු විය. මුද්‍රණය කිරීමට සූදානම්!',
           'success'
         );
@@ -458,8 +461,8 @@ export default function Home() {
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sheet, 
+        body: JSON.stringify({
+          sheet,
           printDensity: activeStyles.printDensity || printDensity,
           styleOptions: activeStyles
         }),
@@ -498,7 +501,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900">
-      
+
       {/* Role Selection Modal (Opens automatically if not selected, or via header) */}
       <RoleSelectModal
         isOpen={isRoleModalOpen}
@@ -507,11 +510,19 @@ export default function Home() {
         onClose={userRole ? () => setIsRoleModalOpen(false) : undefined}
       />
 
+      {/* Export Half-A4 Slip Image & WhatsApp Share Modal */}
+      <ExportImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        sheet={sheet}
+        styleOptions={previewStyles}
+        showToast={showToast}
+      />
+
       {/* Toast Notification */}
       {notification && (
-        <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-xs font-bold text-white flex items-center gap-2 transition-all animate-in slide-in-from-bottom-2 ${
-          notification.type === 'success' ? 'bg-[#15803d]' : notification.type === 'error' ? 'bg-red-700' : 'bg-slate-900'
-        }`}>
+        <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-xs font-bold text-white flex items-center gap-2 transition-all animate-in slide-in-from-bottom-2 ${notification.type === 'success' ? 'bg-[#15803d]' : notification.type === 'error' ? 'bg-red-700' : 'bg-slate-900'
+          }`}>
           {notification.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
           <span>{notification.message}</span>
         </div>
@@ -535,7 +546,7 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-[1720px] mx-auto p-3 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-4 items-stretch">
-        
+
         {/* LEFT SIDEBAR */}
         <aside className="w-full lg:w-[350px] xl:w-[380px] shrink-0 flex flex-col gap-3">
 
@@ -558,7 +569,7 @@ export default function Home() {
               </div>
             </div>
           )}
-          
+
           {/* Aloka Admin Quick Actions (Only shown in Aloka mode) */}
           {userRole === 'aloka' && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
@@ -591,11 +602,10 @@ export default function Home() {
                 type="button"
                 onClick={() => handlePrint()}
                 disabled={!hasSheetData}
-                className={`w-full py-3 text-[15px] font-black rounded-xl flex items-center justify-center gap-2.5 transition-all mb-2 ${
-                  !hasSheetData
+                className={`w-full py-3 text-[15px] font-black rounded-xl flex items-center justify-center gap-2.5 transition-all mb-2 ${!hasSheetData
                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                     : 'bg-[#15803d] hover:bg-[#166534] text-white shadow-sm active:scale-[0.97] cursor-pointer'
-                }`}
+                  }`}
               >
                 <Printer className="w-5 h-5" />
                 <span className="font-sinhala">මුද්‍රණය කරන්න</span>
@@ -620,6 +630,21 @@ export default function Home() {
                   <span>PDF</span>
                 </button>
               </div>
+
+              {/* Half A4 Image & WhatsApp Share */}
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(true)}
+                disabled={!hasSheetData}
+                className={`w-full py-2 px-3 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition active:scale-[0.97] border cursor-pointer mt-2 ${
+                  hasSheetData
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                }`}
+              >
+                <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Image / WhatsApp (වට්ස්ඇප් යවන්න)</span>
+              </button>
             </div>
           )}
 
@@ -666,11 +691,10 @@ export default function Home() {
                 return (
                   <div
                     key={item.date}
-                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all cursor-pointer border ${
-                      isActive
+                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all cursor-pointer border ${isActive
                         ? 'bg-slate-900 text-white border-slate-900'
                         : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-100 hover:border-slate-200'
-                    }`}
+                      }`}
                     onClick={() => handleDateChange(item.date)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -700,11 +724,10 @@ export default function Home() {
                           e.stopPropagation();
                           handleQuickPrint(item.date);
                         }}
-                        className={`p-1.5 rounded-lg transition active:scale-90 cursor-pointer ${
-                          isActive
+                        className={`p-1.5 rounded-lg transition active:scale-90 cursor-pointer ${isActive
                             ? 'bg-white/15 hover:bg-white/25 text-white'
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                        }`}
+                          }`}
                         title={`Print ${item.date}`}
                       >
                         <Printer className="w-3.5 h-3.5" />
