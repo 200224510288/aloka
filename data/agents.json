@@ -20,7 +20,7 @@
     "agentDetailsSize": 22,
     "centerNoteSize": 38,
     "senderSize": 14.5,
-    "outerMarginMm": 4.5,
+    "outerMarginMm": 8,
     "innerPaddingPx": 16
   },
   "updatedAt": "2026-10-26T06:32:45.125Z"

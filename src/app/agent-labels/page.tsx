@@ -102,6 +102,9 @@ export default function AgentLabelsPage() {
       if (cachedFonts) {
         const parsedFonts = JSON.parse(cachedFonts);
         if (parsedFonts && parsedFonts.agentNameSize) {
+          if (!parsedFonts.outerMarginMm || parsedFonts.outerMarginMm < 7) {
+            parsedFonts.outerMarginMm = 8;
+          }
           setFontSettings(parsedFonts);
         }
       }
@@ -134,9 +137,13 @@ export default function AgentLabelsPage() {
               } catch (e) {}
             }
             if (json.fontSettings) {
-              setFontSettings(json.fontSettings);
+              const fs = json.fontSettings;
+              if (!fs.outerMarginMm || fs.outerMarginMm < 7) {
+                fs.outerMarginMm = 8;
+              }
+              setFontSettings(fs);
               try {
-                localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(json.fontSettings));
+                localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(fs));
               } catch (e) {}
             }
           }
@@ -159,7 +166,11 @@ export default function AgentLabelsPage() {
             setSenderSettings(cloudData.senderSettings);
           }
           if (cloudData.fontSettings) {
-            setFontSettings(cloudData.fontSettings);
+            const fs = cloudData.fontSettings;
+            if (!fs.outerMarginMm || fs.outerMarginMm < 7) {
+              fs.outerMarginMm = 8;
+            }
+            setFontSettings(fs);
           }
           try {
             localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(cloudData.agents));
@@ -167,7 +178,11 @@ export default function AgentLabelsPage() {
               localStorage.setItem(LOCAL_STORAGE_SENDER_KEY, JSON.stringify(cloudData.senderSettings));
             }
             if (cloudData.fontSettings) {
-              localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(cloudData.fontSettings));
+              const fs = cloudData.fontSettings;
+              if (!fs.outerMarginMm || fs.outerMarginMm < 7) {
+                fs.outerMarginMm = 8;
+              }
+              localStorage.setItem(LOCAL_STORAGE_FONT_KEY, JSON.stringify(fs));
             }
           } catch (e) {}
           setCloudStatus('synced');
@@ -196,7 +211,13 @@ export default function AgentLabelsPage() {
       if (cloudData && Array.isArray(cloudData.agents) && cloudData.agents.length > 0) {
         setAgents(cloudData.agents);
         if (cloudData.senderSettings) setSenderSettings(cloudData.senderSettings);
-        if (cloudData.fontSettings) setFontSettings(cloudData.fontSettings);
+        if (cloudData.fontSettings) {
+          const fs = cloudData.fontSettings;
+          if (!fs.outerMarginMm || fs.outerMarginMm < 7) {
+            fs.outerMarginMm = 8;
+          }
+          setFontSettings(fs);
+        }
         setCloudStatus('synced');
       }
     });
@@ -448,15 +469,15 @@ export default function AgentLabelsPage() {
       <style jsx global>{`
         @media print {
           @page {
-            size: 297mm 210mm landscape !important;
-            margin: 0mm !important;
+            size: A4 landscape;
+            margin: 0;
           }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
-            width: 297mm !important;
-            height: 210mm !important;
+            width: 100% !important;
+            height: 100% !important;
             overflow: hidden !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -474,11 +495,13 @@ export default function AgentLabelsPage() {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
-            width: 297mm !important;
-            height: 210mm !important;
-            max-width: none !important;
-            max-height: none !important;
-            margin: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 297mm !important;
+            max-height: 210mm !important;
+            margin: auto !important;
             padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
@@ -572,7 +595,7 @@ export default function AgentLabelsPage() {
             >
               <Sliders className="w-3.5 h-3.5 text-emerald-600" />
               <span className="hidden sm:inline font-sinhala">අකුරු සහ මායිම්</span>
-              <span className="text-[10px] text-slate-400 font-mono hidden md:inline">({fontSettings.outerMarginMm ?? 4}mm)</span>
+              <span className="text-[10px] text-slate-400 font-mono hidden md:inline">({fontSettings.outerMarginMm ?? 8}mm)</span>
             </button>
 
             {/* Sender Settings Button */}

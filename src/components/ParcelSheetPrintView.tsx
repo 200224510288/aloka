@@ -76,7 +76,7 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
               key={idx}
               className="group relative w-full h-full box-border flex items-center justify-center overflow-hidden transition-all duration-150"
               style={{
-                padding: `${fontSettings?.outerMarginMm !== undefined ? fontSettings.outerMarginMm : 4}mm`
+                padding: `${fontSettings?.outerMarginMm !== undefined ? fontSettings.outerMarginMm : 8}mm`
               }}
             >
               <ParcelLabelCard

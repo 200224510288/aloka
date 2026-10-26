@@ -37,7 +37,7 @@ export const DEFAULT_FONT_SETTINGS: LabelFontSettings = {
   agentDetailsSize: 20,
   centerNoteSize: 34,
   senderSize: 13,
-  outerMarginMm: 4,
+  outerMarginMm: 8,
   innerPaddingPx: 16,
 };
 

@@ -43,7 +43,7 @@ body {
 /* Print specific styles */
 @media print {
   @page {
-    size: 297mm 210mm landscape;
+    size: A4 landscape;
     margin: 0;
   }
   body {

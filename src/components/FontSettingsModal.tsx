@@ -81,7 +81,7 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
     onClose();
   };
 
-  const outerMargin = current.outerMarginMm !== undefined ? current.outerMarginMm : 4;
+  const outerMargin = current.outerMarginMm !== undefined ? current.outerMarginMm : 8;
   const innerPadding = current.innerPaddingPx !== undefined ? current.innerPaddingPx : 16;
 
   return (
@@ -159,7 +159,7 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                     මුද්‍රණයේදී මායිම් කැපී යාම (Cropping) වැළැක්වීම:
                   </p>
                   <p className="text-[11px] leading-relaxed text-emerald-800">
-                    සාමාන්‍ය මුද්‍රණ යන්ත්‍රවල (Printers) කඩදාසියේ දාරයේ අවම වශයෙන් 3mm - 5mm පමණ මුද්‍රණය නොවන ප්‍රදේශයක් පවතී. කඩදාසි දාරයේ සිට පරතරය (Outer Margin) වැඩි කිරීමෙන් ලේබලයේ කළු මායිම කැපී යාම සම්පූර්ණයෙන්ම වළක්වා ගත හැක.
+                    සාමාන්‍ය Laser සහ Inkjet Printers වල කඩදාසි දාරයේ 5mm - 7mm පමණ මුද්‍රණය නොවන Non-printable Margin එකක් පවතී. කළු මායිම් රේඛාව කැපී යාම වැළැක්වීමට <strong>නිර්දේශිත පරතරය (Outer Margin) 8mm හෝ ඊට වැඩි අගයක්</strong> තබන්න.
                   </p>
                 </div>
               </div>
@@ -172,28 +172,6 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                 <div className="grid grid-cols-4 gap-2">
                   <button
                     type="button"
-                    onClick={() => applyMarginPreset(2, 14)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer ${
-                      outerMargin === 2
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
-                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                    }`}
-                  >
-                    තද (2mm)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyMarginPreset(4, 16)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer shadow-2xs ${
-                      outerMargin === 4
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
-                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                    }`}
-                  >
-                    සාමාන්‍ය (4mm)
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => applyMarginPreset(6, 16)}
                     className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer ${
                       outerMargin === 6
@@ -201,21 +179,56 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                         : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                     }`}
                   >
-                    ආරක්ෂිත (6mm)
+                    සිහින් (6mm)
                   </button>
                   <button
                     type="button"
                     onClick={() => applyMarginPreset(8, 16)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer ${
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer shadow-2xs ${
                       outerMargin === 8
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    ⭐ සාමාන්‍ය (8mm)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarginPreset(10, 16)}
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer ${
+                      outerMargin === 10
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
                         : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                     }`}
                   >
-                    විශාල (8mm)
+                    ආරක්ෂිත (10mm)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarginPreset(12, 16)}
+                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition text-center font-sinhala cursor-pointer ${
+                      outerMargin === 12
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    විශාල (12mm)
                   </button>
                 </div>
               </div>
+
+              {/* Warning if outer margin is too small */}
+              {outerMargin < 7 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 font-sinhala flex items-start gap-2.5">
+                  <span className="text-base leading-none">⚠️</span>
+                  <div>
+                    <span className="font-bold block">අවධානය: මායිම් කැපී යාමේ අවධානමක් පවතී!</span>
+                    <span className="text-[11px] text-amber-800 leading-relaxed block mt-0.5">
+                      පරතරය 7mm ට වඩා අඩු කළ විට Printers වල කළු මායිම් රේඛාව (Border) කැපී යා හැක. ආරක්ෂිත මුද්‍රණයක් සඳහා 8mm තෝරන්න.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="h-px bg-slate-100" />
 
@@ -237,7 +250,7 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                 <div className="flex items-center gap-2.5 pt-1">
                   <button
                     type="button"
-                    onClick={() => updateSetting('outerMarginMm', Math.max(0, outerMargin - 0.5))}
+                    onClick={() => updateSetting('outerMarginMm', Math.max(3, outerMargin - 0.5))}
                     className="w-7 h-7 rounded-lg bg-white hover:bg-slate-100 text-slate-700 flex items-center justify-center transition border border-slate-300 cursor-pointer shadow-2xs"
                     title="පරතරය 0.5mm කින් අඩු කරන්න"
                   >
@@ -245,8 +258,8 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                   </button>
                   <input
                     type="range"
-                    min={0}
-                    max={12}
+                    min={3}
+                    max={16}
                     step={0.5}
                     value={outerMargin}
                     onChange={(e) => updateSetting('outerMarginMm', parseFloat(e.target.value))}
@@ -254,7 +267,7 @@ export const FontSettingsModal: React.FC<FontSettingsModalProps> = ({
                   />
                   <button
                     type="button"
-                    onClick={() => updateSetting('outerMarginMm', Math.min(12, outerMargin + 0.5))}
+                    onClick={() => updateSetting('outerMarginMm', Math.min(16, outerMargin + 0.5))}
                     className="w-7 h-7 rounded-lg bg-white hover:bg-slate-100 text-slate-700 flex items-center justify-center transition border border-slate-300 cursor-pointer shadow-2xs"
                     title="පරතරය 0.5mm කින් වැඩි කරන්න"
                   >

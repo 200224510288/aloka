@@ -74,8 +74,8 @@ export function generateParcelPrintHtml(
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     @page {
-      size: 297mm 210mm landscape;
-      margin: 0mm;
+      size: A4 landscape;
+      margin: 0;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -83,8 +83,8 @@ export function generateParcelPrintHtml(
       padding: 0;
     }
     html, body {
-      width: 297mm;
-      height: 210mm;
+      width: 100%;
+      height: 100%;
       margin: 0;
       padding: 0;
       background: #ffffff;
@@ -96,19 +96,23 @@ export function generateParcelPrintHtml(
     .page-container {
       width: 297mm;
       height: 210mm;
+      max-width: 100vw;
+      max-height: 100vh;
+      margin: 0 auto;
       position: relative;
       display: grid;
-      grid-template-columns: 148.5mm 148.5mm;
-      grid-template-rows: 105mm 105mm;
+      grid-template-columns: 50% 50%;
+      grid-template-rows: 50% 50%;
       background: #ffffff;
+      box-sizing: border-box;
     }
 
-    /* Cut Guidelines (Exact 50% = 148.5mm / 105mm) */
+    /* Cut Guidelines (Exact 50% Center Lines) */
     .cut-line-v {
       position: absolute;
       top: 0;
       bottom: 0;
-      left: 148.5mm;
+      left: 50%;
       width: 0;
       border-left: 1px dashed #cbd5e1;
       pointer-events: none;
@@ -118,7 +122,7 @@ export function generateParcelPrintHtml(
       position: absolute;
       left: 0;
       right: 0;
-      top: 105mm;
+      top: 50%;
       height: 0;
       border-top: 1px dashed #cbd5e1;
       pointer-events: none;
@@ -126,9 +130,9 @@ export function generateParcelPrintHtml(
     }
 
     .slip-outer {
-      width: 148.5mm;
-      height: 105mm;
-      padding: ${fonts.outerMarginMm !== undefined ? fonts.outerMarginMm : 4}mm;
+      width: 100%;
+      height: 100%;
+      padding: ${fonts.outerMarginMm !== undefined ? fonts.outerMarginMm : 8}mm;
       box-sizing: border-box;
       display: flex;
     }
@@ -266,12 +270,13 @@ export function directPrintParcelLabels(
       printFrame = document.createElement('iframe');
       printFrame.id = 'parcel-labels-print-frame';
       printFrame.style.position = 'fixed';
-      printFrame.style.left = '-9999px';
-      printFrame.style.top = '-9999px';
+      printFrame.style.right = '100vw';
+      printFrame.style.bottom = '100vh';
       printFrame.style.width = '297mm';
       printFrame.style.height = '210mm';
       printFrame.style.border = '0';
-      printFrame.style.visibility = 'hidden';
+      printFrame.style.opacity = '0';
+      printFrame.style.pointerEvents = 'none';
       printFrame.style.zIndex = '-9999';
       document.body.appendChild(printFrame);
     }
@@ -286,7 +291,7 @@ export function directPrintParcelLabels(
     frameDoc.write(html);
     frameDoc.close();
 
-    setTimeout(() => {
+    const triggerPrint = () => {
       try {
         printFrame.contentWindow?.focus();
         printFrame.contentWindow?.print();
@@ -295,7 +300,16 @@ export function directPrintParcelLabels(
         console.error('Print frame error:', err);
         window.print();
       }
-    }, 250);
+    };
+
+    // Ensure all Sinhala and external fonts are fully loaded before showing print dialog
+    if (frameDoc.fonts && frameDoc.fonts.ready) {
+      frameDoc.fonts.ready.then(() => {
+        setTimeout(triggerPrint, 150);
+      });
+    } else {
+      setTimeout(triggerPrint, 350);
+    }
 
     return true;
   } catch (err) {
