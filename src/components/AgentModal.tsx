@@ -119,6 +119,26 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
               autoFocus
             />
+            {name.trim() && (
+              <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-sinhala flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[11px] text-emerald-700 font-medium shrink-0">සිංහල වචනය:</span>
+                  <span className="font-bold text-sm text-emerald-950 font-sinhala truncate">
+                    {hasEnglishLetters(name) ? transliterateSinglish(name) : name}
+                  </span>
+                </div>
+                {hasEnglishLetters(name) && (
+                  <button
+                    type="button"
+                    onClick={() => setName(transliterateSinglish(name))}
+                    className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 bg-white px-2 py-0.5 rounded border border-emerald-300 shadow-2xs hover:bg-emerald-100 transition shrink-0"
+                    title="මෙම සිංහල වචනය යොදන්න"
+                  >
+                    යොදන්න ↵
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Town / Destination */}
@@ -135,6 +155,26 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               placeholder="උදා: වත්තේගම"
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sinhala"
             />
+            {town.trim() && (
+              <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-sinhala flex items-center justify-between">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[11px] text-emerald-700 font-medium shrink-0">සිංහල වචනය:</span>
+                  <span className="font-bold text-sm text-emerald-950 font-sinhala truncate">
+                    {hasEnglishLetters(town) ? transliterateSinglish(town) : town}
+                  </span>
+                </div>
+                {hasEnglishLetters(town) && (
+                  <button
+                    type="button"
+                    onClick={() => setTown(transliterateSinglish(town))}
+                    className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 bg-white px-2 py-0.5 rounded border border-emerald-300 shadow-2xs hover:bg-emerald-100 transition shrink-0"
+                    title="මෙම සිංහල වචනය යොදන්න"
+                  >
+                    යොදන්න ↵
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Phone Number */}
