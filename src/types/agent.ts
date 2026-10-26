@@ -20,10 +20,12 @@ export interface SenderSettings {
 }
 
 export interface LabelFontSettings {
-  agentNameSize: number;    // in px (default: 26, range: 18 - 36)
+  agentNameSize: number;    // in px (default: 26, range: 18 - 38)
   agentDetailsSize: number; // in px (default: 20, range: 14 - 28)
   centerNoteSize: number;   // in px (default: 34, range: 22 - 46)
   senderSize: number;       // in px (default: 13, range: 10 - 18)
+  outerMarginMm?: number;   // in mm (distance from paper/cut edge to border, default: 4, range: 0 - 12)
+  innerPaddingPx?: number;  // in px (distance from border to text, default: 16, range: 8 - 30)
 }
 
 export interface PrintSheetState {
@@ -35,6 +37,8 @@ export const DEFAULT_FONT_SETTINGS: LabelFontSettings = {
   agentDetailsSize: 20,
   centerNoteSize: 34,
   senderSize: 13,
+  outerMarginMm: 4,
+  innerPaddingPx: 16,
 };
 
 export const DEFAULT_SENDER_SETTINGS: SenderSettings = {

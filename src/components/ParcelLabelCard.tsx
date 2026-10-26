@@ -96,8 +96,13 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
         </div>
       )}
 
-      {/* Single Border Frame - Utilises full 1/4 A4 quadrant */}
-      <div className="w-full h-full border border-black p-3 sm:p-4 lg:p-5 flex flex-col justify-between relative overflow-hidden bg-white box-border">
+      {/* Single Border Frame - Utilises full 1/4 A4 quadrant with customizable padding */}
+      <div 
+        className="w-full h-full border border-black flex flex-col justify-between relative overflow-hidden bg-white box-border transition-all duration-150"
+        style={{
+          padding: `${fontSettings?.innerPaddingPx !== undefined ? fontSettings.innerPaddingPx : 16}px`
+        }}
+      >
         
         {/* Top Section: Agent / Recipient Details - Customizable font size */}
         <div className="space-y-1 sm:space-y-1.5 text-slate-900 font-sinhala font-normal">

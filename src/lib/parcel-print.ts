@@ -128,7 +128,7 @@ export function generateParcelPrintHtml(
     .slip-outer {
       width: 148.5mm;
       height: 105mm;
-      padding: 2mm;
+      padding: ${fonts.outerMarginMm !== undefined ? fonts.outerMarginMm : 4}mm;
       box-sizing: border-box;
       display: flex;
     }
@@ -137,7 +137,7 @@ export function generateParcelPrintHtml(
       width: 100%;
       height: 100%;
       border: 1px solid #000000;
-      padding: 16px 20px;
+      padding: ${fonts.innerPaddingPx !== undefined ? fonts.innerPaddingPx : 16}px;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;

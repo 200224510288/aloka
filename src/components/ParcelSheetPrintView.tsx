@@ -74,7 +74,10 @@ export const ParcelSheetPrintView: React.FC<ParcelSheetPrintViewProps> = ({
           {displaySlots.map((agent, idx) => (
             <div
               key={idx}
-              className="group relative w-full h-full p-[2mm] box-border flex items-center justify-center overflow-hidden"
+              className="group relative w-full h-full box-border flex items-center justify-center overflow-hidden transition-all duration-150"
+              style={{
+                padding: `${fontSettings?.outerMarginMm !== undefined ? fontSettings.outerMarginMm : 4}mm`
+              }}
             >
               <ParcelLabelCard
                 agent={agent}
