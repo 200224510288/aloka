@@ -1,6 +1,6 @@
 {
-  "isFooterReviewed": false,
   "branch": "result-generator",
+  "headerGreeting": "ඔබට සුබ දවසක් !",
   "lotteries": [
     {
       "extractionConfidence": 100,
@@ -352,12 +352,14 @@
       "lotteryId": "vasi"
     }
   ],
-  "dayOfWeekSi": "ඉරිදා",
-  "lastCloudUpdate": "2026-10-26T03:15:40.735Z",
-  "syncedAt": "2026-10-26T03:15:40.735Z",
-  "updatedAt": "2026-10-26T03:16:08.840Z",
   "headerDealerName": "S.W.ඔස්මන් ද සිල්වා",
+  "syncedAt": "2026-10-26T03:25:51.434Z",
+  "date": "2026-10-25",
+  "updatedAt": "2026-10-26T03:25:51.823Z",
+  "isFooterReviewed": false,
   "footerAnnouncement": "මහජන සම්පත රු 100 000ක් ඔස්මන් ද සිල්වගෙන්",
+  "lastCloudUpdate": "2026-10-26T03:25:51.434Z",
+  "dayOfWeekSi": "ඉරිදා",
   "sources": [
     {
       "fileType": "pdf",
@@ -372,7 +374,5 @@
       "id": "doc_1792970563617_46n25",
       "pageCount": 1
     }
-  ],
-  "date": "2026-10-25",
-  "headerGreeting": "ඔබට සුබ දවසක් !"
+  ]
 }

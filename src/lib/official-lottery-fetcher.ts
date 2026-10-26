@@ -75,7 +75,7 @@ export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
   'mesham': ALL_ZODIAC_DEFINITIONS[0],
   'මේෂ': ALL_ZODIAC_DEFINITIONS[0],
 
-  // Taurus (DLB uses wushaba, wushabha, vrushaba, rushaba, etc.)
+  // Taurus (DLB uses wushaba, wushabha, vrushaba, rushaba, vushaba, etc.)
   'taurus': ALL_ZODIAC_DEFINITIONS[1],
   'wushaba': ALL_ZODIAC_DEFINITIONS[1],
   'wushabha': ALL_ZODIAC_DEFINITIONS[1],
@@ -88,6 +88,8 @@ export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
   'rishaba': ALL_ZODIAC_DEFINITIONS[1],
   'rishabha': ALL_ZODIAC_DEFINITIONS[1],
   'wishaba': ALL_ZODIAC_DEFINITIONS[1],
+  'vushaba': ALL_ZODIAC_DEFINITIONS[1],
+  'vushabha': ALL_ZODIAC_DEFINITIONS[1],
   'වෘෂභ': ALL_ZODIAC_DEFINITIONS[1],
 
   // Gemini
@@ -130,11 +132,14 @@ export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
   'tulam': ALL_ZODIAC_DEFINITIONS[6],
   'තුලා': ALL_ZODIAC_DEFINITIONS[6],
 
-  // Scorpio
+  // Scorpio (DLB confirmed: vushchika — the 'r' is often dropped in DLB filenames)
   'scorpio': ALL_ZODIAC_DEFINITIONS[7],
   'scorpian': ALL_ZODIAC_DEFINITIONS[7],
   'vrushchika': ALL_ZODIAC_DEFINITIONS[7],
   'vrushika': ALL_ZODIAC_DEFINITIONS[7],
+  'vushchika': ALL_ZODIAC_DEFINITIONS[7],
+  'vushika': ALL_ZODIAC_DEFINITIONS[7],
+  'wushchika': ALL_ZODIAC_DEFINITIONS[7],
   'wruchika': ALL_ZODIAC_DEFINITIONS[7],
   'wrichika': ALL_ZODIAC_DEFINITIONS[7],
   'wrischika': ALL_ZODIAC_DEFINITIONS[7],
@@ -147,6 +152,7 @@ export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
   'sagittarius': ALL_ZODIAC_DEFINITIONS[8],
   'dhanu': ALL_ZODIAC_DEFINITIONS[8],
   'dhanus': ALL_ZODIAC_DEFINITIONS[8],
+  'danu': ALL_ZODIAC_DEFINITIONS[8],
   'ධනු': ALL_ZODIAC_DEFINITIONS[8],
 
   // Capricorn
@@ -172,21 +178,91 @@ export const ZODIAC_KEYWORD_MAP: Record<string, ZodiacMatchInfo> = {
 };
 
 /**
- * Robust identification of Zodiac sign from image filenames, URLs, English/Sinhala names
+ * Levenshtein edit distance between two strings.
+ * Used as a fuzzy fallback when DLB introduces unknown zodiac spellings.
+ */
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Canonical romanized root for each zodiac sign — used for fuzzy matching
+const ZODIAC_CANONICAL_ROOTS: { root: string; def: ZodiacMatchInfo }[] = [
+  { root: 'mesha', def: ALL_ZODIAC_DEFINITIONS[0] },
+  { root: 'vrushabha', def: ALL_ZODIAC_DEFINITIONS[1] },
+  { root: 'mithuna', def: ALL_ZODIAC_DEFINITIONS[2] },
+  { root: 'kataka', def: ALL_ZODIAC_DEFINITIONS[3] },
+  { root: 'sinha', def: ALL_ZODIAC_DEFINITIONS[4] },
+  { root: 'kanya', def: ALL_ZODIAC_DEFINITIONS[5] },
+  { root: 'thula', def: ALL_ZODIAC_DEFINITIONS[6] },
+  { root: 'vrushchika', def: ALL_ZODIAC_DEFINITIONS[7] },
+  { root: 'dhanu', def: ALL_ZODIAC_DEFINITIONS[8] },
+  { root: 'makara', def: ALL_ZODIAC_DEFINITIONS[9] },
+  { root: 'kumbha', def: ALL_ZODIAC_DEFINITIONS[10] },
+  { root: 'meena', def: ALL_ZODIAC_DEFINITIONS[11] },
+];
+
+/**
+ * Robust identification of Zodiac sign from image filenames, URLs, English/Sinhala names.
+ * Three-tier matching:
+ *   1. Exact keyword lookup
+ *   2. Substring keyword match (longest keyword first)
+ *   3. Fuzzy Levenshtein fallback (edit distance ≤ 2, unambiguous match only)
  */
 export function identifyZodiac(rawText?: string | null): ZodiacMatchInfo | null {
   if (!rawText) return null;
   const clean = rawText.toLowerCase().replace(/[^a-z0-9\u0D80-\u0DFF]/g, '');
   if (!clean) return null;
+
+  // Tier 1: Exact keyword lookup
   if (ZODIAC_KEYWORD_MAP[clean]) {
     return ZODIAC_KEYWORD_MAP[clean];
   }
+
+  // Tier 2: Substring keyword match (longest keyword first to avoid partial hits)
   const sortedKeys = Object.keys(ZODIAC_KEYWORD_MAP).sort((a, b) => b.length - a.length);
   for (const k of sortedKeys) {
     if (clean.includes(k.toLowerCase())) {
       return ZODIAC_KEYWORD_MAP[k];
     }
   }
+
+  // Tier 3: Fuzzy Levenshtein fallback for unknown DLB spellings
+  // Extract alphabetic tokens ≥ 4 chars from the cleaned string (skip numeric prefixes)
+  const alphaOnly = clean.replace(/[0-9]/g, '');
+  if (alphaOnly.length >= 4) {
+    let bestMatch: ZodiacMatchInfo | null = null;
+    let bestDist = Infinity;
+    let ambiguous = false;
+    for (const { root, def } of ZODIAC_CANONICAL_ROOTS) {
+      const dist = levenshtein(alphaOnly, root);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestMatch = def;
+        ambiguous = false;
+      } else if (dist === bestDist && bestMatch !== def) {
+        ambiguous = true;
+      }
+    }
+    // Accept fuzzy match only if distance ≤ 2 and unambiguous
+    if (bestMatch && bestDist <= 2 && !ambiguous) {
+      console.log(`[identifyZodiac] Fuzzy matched "${alphaOnly}" → ${bestMatch.en} (distance=${bestDist})`);
+      return bestMatch;
+    }
+  }
+
   return null;
 }
 

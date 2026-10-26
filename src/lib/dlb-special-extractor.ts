@@ -1,15 +1,5 @@
-import sharp from 'sharp';
+import { execFileSync } from 'child_process';
 import path from 'path';
-import fs from 'fs';
-
-// Type definitions for direct WebAssembly TesseractCore
-interface TessCoreEngine {
-  core: any;
-  api: any;
-  recognize: (buffer: Buffer) => string;
-}
-
-let globalEnginePromise: Promise<TessCoreEngine | null> | null = null;
 
 // Immutable in-memory cache: a draw's special image result never changes once extracted
 const extractedNumberCache = new Map<string, string>();
@@ -23,172 +13,33 @@ export const ocrDiagnosticInfo: {
   attempts: Record<string, any>;
 } = {
   lastError: null,
-  hasLocalModel: false,
-  selectedLangPath: '',
-  workerState: 'uninitialized',
+  hasLocalModel: true,
+  selectedLangPath: 'scripts/extract-dlb-special.mjs',
+  workerState: 'ready',
   cacheSize: 0,
   attempts: {},
 };
 
-/**
- * Direct In-Process WebAssembly OCR Engine:
- * - Completely avoids worker_threads, IPC channels, and child processes.
- * - Runs 100% synchronously and deterministically inside Vercel Lambda / Node.js.
- * - Cleans up memory buffers after each recognition call to prevent memory accumulation.
- */
-export async function getSharedWorker(): Promise<TessCoreEngine | null> {
-  if (!globalEnginePromise) {
-    globalEnginePromise = (async () => {
-      try {
-        ocrDiagnosticInfo.workerState = 'loading_core';
-
-        // Load WebAssembly module directly into main thread
-        // @ts-ignore
-        const coreModule = await import('tesseract.js-core');
-        const createCore = typeof coreModule.default === 'function' ? coreModule.default : (coreModule as any);
-        const core = await createCore();
-
-        // Prepare virtual FS
-        try {
-          core.FS.mkdir('/tessdata');
-        } catch {
-          // Already exists
-        }
-
-        // Obtain eng.traineddata
-        const localPath = path.join(process.cwd(), 'public', 'tessdata', 'eng.traineddata');
-        const rootPath = path.join(process.cwd(), 'eng.traineddata');
-        let trainedDataBuf: Buffer | null = null;
-
-        if (fs.existsSync(localPath)) {
-          trainedDataBuf = fs.readFileSync(localPath);
-          ocrDiagnosticInfo.hasLocalModel = true;
-          ocrDiagnosticInfo.selectedLangPath = localPath;
-        } else if (fs.existsSync(rootPath)) {
-          trainedDataBuf = fs.readFileSync(rootPath);
-          ocrDiagnosticInfo.hasLocalModel = true;
-          ocrDiagnosticInfo.selectedLangPath = rootPath;
-        } else {
-          // Fallback: fetch from public CDN URL
-          ocrDiagnosticInfo.hasLocalModel = false;
-          ocrDiagnosticInfo.selectedLangPath = 'https://aloka-alpha.vercel.app/tessdata/eng.traineddata';
-          const res = await fetch(ocrDiagnosticInfo.selectedLangPath);
-          if (res.ok) {
-            trainedDataBuf = Buffer.from(await res.arrayBuffer());
-          }
-        }
-
-        if (!trainedDataBuf) {
-          throw new Error('Failed to load eng.traineddata model from disk or CDN');
-        }
-
-        core.FS.writeFile('/tessdata/eng.traineddata', trainedDataBuf);
-
-        // Initialize Base API
-        const api = new core.TessBaseAPI();
-        const initCode = api.Init('/tessdata', 'eng');
-        if (initCode !== 0) {
-          throw new Error(`TessBaseAPI.Init failed with code ${initCode}`);
-        }
-
-        api.SetVariable('tessedit_char_whitelist', '0123456789');
-        api.SetPageSegMode(8); // PSM.SINGLE_WORD
-
-        const recognize = (buffer: Buffer): string => {
-          try {
-            core.FS.writeFile('/input', buffer);
-            api.SetImageFile(1, 0);
-            api.Recognize();
-            const text = api.GetUTF8Text() || '';
-            try { api.Clear(); } catch {}
-            try { core.FS.unlink('/input'); } catch {}
-            return text;
-          } catch (e) {
-            console.warn('[Direct WASM OCR] Single recognize error:', e);
-            try { api.Clear(); } catch {}
-            try { core.FS.unlink('/input'); } catch {}
-            return '';
-          }
-        };
-
-        ocrDiagnosticInfo.workerState = 'ready';
-        return { core, api, recognize };
-      } catch (err: any) {
-        ocrDiagnosticInfo.lastError = err?.message || String(err);
-        ocrDiagnosticInfo.workerState = 'error';
-        console.warn('[DLB Special OCR] Could not initialize in-process WebAssembly OCR:', err);
-        return null;
-      }
-    })();
-  }
-  return globalEnginePromise;
-}
-
-/**
- * Extracts digits from a specified region of an image buffer
- * using pure dark pixel isolation to eliminate background patterns, colors, and divider lines.
- */
-async function binarizeRegion(
-  imageBuffer: Buffer,
-  cropBox: { left: number; top: number; width: number; height: number },
-  thresh = 55,
-  scaleX = 1
-): Promise<Buffer> {
-  const { data, info } = await sharp(imageBuffer)
-    .extract(cropBox)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const channels = info.channels;
-  const outData = Buffer.alloc(info.width * info.height);
-
-  // Isolate pure dark pixels (digits are black, dividers and backgrounds are colored or white)
-  for (let i = 0; i < info.width * info.height; i++) {
-    const r = data[i * channels];
-    const g = data[i * channels + 1];
-    const b = data[i * channels + 2];
-    if (r < thresh && g < thresh && b < thresh) {
-      outData[i] = 0; // Black
-    } else {
-      outData[i] = 255; // White
-    }
-  }
-
-  // Clear thin edge border artifacts (outer 6 pixels)
-  for (let y = 0; y < info.height; y++) {
-    for (let x = 0; x < info.width; x++) {
-      if (x < 6 || x >= info.width - 6 || y < 6 || y >= info.height - 6) {
-        outData[y * info.width + x] = 255;
-      }
-    }
-  }
-
-  return await sharp(outData, {
-    raw: { width: info.width, height: info.height, channels: 1 }
-  })
-    .resize({ width: Math.round(info.width * scaleX), height: 250, fit: 'fill' })
-    .withMetadata({ density: 300 })
-    .extend({ top: 30, bottom: 30, left: 30, right: 30, background: { r: 255, g: 255, b: 255 } })
-    .png()
-    .toBuffer();
+export async function getSharedWorker(): Promise<any> {
+  return { status: 'external_process' };
 }
 
 /**
  * Robust OCR extraction for DLB Special Draw Images:
- * - Lagna Wasana: 5 digits (e.g. 46517)
- * - Shanida Wasana: 5 digits (e.g. 96427)
- * - Super Ball: 5 digits (e.g. 66574)
- * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 707 / 941)
+ * - Lagna Wasana: 5 digits (e.g. 81948)
+ * - Shanida Wasana: 5 digits (e.g. 82025)
+ * - Super Ball: 5 digits (e.g. 61346)
+ * - Supiri Dhana Sampatha: 3 digits top + 3 digits bottom (e.g. 529 / 189)
  *
- * Guarantees zero blocking: never throws and never delays the response beyond timeout.
- * Employs multi-layer defenses: in-memory result caching, network retry, dual-pass thresholding.
+ * Runs via an isolated Node child process to prevent Turbopack native binary conflicts.
+ * In-memory cache guarantees 0ms response on repeat requests.
  */
 export async function extractSpecialNumberFromDlbImage(
   imageUrl: string,
   lotteryId: string
 ): Promise<string | null> {
   const fullUrl = imageUrl.startsWith('http') ? imageUrl : `https://www.dlb.lk/${imageUrl.replace(/^\//, '')}`;
-  
+
   // Layer 1: In-memory result cache check (Instant 0ms response)
   if (extractedNumberCache.has(fullUrl)) {
     const cached = extractedNumberCache.get(fullUrl)!;
@@ -207,182 +58,47 @@ export async function extractSpecialNumberFromDlbImage(
   };
 
   try {
-    // Layer 2: Network fetch with automatic retry on transient socket errors
-    let res: Response | null = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const scriptPath = path.resolve(process.cwd(), 'scripts', 'extract-dlb-special.mjs');
+    const stdout = execFileSync(process.execPath, [scriptPath, fullUrl, lotteryId], {
+      timeout: 15000,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+
+    // Parse the JSON output line (ignoring any tesseract stderr/stdout warnings)
+    const lines = stdout.trim().split(/\r?\n/);
+    let resultJson: any = null;
+    for (let i = lines.length - 1; i >= 0; i--) {
       try {
-        res = await fetch(fullUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Referer': 'https://www.dlb.lk/result/2/',
-            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-          },
-          signal: AbortSignal.timeout(6000),
-        });
-        if (res.ok) break;
-      } catch (fetchErr) {
-        if (attempt === 1) throw fetchErr;
-        await new Promise(r => setTimeout(r, 250));
-      }
+        resultJson = JSON.parse(lines[i]);
+        break;
+      } catch {}
     }
 
-    if (!res || !res.ok) {
-      ocrDiagnosticInfo.attempts[lotteryId].status = `http_error_${res?.status || 'network'}`;
-      console.warn(`[DLB Special OCR] Failed to fetch image ${fullUrl}`);
+    if (resultJson && resultJson.success && resultJson.result) {
+      extractedNumberCache.set(fullUrl, resultJson.result);
+      ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
+      ocrDiagnosticInfo.attempts[lotteryId] = {
+        fullUrl,
+        status: 'success',
+        result: resultJson.result,
+      };
+      return resultJson.result;
+    } else {
+      ocrDiagnosticInfo.attempts[lotteryId] = {
+        fullUrl,
+        status: 'no_digits',
+        error: resultJson?.error || 'No result returned',
+      };
       return null;
     }
-
-    ocrDiagnosticInfo.attempts[lotteryId].httpStatus = res.status;
-
-    const imageBuffer = Buffer.from(await res.arrayBuffer());
-    ocrDiagnosticInfo.attempts[lotteryId].bufferLength = imageBuffer.length;
-
-    const meta = await sharp(imageBuffer).metadata();
-    const w = meta.width;
-    const h = meta.height;
-    if (!w || !h) {
-      ocrDiagnosticInfo.attempts[lotteryId].status = 'invalid_image_meta';
-      return null;
-    }
-
-    ocrDiagnosticInfo.attempts[lotteryId].dimensions = { w, h };
-
-    // Layer 3: Direct WebAssembly In-Process Engine
-    const engine = await getSharedWorker();
-    if (!engine) {
-      ocrDiagnosticInfo.attempts[lotteryId].status = 'worker_unavailable';
-      return null;
-    }
-
-    // 1. Lagna Wasana: 5 separate white squares horizontally centered
-    if (lotteryId === 'lagna_wasana') {
-      const crop = {
-        left: Math.round(0.165 * w),
-        top: Math.round(0.53 * h),
-        width: Math.round(0.66 * w),
-        height: Math.round(0.18 * h)
-      };
-
-      // Pass 1: standard contrast
-      let processed = await binarizeRegion(imageBuffer, crop, 65, 1.4);
-      let text = engine.recognize(processed);
-      let digits = text.replace(/\D/g, '');
-
-      // Pass 2 fallback: slightly deeper threshold if digits missed
-      if (digits.length < 5) {
-        processed = await binarizeRegion(imageBuffer, crop, 75, 1.4);
-        text = engine.recognize(processed);
-        digits = text.replace(/\D/g, '');
-      }
-
-      const finalDigits = digits.length >= 5 ? digits.slice(0, 5) : (digits || null);
-      if (finalDigits) {
-        extractedNumberCache.set(fullUrl, finalDigits);
-        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
-      }
-
-      if (ocrDiagnosticInfo.attempts[lotteryId]) {
-        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
-        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
-        ocrDiagnosticInfo.attempts[lotteryId].rawText = text;
-      }
-      return finalDigits;
-    }
-
-    // 2. Shanida Wasana & Super Ball: White rectangular 5-box grid at bottom right
-    if (lotteryId === 'shanida_wasana' || lotteryId === 'super_ball') {
-      const crop = {
-        left: Math.round(0.40 * w),
-        top: Math.round(0.57 * h),
-        width: Math.round(0.48 * w),
-        height: Math.round(0.24 * h)
-      };
-      const processed = await sharp(imageBuffer)
-        .extract(crop)
-        .resize({ height: 250 })
-        .withMetadata({ density: 300 })
-        .png()
-        .toBuffer();
-
-      const text = engine.recognize(processed);
-      const digits = text.replace(/\D/g, '');
-      const finalDigits = digits.length >= 5 ? digits.slice(-5) : (digits || null);
-      if (finalDigits) {
-        extractedNumberCache.set(fullUrl, finalDigits);
-        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
-      }
-
-      if (ocrDiagnosticInfo.attempts[lotteryId]) {
-        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
-        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
-        ocrDiagnosticInfo.attempts[lotteryId].rawText = text;
-      }
-      return finalDigits;
-    }
-
-    // 3. Supiri Dhana Sampatha: Top box (3 digits) + Bottom box (3 digits) -> e.g. 707 / 941
-    if (lotteryId === 'supiri_dhana_sampatha' || lotteryId === 'dhana_sampatha') {
-      const cropTop = {
-        left: Math.round(0.505 * w),
-        top: Math.round(0.405 * h),
-        width: Math.round(0.25 * w),
-        height: Math.round(0.145 * h)
-      };
-      const cropBottom = {
-        left: Math.round(0.505 * w),
-        top: Math.round(0.745 * h),
-        width: Math.round(0.25 * w),
-        height: Math.round(0.145 * h)
-      };
-
-      const topBuf = await sharp(imageBuffer)
-        .extract(cropTop)
-        .resize({ height: 200 })
-        .withMetadata({ density: 300 })
-        .png()
-        .toBuffer();
-
-      const botBuf = await sharp(imageBuffer)
-        .extract(cropBottom)
-        .resize({ height: 200 })
-        .withMetadata({ density: 300 })
-        .png()
-        .toBuffer();
-
-      const topText = engine.recognize(topBuf);
-      const botText = engine.recognize(botBuf);
-
-      const topDigits = topText.replace(/\D/g, '').slice(-3);
-      const botDigits = botText.replace(/\D/g, '').slice(-3);
-
-      let finalDigits: string | null = null;
-      if (topDigits && botDigits) {
-        finalDigits = `${topDigits} / ${botDigits}`;
-      } else if (topDigits) {
-        finalDigits = topDigits;
-      }
-
-      if (finalDigits) {
-        extractedNumberCache.set(fullUrl, finalDigits);
-        ocrDiagnosticInfo.cacheSize = extractedNumberCache.size;
-      }
-
-      if (ocrDiagnosticInfo.attempts[lotteryId]) {
-        ocrDiagnosticInfo.attempts[lotteryId].status = finalDigits ? 'success' : 'no_digits';
-        ocrDiagnosticInfo.attempts[lotteryId].result = finalDigits;
-        ocrDiagnosticInfo.attempts[lotteryId].topText = topText;
-        ocrDiagnosticInfo.attempts[lotteryId].botText = botText;
-      }
-      return finalDigits;
-    }
-
-    return null;
   } catch (err: any) {
-    if (ocrDiagnosticInfo.attempts[lotteryId]) {
-      ocrDiagnosticInfo.attempts[lotteryId].status = 'exception';
-      ocrDiagnosticInfo.attempts[lotteryId].error = err?.message || String(err);
-    }
-    console.warn(`[DLB Special OCR] Safe fallback for ${lotteryId}:`, err);
+    ocrDiagnosticInfo.attempts[lotteryId] = {
+      fullUrl,
+      status: 'exception',
+      error: err?.message || String(err),
+    };
+    console.warn(`[DLB Special OCR] Error for ${lotteryId}:`, err);
     return null;
   }
 }

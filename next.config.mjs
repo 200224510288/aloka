@@ -7,6 +7,7 @@ const nextConfig = {
       './node_modules/tesseract.js/**/*',
       './node_modules/tesseract.js-core/**/*',
       './eng.traineddata',
+      './scripts/**/*',
     ],
   },
   experimental: {
