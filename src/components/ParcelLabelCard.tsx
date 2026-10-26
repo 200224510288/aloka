@@ -103,25 +103,25 @@ export const ParcelLabelCard: React.FC<ParcelLabelCardProps> = ({
       <div className="w-full h-full p-[1.5mm] box-border bg-white">
         <div className="w-full h-full border border-black p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden bg-white">
           
-          {/* Top Section: Agent / Recipient Details (Light font weight, avoid bold) */}
-          <div className="space-y-1 text-slate-900 font-sinhala font-normal">
-            <div className="flex items-baseline gap-2 text-base sm:text-lg font-normal">
-              <span className="whitespace-nowrap text-slate-800 font-normal">අලෙවි නියෝජිත :</span>
-              <span className="text-black font-sinhala text-lg sm:text-xl font-normal">
+          {/* Top Section: Agent / Recipient Details - Increased font size, light/normal weight */}
+          <div className="space-y-1.5 sm:space-y-2 text-slate-900 font-sinhala font-normal">
+            <div className="flex items-baseline gap-2.5 text-lg sm:text-2xl font-normal leading-tight">
+              <span className="whitespace-nowrap text-slate-900 font-normal">අලෙවි නියෝජිත :</span>
+              <span className="text-black font-sinhala text-xl sm:text-3xl font-normal">
                 {agent.name}
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2 text-sm sm:text-base font-normal">
-              <span className="whitespace-nowrap text-slate-800 font-normal">නගරය :</span>
-              <span className="text-black font-sinhala font-normal">
+            <div className="flex items-baseline gap-2.5 text-base sm:text-xl font-normal leading-tight">
+              <span className="whitespace-nowrap text-slate-900 font-normal">නගරය :</span>
+              <span className="text-black font-sinhala text-lg sm:text-2xl font-normal">
                 {agent.town}
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2 text-sm sm:text-base font-normal">
-              <span className="whitespace-nowrap text-slate-800 font-normal">දුරකථන අංකය :</span>
-              <span className="text-black tracking-wider font-normal">
+            <div className="flex items-baseline gap-2.5 text-base sm:text-xl font-normal leading-tight">
+              <span className="whitespace-nowrap text-slate-900 font-normal">දුරකථන අංකය :</span>
+              <span className="text-black tracking-wider font-normal text-lg sm:text-2xl">
                 {agent.phone}
               </span>
             </div>
